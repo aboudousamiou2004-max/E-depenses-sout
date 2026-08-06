@@ -1,0 +1,11 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# Application React (SPA) : toutes les routes doivent retomber sur index.html
+# pour que React Router gère la navigation côté client — sinon Netlify renvoie
+# une 404 pour toute URL directe (rechargement, raccourci, lien partagé...).
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

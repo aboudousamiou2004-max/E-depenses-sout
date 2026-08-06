@@ -23,6 +23,8 @@ export default function StockMateriel() {
 
   const [open, setOpen] = useState(false);
   const [openArticle, setOpenArticle] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ articleId: referentielMateriel[0]?.id, type: "achat", quantite: "", motif: "", date: "2026-07-27" });
   const [articleForm, setArticleForm] = useState({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "" });
 
@@ -34,18 +36,26 @@ export default function StockMateriel() {
   const enRupture = lignes.filter((l) => l.stock === 0).length;
   const derniersMouvements = mouvementsMateriel.slice(0, 8);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!form.quantite || !form.articleId) return;
-    addMouvementMateriel(form, user);
+    setSaving(true);
+    setError("");
+    const res = await addMouvementMateriel(form, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpen(false);
     setForm((f) => ({ ...f, quantite: "", motif: "" }));
   }
 
-  function submitArticle(e) {
+  async function submitArticle(e) {
     e.preventDefault();
     if (!articleForm.nom) return;
-    ajouterArticleMateriel(articleForm);
+    setSaving(true);
+    setError("");
+    const res = await ajouterArticleMateriel(articleForm);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpenArticle(false);
     setArticleForm({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "" });
   }
@@ -119,9 +129,10 @@ export default function StockMateriel() {
         open={open}
         onClose={() => setOpen(false)}
         title="Nouveau mouvement de stock"
-        footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={submit}>Enregistrer</Button></>}
+        footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}
       >
         <form onSubmit={submit}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Article">
             <Select value={form.articleId} onChange={(e) => setForm({ ...form, articleId: e.target.value })}>
               {referentielMateriel.map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
@@ -150,7 +161,7 @@ export default function StockMateriel() {
         open={openArticle}
         onClose={() => setOpenArticle(false)}
         title="Nouvel article"
-        footer={<><Button variant="ghost" onClick={() => setOpenArticle(false)}>Annuler</Button><Button onClick={submitArticle}>Créer</Button></>}
+        footer={<><Button variant="ghost" onClick={() => setOpenArticle(false)}>Annuler</Button><Button onClick={submitArticle} disabled={saving}>{saving ? "Création…" : "Créer"}</Button></>}
       >
         <form onSubmit={submitArticle}>
           <Field label="Nom de l'article">

@@ -1,21 +1,24 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Building2, Lock, User, ArrowRight, AlertCircle } from "lucide-react";
+import { User, Lock, ArrowRight, AlertCircle, Loader2 } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
-import { useDataStore } from "../store/dataStore";
 import Button from "../components/ui/Button";
 
 export default function Login() {
   const [login, setLogin] = useState("");
+  const [pass, setPass] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const { login: doLogin } = useAuthStore();
-  const { users } = useDataStore();
   const navigate = useNavigate();
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
-    const res = doLogin(login || "admin");
+    setError("");
+    setLoading(true);
+    const res = await doLogin(login, pass);
+    setLoading(false);
     if (!res.ok) return setError(res.error);
     navigate("/portal");
   }
@@ -33,8 +36,8 @@ export default function Login() {
         className="glass-strong rounded-[32px] w-[420px] p-9"
       >
         <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-16 h-16 rounded-[22px] bg-gradient-to-br from-[#0A84FF] to-[#5E5CE6] flex items-center justify-center shadow-xl shadow-[#0A84FF]/30 mb-4">
-            <Building2 size={28} className="text-white" strokeWidth={2.2} />
+          <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl mb-4 border-4 border-[#7A1128] overflow-hidden">
+            <img src="/logo_termitiere.png" alt="Logo" className="w-full h-full object-contain p-1.5" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-ink">E-DÉPENSES</h1>
           <p className="text-[13.5px] text-ink-soft font-medium mt-1">
@@ -60,7 +63,13 @@ export default function Login() {
             <span className="text-[12.5px] font-semibold text-ink-soft ml-1">Mot de passe</span>
             <div className="mt-1.5 glass rounded-2xl px-3.5 py-3 flex items-center gap-2.5">
               <Lock size={16} className="text-ink-soft" strokeWidth={2.2} />
-              <input type="password" placeholder="••••••••" className="bg-transparent outline-none text-[14.5px] text-ink placeholder:text-ink-soft/60 w-full" />
+              <input
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                placeholder="••••••••"
+                className="bg-transparent outline-none text-[14.5px] text-ink placeholder:text-ink-soft/60 w-full"
+              />
             </div>
           </label>
 
@@ -71,27 +80,10 @@ export default function Login() {
             </div>
           )}
 
-          <Button type="submit" className="w-full mt-1.5" icon={ArrowRight}>
-            Se connecter
+          <Button type="submit" className="w-full mt-1.5" icon={loading ? Loader2 : ArrowRight} disabled={loading}>
+            {loading ? "Connexion…" : "Se connecter"}
           </Button>
         </form>
-
-        <div className="mt-6 pt-5 border-t border-black/5">
-          <p className="text-[11.5px] font-semibold text-ink-soft mb-2.5 text-center uppercase tracking-wide">
-            Comptes de démonstration
-          </p>
-          <div className="flex flex-wrap gap-1.5 justify-center">
-            {users.map((u) => (
-              <button
-                key={u.uid}
-                onClick={() => setLogin(u.login)}
-                className="text-[11.5px] font-semibold px-2.5 py-1.5 rounded-full bg-black/5 hover:bg-black/10 text-ink-soft hover:text-ink transition-colors"
-              >
-                {u.login}
-              </button>
-            ))}
-          </div>
-        </div>
       </motion.div>
     </div>
   );

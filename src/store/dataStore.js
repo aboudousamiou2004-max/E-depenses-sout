@@ -1,203 +1,263 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
-import { SECTEURS, BUDGETS, DEPENSES, RECETTES, JOURNAL, USERS, seuilApprobation } from "../data/seed";
+import { supabase, loginToEmail } from "../lib/supabaseClient";
 
-// Basé sur crypto.randomUUID (pas un compteur de session) car cet état est
-// persisté en localStorage : un compteur remis à zéro à chaque rechargement
-// entrerait en collision avec des identifiants déjà enregistrés.
-const nextId = (p) => `${p}_${crypto.randomUUID()}`;
+// Store principal — anciennement du JS en mémoire persisté en localStorage,
+// aujourd'hui de simples lectures/écritures Supabase. Les noms d'action et la
+// forme des objets exposés aux composants (camelCase) restent identiques à
+// avant : seule la source de données change, pour minimiser les changements
+// dans les pages qui consomment ce store. Le statut/seuil des dépenses, le
+// journal d'audit et les notifications sont désormais calculés/écrits
+// exclusivement côté serveur (triggers SQL, voir supabase/schema.sql) — ce
+// store ne fait plus que lire le résultat et déclencher les INSERT bruts.
 
-export const useDataStore = create(
-  persist(
-    (set, get) => ({
-      secteurs: SECTEURS,
-      budgets: BUDGETS,
-      depenses: DEPENSES,
-      recettes: RECETTES,
-      journal: JOURNAL,
-      users: USERS,
-      notifications: [],
+const mapSecteur = (r) => ({ id: r.id, nom: r.nom, label: r.label, color: r.color });
+const mapBudget = (r) => ({ id: r.id, secteurId: r.secteur_id, annee: r.annee, mois: r.mois, montant: Number(r.montant) });
+const mapDepense = (r) => ({
+  id: r.id,
+  secteurId: r.secteur_id,
+  categorie: r.categorie,
+  montant: Number(r.montant),
+  date: r.date,
+  description: r.description,
+  natureFlux: r.nature_flux,
+  sourceFinancement: r.source_financement,
+  beneficiaireNom: r.beneficiaire_nom,
+  piece: r.piece,
+  statut: r.statut,
+  seuil: Number(r.seuil),
+  creeParUid: r.cree_par,
+});
+const mapRecette = (r) => ({
+  id: r.id,
+  secteurId: r.secteur_id,
+  montant: Number(r.montant),
+  date: r.date,
+  origine: r.origine,
+  creeParUid: r.cree_par,
+});
+const mapJournalRow = (r) => ({
+  id: r.id,
+  userNom: r.user_nom,
+  role: r.role,
+  module: r.module,
+  action: r.action,
+  details: r.details,
+  timestamp: r.timestamp,
+});
+const mapNotification = (r) => ({
+  id: r.id,
+  destinataireUid: r.destinataire_id,
+  lu: r.lu,
+  timestamp: r.timestamp,
+  type: r.type,
+  titre: r.titre,
+  message: r.message,
+  lien: r.lien,
+});
+const mapUser = (r) => ({
+  uid: r.id,
+  login: r.login,
+  nom: r.nom,
+  role: r.role,
+  secteur: r.secteur,
+  poste: r.poste,
+  telephone: r.telephone,
+  actif: r.actif,
+  modules: r.modules || [],
+});
 
-      // Notification interne (cloche) — chaque ligne cible un seul destinataire
-      // (uid). Pas de push navigateur réel ici (pas de backend/service worker
-      // dans cette démo statique) : c'est l'équivalent en-app du système de
-      // notifications de la vraie plateforme.
-      addNotification: (payload) =>
-        set((s) => ({
-          notifications: [{ id: nextId("notif"), lu: false, timestamp: new Date().toISOString(), ...payload }, ...s.notifications],
-        })),
+const slugify = (nom) =>
+  (nom || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || "secteur";
 
-      marquerNotificationLue: (id) =>
-        set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, lu: true } : n)) })),
+export const useDataStore = create((set, get) => ({
+  secteurs: [],
+  budgets: [],
+  depenses: [],
+  recettes: [],
+  journal: [],
+  notifications: [],
+  users: [],
+  loaded: false,
 
-      marquerToutesNotificationsLues: (destinataireUid) =>
-        set((s) => ({
-          notifications: s.notifications.map((n) => (n.destinataireUid === destinataireUid ? { ...n, lu: true } : n)),
-        })),
+  // Charge toutes les données de l'app en une fois — appelé par authStore dès
+  // qu'une session est résolue. `userId` sert à filtrer les notifications
+  // (chacun ne peut de toute façon voir que les siennes, RLS l'impose déjà,
+  // mais filtrer ici évite de dépendre de l'ordre des champs retournés).
+  chargerTout: async (userId) => {
+    const [secteurs, budgets, depenses, recettes, journal, notifications, users] = await Promise.all([
+      supabase.from("secteurs").select("*").order("created_at"),
+      supabase.from("budgets").select("*"),
+      supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
+      supabase.from("recettes").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
+      supabase.from("journal").select("*").order("timestamp", { ascending: false }).limit(300),
+      userId
+        ? supabase.from("notifications").select("*").eq("destinataire_id", userId).order("timestamp", { ascending: false })
+        : Promise.resolve({ data: [] }),
+      supabase.from("profiles").select("*").order("nom"),
+    ]);
+    set({
+      secteurs: (secteurs.data || []).map(mapSecteur),
+      budgets: (budgets.data || []).map(mapBudget),
+      depenses: (depenses.data || []).map(mapDepense),
+      recettes: (recettes.data || []).map(mapRecette),
+      journal: (journal.data || []).map(mapJournalRow),
+      notifications: (notifications.data || []).map(mapNotification),
+      users: (users.data || []).map(mapUser),
+      loaded: true,
+    });
+  },
 
-      // Ajoute un utilisateur avec les modules auxquels il a accès — même principe
-      // que sur la vraie plateforme (un profil + une liste de modules autorisés).
-      addUser: (payload, auteur) => {
-        const uid = nextId("u");
-        const utilisateur = {
-          uid,
+  reset: () => set({ secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [], loaded: false }),
+
+  // Rechargements ciblés après une écriture — évitent de tout re-fetcher.
+  chargerSecteurs: async () => {
+    const { data } = await supabase.from("secteurs").select("*").order("created_at");
+    set({ secteurs: (data || []).map(mapSecteur) });
+  },
+  chargerBudgets: async () => {
+    const { data } = await supabase.from("budgets").select("*");
+    set({ budgets: (data || []).map(mapBudget) });
+  },
+  chargerDepenses: async () => {
+    const { data } = await supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false });
+    set({ depenses: (data || []).map(mapDepense) });
+  },
+  chargerRecettes: async () => {
+    const { data } = await supabase.from("recettes").select("*").order("date", { ascending: false }).order("created_at", { ascending: false });
+    set({ recettes: (data || []).map(mapRecette) });
+  },
+  chargerJournal: async () => {
+    const { data } = await supabase.from("journal").select("*").order("timestamp", { ascending: false }).limit(300);
+    set({ journal: (data || []).map(mapJournalRow) });
+  },
+  chargerNotifications: async (userId) => {
+    if (!userId) return;
+    const { data } = await supabase.from("notifications").select("*").eq("destinataire_id", userId).order("timestamp", { ascending: false });
+    set({ notifications: (data || []).map(mapNotification) });
+  },
+  chargerUsers: async () => {
+    const { data } = await supabase.from("profiles").select("*").order("nom");
+    set({ users: (data || []).map(mapUser) });
+  },
+
+  // Crée un compte Supabase Auth + déclenche la création du profil (trigger
+  // handle_new_user côté serveur, voir supabase/schema.sql). signUp() bascule
+  // la session active sur le nouveau compte : on reconnecte immédiatement
+  // l'admin avec le mot de passe qu'il vient de fournir dans le formulaire
+  // (ré-authentification silencieuse — voir le plan de migration).
+  addUser: async (payload, auteur, adminPass) => {
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email: loginToEmail(payload.login),
+      password: payload.pass,
+      options: {
+        data: {
           login: payload.login.trim(),
           nom: payload.nom.trim(),
           role: payload.role,
           secteur: payload.secteur || null,
+          poste: payload.poste?.trim() || "",
+          telephone: payload.telephone?.trim() || "",
+          actif: payload.actif !== false,
           modules: payload.modules || [],
-        };
-        set((s) => ({ users: [...s.users, utilisateur] }));
-        get().addJournal({
-          userNom: auteur?.nom || "Utilisateur",
-          role: auteur?.role || "admin",
-          module: "E-DÉPENSES",
-          action: "Ajout utilisateur",
-          details: `${utilisateur.nom} (${utilisateur.login}) — accès : ${utilisateur.modules.join(", ") || "aucun module spécifique"}`,
-        });
-        return utilisateur;
+        },
       },
+    });
+    if (signUpError) return { ok: false, error: signUpError.message };
 
-      modifierAccesUtilisateur: (uid, modules, auteur) => {
-        set((s) => ({ users: s.users.map((u) => (u.uid === uid ? { ...u, modules } : u)) }));
-        const u = get().users.find((x) => x.uid === uid);
-        get().addJournal({
-          userNom: auteur?.nom || "Utilisateur",
-          role: auteur?.role || "admin",
-          module: "E-DÉPENSES",
-          action: "Modification accès",
-          details: `${u?.nom || uid} — accès : ${modules.join(", ") || "aucun module spécifique"}`,
-        });
-      },
+    const { error: reloginError } = await supabase.auth.signInWithPassword({
+      email: loginToEmail(auteur.login),
+      password: adminPass,
+    });
+    if (reloginError) {
+      return { ok: false, error: "Utilisateur créé, mais la reconnexion a échoué — reconnectez-vous manuellement." };
+    }
+    await get().chargerUsers();
+    return { ok: true, utilisateur: signUpData.user };
+  },
 
-      addJournal: (entry) =>
-        set((s) => ({
-          journal: [{ id: nextId("j"), timestamp: new Date().toISOString(), ...entry }, ...s.journal],
-        })),
+  modifierAccesUtilisateur: async (uid, modules) => {
+    const { error } = await supabase.from("profiles").update({ modules }).eq("id", uid);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerUsers();
+    return { ok: true };
+  },
 
-      // Ajoute un nouveau secteur d'activité — disponible aussitôt dans tous les
-      // sélecteurs (filtre, formulaires de dépense/recette) puisqu'ils lisent tous
-      // `secteurs` depuis ce store.
-      addSecteur: (payload, user) => {
-        const base = (payload.nom || "")
-          .toLowerCase()
-          .normalize("NFD")
-          .replace(/[̀-ͯ]/g, "")
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/(^-|-$)/g, "") || "secteur";
-        const existants = get().secteurs.map((s) => s.id);
-        let id = base;
-        let n = 2;
-        while (existants.includes(id)) id = `${base}-${n++}`;
-        const secteur = { id, nom: payload.nom, label: payload.label || payload.nom, color: payload.color || "#0A84FF" };
-        set((s) => ({ secteurs: [...s.secteurs, secteur] }));
-        get().addJournal({
-          userNom: user?.nom || "Utilisateur",
-          role: user?.role || "admin",
-          module: "E-DÉPENSES",
-          action: "Ajout secteur",
-          details: `Nouveau secteur créé : ${secteur.nom}`,
-        });
-        return secteur;
-      },
+  addSecteur: async (payload) => {
+    const base = slugify(payload.nom);
+    const existants = get().secteurs.map((s) => s.id);
+    let id = base;
+    let n = 2;
+    while (existants.includes(id)) id = `${base}-${n++}`;
+    const { data, error } = await supabase
+      .from("secteurs")
+      .insert({ id, nom: payload.nom, label: payload.label || payload.nom, color: payload.color || "#0A84FF" })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerSecteurs();
+    return { ok: true, secteur: mapSecteur(data) };
+  },
 
-      addDepense: (payload, user) => {
-        const seuil = seuilApprobation();
-        const statut = payload.montant >= seuil ? "en_attente" : "decaissee";
-        const dep = { id: nextId("dep"), statut, seuil, creeParUid: user?.uid || null, ...payload };
-        set((s) => ({ depenses: [dep, ...s.depenses] }));
-        get().addJournal({
-          userNom: user?.nom || "Utilisateur",
-          role: user?.role || "agent",
-          module: "E-DÉPENSES",
-          action: "Saisie dépense",
-          details: `${payload.categorie} — ${payload.secteurId} — ${payload.montant.toLocaleString("fr-FR")} FCFA`,
-        });
+  addDepense: async (payload, user) => {
+    const { data, error } = await supabase
+      .from("depenses")
+      .insert({
+        secteur_id: payload.secteurId,
+        categorie: payload.categorie,
+        montant: payload.montant,
+        date: payload.date,
+        description: payload.description || "",
+        nature_flux: payload.natureFlux,
+        source_financement: payload.sourceFinancement,
+        beneficiaire_nom: payload.beneficiaireNom || "",
+        piece: payload.piece || "",
+      })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await Promise.all([get().chargerDepenses(), get().chargerNotifications(user?.uid)]);
+    return { ok: true, depense: mapDepense(data) };
+  },
 
-        // Dépense au-dessus du seuil : PAU et GE reçoivent la demande d'autorisation
-        // (avec son motif), et le demandeur reçoit une confirmation d'envoi.
-        if (statut === "en_attente") {
-          const secteur = get().secteurs.find((s) => s.id === payload.secteurId);
-          const motif = payload.description?.trim() || "Aucun motif renseigné";
-          get()
-            .users.filter((u) => u.role === "pau" || u.role === "ge")
-            .forEach((approbateur) => {
-              get().addNotification({
-                destinataireUid: approbateur.uid,
-                type: "warning",
-                titre: `Demande d'autorisation — ${secteur?.nom || payload.secteurId}`,
-                message: `${payload.categorie} · ${dep.montant.toLocaleString("fr-FR")} FCFA · ${motif}`,
-                lien: "/depense/autorisations",
-              });
-            });
-          if (user?.uid) {
-            get().addNotification({
-              destinataireUid: user.uid,
-              type: "info",
-              titre: "Demande envoyée",
-              message: `${payload.categorie} · ${dep.montant.toLocaleString("fr-FR")} FCFA — en attente de la décision du PAU ou de la GE.`,
-              lien: "/depense/depenses",
-            });
-          }
-        }
-        return dep;
-      },
+  addRecette: async (payload) => {
+    const { data, error } = await supabase
+      .from("recettes")
+      .insert({ secteur_id: payload.secteurId, montant: payload.montant, date: payload.date, origine: payload.origine })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerRecettes();
+    return { ok: true, recette: mapRecette(data) };
+  },
 
-      addRecette: (payload, user) => {
-        const rec = { id: nextId("rec"), ...payload };
-        set((s) => ({ recettes: [rec, ...s.recettes] }));
-        get().addJournal({
-          userNom: user?.nom || "Utilisateur",
-          role: user?.role || "agent",
-          module: "E-DÉPENSES",
-          action: "Saisie recette",
-          details: `${payload.origine} — ${payload.secteurId} — ${payload.montant.toLocaleString("fr-FR")} FCFA`,
-        });
-        return rec;
-      },
+  changerStatutDepense: async (id, statut) => {
+    const { error } = await supabase.from("depenses").update({ statut }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerDepenses();
+    return { ok: true };
+  },
 
-      changerStatutDepense: (id, statut, user) => {
-        set((s) => ({ depenses: s.depenses.map((d) => (d.id === id ? { ...d, statut } : d)) }));
-        const dep = get().depenses.find((d) => d.id === id);
-        get().addJournal({
-          userNom: user?.nom || "Utilisateur",
-          role: user?.role || "pau",
-          module: "E-DÉPENSES",
-          action: statut === "approuvee" ? "Approbation dépense" : statut === "refusee" ? "Refus dépense" : "Décaissement",
-          details: `Dépense ${id} — ${dep ? dep.montant.toLocaleString("fr-FR") : ""} FCFA`,
-        });
+  setBudget: async (secteurId, annee, mois, montant) => {
+    const { error } = await supabase
+      .from("budgets")
+      .upsert({ secteur_id: secteurId, annee, mois, montant }, { onConflict: "secteur_id,annee,mois" });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerBudgets();
+    return { ok: true };
+  },
 
-        // Le secteur demandeur est notifié en retour à chaque étape du circuit.
-        if (dep?.creeParUid) {
-          const montantTxt = dep.montant.toLocaleString("fr-FR");
-          const infos = {
-            approuvee: { type: "success", titre: "Dépense approuvée", message: `${dep.categorie} · ${montantTxt} FCFA — approuvée par ${user?.nom || "le PAU/GE"}, décaissement possible.` },
-            refusee: { type: "danger", titre: "Dépense refusée", message: `${dep.categorie} · ${montantTxt} FCFA — refusée par ${user?.nom || "le PAU/GE"}.` },
-            decaissee: { type: "success", titre: "Dépense décaissée", message: `${dep.categorie} · ${montantTxt} FCFA — décaissement effectué.` },
-          }[statut];
-          if (infos) {
-            get().addNotification({ destinataireUid: dep.creeParUid, lien: "/depense/depenses", ...infos });
-          }
-        }
-      },
+  marquerNotificationLue: async (id) => {
+    await supabase.from("notifications").update({ lu: true }).eq("id", id);
+    set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, lu: true } : n)) }));
+  },
 
-      setBudget: (secteurId, annee, mois, montant, user) => {
-        set((s) => {
-          const exists = s.budgets.some((b) => b.secteurId === secteurId && b.annee === annee && b.mois === mois);
-          const budgets = exists
-            ? s.budgets.map((b) => (b.secteurId === secteurId && b.annee === annee && b.mois === mois ? { ...b, montant } : b))
-            : [...s.budgets, { id: nextId("bud"), secteurId, annee, mois, montant }];
-          return { budgets };
-        });
-        get().addJournal({
-          userNom: user?.nom || "Utilisateur",
-          role: user?.role || "gerant",
-          module: "E-DÉPENSES",
-          action: "Définition budget",
-          details: `${secteurId} — ${mois + 1}/${annee} — ${montant.toLocaleString("fr-FR")} FCFA`,
-        });
-      },
-    }),
-    { name: "edepenses-data" }
-  )
-);
+  marquerToutesNotificationsLues: async (destinataireUid) => {
+    await supabase.from("notifications").update({ lu: true }).eq("destinataire_id", destinataireUid);
+    set((s) => ({ notifications: s.notifications.map((n) => (n.destinataireUid === destinataireUid ? { ...n, lu: true } : n)) }));
+  },
+}));

@@ -24,6 +24,8 @@ export default function StockAnimaux() {
 
   const [open, setOpen] = useState(false);
   const [openEspece, setOpenEspece] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ especeId: referentielAnimaux[0]?.id, type: "naissance", quantite: "", motif: "", date: "2026-07-27" });
   const [especeForm, setEspeceForm] = useState({ nom: "", cat: CAT_ANIMAUX[0] });
 
@@ -37,18 +39,26 @@ export default function StockAnimaux() {
   const tauxMortalite = effectifTotal + deces30j > 0 ? Math.round((deces30j / (effectifTotal + deces30j)) * 1000) / 10 : 0;
   const derniersMouvements = mouvementsAnimaux.slice(0, 8);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!form.quantite || !form.especeId) return;
-    addMouvementAnimal(form, user);
+    setSaving(true);
+    setError("");
+    const res = await addMouvementAnimal(form, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpen(false);
     setForm((f) => ({ ...f, quantite: "", motif: "" }));
   }
 
-  function submitEspece(e) {
+  async function submitEspece(e) {
     e.preventDefault();
     if (!especeForm.nom) return;
-    ajouterEspece(especeForm);
+    setSaving(true);
+    setError("");
+    const res = await ajouterEspece(especeForm);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpenEspece(false);
     setEspeceForm({ nom: "", cat: CAT_ANIMAUX[0] });
   }
@@ -122,9 +132,10 @@ export default function StockAnimaux() {
         open={open}
         onClose={() => setOpen(false)}
         title="Nouveau mouvement — cheptel"
-        footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={submit}>Enregistrer</Button></>}
+        footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}
       >
         <form onSubmit={submit}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Espèce">
             <Select value={form.especeId} onChange={(e) => setForm({ ...form, especeId: e.target.value })}>
               {referentielAnimaux.map((e) => <option key={e.id} value={e.id}>{e.nom}</option>)}
@@ -153,7 +164,7 @@ export default function StockAnimaux() {
         open={openEspece}
         onClose={() => setOpenEspece(false)}
         title="Nouvelle espèce"
-        footer={<><Button variant="ghost" onClick={() => setOpenEspece(false)}>Annuler</Button><Button onClick={submitEspece}>Créer</Button></>}
+        footer={<><Button variant="ghost" onClick={() => setOpenEspece(false)}>Annuler</Button><Button onClick={submitEspece} disabled={saving}>{saving ? "Création…" : "Créer"}</Button></>}
       >
         <form onSubmit={submitEspece}>
           <Field label="Nom de l'espèce">

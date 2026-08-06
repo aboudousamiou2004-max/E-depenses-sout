@@ -20,10 +20,10 @@ export default function NotificationBell() {
   const mesNotifs = notifications.filter((n) => n.destinataireUid === user?.uid).slice(0, 30);
   const nonLues = mesNotifs.filter((n) => !n.lu).length;
 
-  function onClickNotif(n) {
-    marquerNotificationLue(n.id);
+  async function onClickNotif(n) {
     setOpen(false);
     if (n.lien) navigate(n.lien);
+    await marquerNotificationLue(n.id);
   }
 
   return (

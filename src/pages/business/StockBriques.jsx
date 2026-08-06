@@ -9,7 +9,7 @@ import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useStockStore } from "../../store/stockStore";
 import { useAuthStore } from "../../store/authStore";
-import { ETATS_BRIQUE, MATIERES_PREMIERES } from "../../data/stockData";
+import { ETATS_BRIQUE } from "../../data/stockData";
 
 // Stock de briques d'E-BRIQUETERIE — même modèle que le vrai module : chaque
 // type de brique suit 4 états (appâtam → séchage → prêt, ou casse en cours de
@@ -25,32 +25,46 @@ export default function StockBriques() {
   const [transForm, setTransForm] = useState({ typeId: typesBriques[0]?.id, de: "appatam", vers: "sechage", quantite: "" });
   const [openMatiere, setOpenMatiere] = useState(false);
   const [matiereForm, setMatiereForm] = useState({ matiereId: referentielMatieres[0]?.id, type: "arrivage", quantite: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   const totalPret = typesBriques.reduce((acc, t) => acc + (stockBriques[t.id]?.pret || 0), 0);
   const totalAppatam = typesBriques.reduce((acc, t) => acc + (stockBriques[t.id]?.appatam || 0), 0);
   const totalCaillasses = typesBriques.reduce((acc, t) => acc + (stockBriques[t.id]?.caillasses || 0), 0);
   const valeurPret = typesBriques.reduce((acc, t) => acc + (stockBriques[t.id]?.pret || 0) * t.tarifVente, 0);
 
-  function submitProd(e) {
+  async function submitProd(e) {
     e.preventDefault();
     if (!prodForm.quantite) return;
-    ajouterProduction(prodForm.typeId, prodForm.quantite, user);
+    setSaving(true);
+    setError("");
+    const res = await ajouterProduction(prodForm.typeId, prodForm.quantite, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpenProd(false);
     setProdForm((f) => ({ ...f, quantite: "" }));
   }
 
-  function submitTrans(e) {
+  async function submitTrans(e) {
     e.preventDefault();
     if (!transForm.quantite || transForm.de === transForm.vers) return;
-    transitionBrique(transForm.typeId, transForm.de, transForm.vers, transForm.quantite, user);
+    setSaving(true);
+    setError("");
+    const res = await transitionBrique(transForm.typeId, transForm.de, transForm.vers, transForm.quantite, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpenTrans(false);
     setTransForm((f) => ({ ...f, quantite: "" }));
   }
 
-  function submitMatiere(e) {
+  async function submitMatiere(e) {
     e.preventDefault();
     if (!matiereForm.quantite) return;
-    addMouvementMatiere(matiereForm, user);
+    setSaving(true);
+    setError("");
+    const res = await addMouvementMatiere(matiereForm, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpenMatiere(false);
     setMatiereForm((f) => ({ ...f, quantite: "" }));
   }
@@ -126,8 +140,9 @@ export default function StockBriques() {
         </GlassCard>
       </div>
 
-      <Modal open={openProd} onClose={() => setOpenProd(false)} title="Nouvelle production" footer={<><Button variant="ghost" onClick={() => setOpenProd(false)}>Annuler</Button><Button onClick={submitProd}>Enregistrer</Button></>}>
+      <Modal open={openProd} onClose={() => setOpenProd(false)} title="Nouvelle production" footer={<><Button variant="ghost" onClick={() => setOpenProd(false)}>Annuler</Button><Button onClick={submitProd} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitProd}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Type de brique">
             <Select value={prodForm.typeId} onChange={(e) => setProdForm({ ...prodForm, typeId: e.target.value })}>
               {typesBriques.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
@@ -139,8 +154,9 @@ export default function StockBriques() {
         </form>
       </Modal>
 
-      <Modal open={openTrans} onClose={() => setOpenTrans(false)} title="Transition d'état" footer={<><Button variant="ghost" onClick={() => setOpenTrans(false)}>Annuler</Button><Button onClick={submitTrans}>Enregistrer</Button></>}>
+      <Modal open={openTrans} onClose={() => setOpenTrans(false)} title="Transition d'état" footer={<><Button variant="ghost" onClick={() => setOpenTrans(false)}>Annuler</Button><Button onClick={submitTrans} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitTrans}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Type de brique">
             <Select value={transForm.typeId} onChange={(e) => setTransForm({ ...transForm, typeId: e.target.value })}>
               {typesBriques.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
@@ -165,8 +181,9 @@ export default function StockBriques() {
         </form>
       </Modal>
 
-      <Modal open={openMatiere} onClose={() => setOpenMatiere(false)} title="Mouvement matière première" footer={<><Button variant="ghost" onClick={() => setOpenMatiere(false)}>Annuler</Button><Button onClick={submitMatiere}>Enregistrer</Button></>}>
+      <Modal open={openMatiere} onClose={() => setOpenMatiere(false)} title="Mouvement matière première" footer={<><Button variant="ghost" onClick={() => setOpenMatiere(false)}>Annuler</Button><Button onClick={submitMatiere} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitMatiere}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Matière">
             <Select value={matiereForm.matiereId} onChange={(e) => setMatiereForm({ ...matiereForm, matiereId: e.target.value })}>
               {referentielMatieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}

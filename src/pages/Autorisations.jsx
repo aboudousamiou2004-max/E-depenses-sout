@@ -21,6 +21,11 @@ export default function Autorisations() {
     return secteurs.find((s) => s.id === id);
   }
 
+  async function changerStatut(id, statut) {
+    const res = await changerStatutDepense(id, statut, user);
+    if (!res.ok) alert(res.error);
+  }
+
   return (
     <div>
       <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses — seuil : 30 000 FCFA (PAU ou GE)" />
@@ -67,10 +72,10 @@ export default function Autorisations() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="font-bold tabular text-ink">{fmtFCFA(d.montant)}</span>
-                    <Button variant="success" className="!px-3 !py-2" onClick={() => changerStatutDepense(d.id, "approuvee", user)}>
+                    <Button variant="success" className="!px-3 !py-2" onClick={() => changerStatut(d.id, "approuvee")}>
                       <Check size={15} strokeWidth={2.6} />
                     </Button>
-                    <Button variant="danger" className="!px-3 !py-2" onClick={() => changerStatutDepense(d.id, "refusee", user)}>
+                    <Button variant="danger" className="!px-3 !py-2" onClick={() => changerStatut(d.id, "refusee")}>
                       <X size={15} strokeWidth={2.6} />
                     </Button>
                   </div>
@@ -97,7 +102,7 @@ export default function Autorisations() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-bold tabular text-ink">{fmtFCFA(d.montant)}</span>
-                  <Button variant="primary" className="!px-3 !py-2 text-xs" onClick={() => changerStatutDepense(d.id, "decaissee", user)}>
+                  <Button variant="primary" className="!px-3 !py-2 text-xs" onClick={() => changerStatut(d.id, "decaissee")}>
                     Décaisser
                   </Button>
                 </div>

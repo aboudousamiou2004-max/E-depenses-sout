@@ -29,6 +29,16 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [ouvrirAjoutSecteur, setOuvrirAjoutSecteur] = useState(false);
   const [formSecteur, setFormSecteur] = useState({ nom: "", label: "", color: COULEURS_SUGGEREES[0] });
+  const [savingSecteur, setSavingSecteur] = useState(false);
+
+  async function creerSecteur() {
+    setSavingSecteur(true);
+    const res = await addSecteur(formSecteur, user);
+    setSavingSecteur(false);
+    if (!res.ok) return alert(res.error);
+    setOuvrirAjoutSecteur(false);
+    setFormSecteur({ nom: "", label: "", color: COULEURS_SUGGEREES[0] });
+  }
 
   const secteurActif = secteurFiltre !== "tous" ? secteurs.find((s) => s.id === secteurFiltre) : null;
 
@@ -184,16 +194,8 @@ export default function Dashboard() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setOuvrirAjoutSecteur(false)}>Annuler</Button>
-            <Button
-              icon={Building2}
-              disabled={!formSecteur.nom.trim()}
-              onClick={() => {
-                addSecteur(formSecteur, user);
-                setOuvrirAjoutSecteur(false);
-                setFormSecteur({ nom: "", label: "", color: COULEURS_SUGGEREES[0] });
-              }}
-            >
-              Créer le secteur
+            <Button icon={Building2} disabled={!formSecteur.nom.trim() || savingSecteur} onClick={creerSecteur}>
+              {savingSecteur ? "Création…" : "Créer le secteur"}
             </Button>
           </>
         }

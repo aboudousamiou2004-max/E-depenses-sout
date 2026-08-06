@@ -19,6 +19,8 @@ export default function BusinessDepenses() {
   const { depenses, addDepense } = useDataStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({ categorie: CATEGORIES[0], montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
 
   const toutes = useMemo(
@@ -27,10 +29,14 @@ export default function BusinessDepenses() {
   );
   const liste = useMemo(() => toutes.slice(0, 60), [toutes]);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!form.montant) return;
-    addDepense({ ...form, secteurId: config.secteurId, montant: Number(form.montant), piece: "justificatif.pdf" }, user);
+    setSaving(true);
+    setError("");
+    const res = await addDepense({ ...form, secteurId: config.secteurId, montant: Number(form.montant), piece: "justificatif.pdf" }, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpen(false);
     setForm((f) => ({ ...f, montant: "", description: "" }));
   }
@@ -96,11 +102,12 @@ export default function BusinessDepenses() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
-            <Button icon={Receipt} onClick={submit}>Enregistrer</Button>
+            <Button icon={Receipt} onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button>
           </>
         }
       >
         <form onSubmit={submit}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Catégorie">
             <Select value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })}>
               {CATEGORIES.map((c) => (

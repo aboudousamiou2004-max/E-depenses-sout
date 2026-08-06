@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Wallet, TrendingUp, AlertTriangle, Search, Eye } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
@@ -30,10 +30,18 @@ export default function Recettes() {
   const { secteurFiltre, periode } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ secteurId: secteurs[0].id, origine: ORIGINES[0], montant: "", date: "2026-07-27" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({ secteurId: "", origine: ORIGINES[0], montant: "", date: "2026-07-27" });
   const [recherche, setRecherche] = useState("");
   const [filtreOrigine, setFiltreOrigine] = useState("");
   const [detail, setDetail] = useState(null);
+
+  // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
+  // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
+  useEffect(() => {
+    if (!form.secteurId && secteurs.length > 0) setForm((f) => ({ ...f, secteurId: secteurs[0].id }));
+  }, [secteurs, form.secteurId]);
 
   function secteurOf(id) {
     return secteurs.find((s) => s.id === id);
@@ -83,10 +91,14 @@ export default function Recettes() {
     [secteurs, depenses, budgets, periode]
   );
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!form.montant) return;
-    addRecette({ ...form, montant: Number(form.montant) }, user);
+    setSaving(true);
+    setError("");
+    const res = await addRecette({ ...form, montant: Number(form.montant) }, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpen(false);
     setForm((f) => ({ ...f, montant: "" }));
   }
@@ -251,11 +263,12 @@ export default function Recettes() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
-            <Button icon={Wallet} onClick={submit}>Enregistrer</Button>
+            <Button icon={Wallet} onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button>
           </>
         }
       >
         <form onSubmit={submit}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Secteur">
             <Select value={form.secteurId} onChange={(e) => setForm({ ...form, secteurId: e.target.value })}>
               {secteurs.map((s) => (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Receipt, FileText, FileDown } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
@@ -20,7 +20,15 @@ export default function Depenses() {
   const { secteurFiltre } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ secteurId: secteurs[0].id, categorie: CATEGORIES[0], montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({ secteurId: "", categorie: CATEGORIES[0], montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
+
+  // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
+  // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
+  useEffect(() => {
+    if (!form.secteurId && secteurs.length > 0) setForm((f) => ({ ...f, secteurId: secteurs[0].id }));
+  }, [secteurs, form.secteurId]);
 
   const filtrees = useMemo(
     () => (secteurFiltre === "tous" ? depenses : depenses.filter((d) => d.secteurId === secteurFiltre)),
@@ -32,10 +40,14 @@ export default function Depenses() {
     return secteurs.find((s) => s.id === id);
   }
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
     if (!form.montant) return;
-    addDepense({ ...form, montant: Number(form.montant), piece: "justificatif.pdf" }, user);
+    setSaving(true);
+    setError("");
+    const res = await addDepense({ ...form, montant: Number(form.montant), piece: "justificatif.pdf" }, user);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
     setOpen(false);
     setForm((f) => ({ ...f, montant: "", description: "" }));
   }
@@ -109,11 +121,12 @@ export default function Depenses() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
-            <Button icon={Receipt} onClick={submit}>Enregistrer</Button>
+            <Button icon={Receipt} onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button>
           </>
         }
       >
         <form onSubmit={submit}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Secteur">
             <Select value={form.secteurId} onChange={(e) => setForm({ ...form, secteurId: e.target.value })}>
               {secteurs.map((s) => (

@@ -20,6 +20,8 @@ export default function BusinessFacturation() {
   const { typesBriques, stockBriques, venteBriques } = useStockStore();
   const venteDeBriques = config.stock === "briques";
   const [open, setOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     type: config.typesFacturation[0],
     client: "",
@@ -40,23 +42,39 @@ export default function BusinessFacturation() {
   );
   const total = totalMontant(liste);
 
-  function submit(e) {
+  async function submit(e) {
     e.preventDefault();
+    setSaving(true);
+    setError("");
     if (isVenteBriques) {
       const qte = Math.min(Number(form.briqueQuantite) || 0, stockDispoBrique);
-      if (qte <= 0) return;
+      if (qte <= 0) {
+        setSaving(false);
+        return;
+      }
       const montant = qte * (briqueChoisie?.tarifVente || 0);
-      addRecette(
+      const res = await addRecette(
         { secteurId: config.secteurId, montant, date: form.date, origine: `${form.type} — ${briqueChoisie?.nom}`, client: form.client, description: form.description },
         user
       );
-      venteBriques(briqueChoisie.id, qte);
+      if (!res.ok) {
+        setSaving(false);
+        return setError(res.error);
+      }
+      const resVente = await venteBriques(briqueChoisie.id, qte, user);
+      setSaving(false);
+      if (!resVente.ok) return setError(resVente.error);
     } else {
-      if (!form.montant) return;
-      addRecette(
+      if (!form.montant) {
+        setSaving(false);
+        return;
+      }
+      const res = await addRecette(
         { secteurId: config.secteurId, montant: Number(form.montant), date: form.date, origine: form.type, client: form.client, description: form.description },
         user
       );
+      setSaving(false);
+      if (!res.ok) return setError(res.error);
     }
     setOpen(false);
     setForm((f) => ({ ...f, montant: "", client: "", description: "", briqueQuantite: "" }));
@@ -117,11 +135,12 @@ export default function BusinessFacturation() {
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
-            <Button icon={FileText} onClick={submit}>Enregistrer</Button>
+            <Button icon={FileText} onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button>
           </>
         }
       >
         <form onSubmit={submit}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Type">
             <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
               {config.typesFacturation.map((t) => (
