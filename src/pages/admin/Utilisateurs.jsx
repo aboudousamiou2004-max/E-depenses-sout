@@ -1,0 +1,171 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { ArrowLeft, Plus, UserPlus, Check } from "lucide-react";
+import GlassCard from "../../components/ui/GlassCard";
+import Badge from "../../components/ui/Badge";
+import Button from "../../components/ui/Button";
+import Modal from "../../components/ui/Modal";
+import Field, { TextInput, Select } from "../../components/ui/Field";
+import { useDataStore } from "../../store/dataStore";
+import { useAuthStore } from "../../store/authStore";
+import { ROLES } from "../../data/seed";
+import { TOUS_LES_MODULES, MODULES_METIER, ROLES_ACCES_TOTAL } from "../../lib/modules";
+
+const empty = () => ({ login: "", nom: "", role: "agent", modules: [] });
+
+export default function Utilisateurs() {
+  const { users, addUser, modifierAccesUtilisateur } = useDataStore();
+  const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [form, setForm] = useState(empty());
+
+  function toggleModule(id) {
+    setForm((f) => ({ ...f, modules: f.modules.includes(id) ? f.modules.filter((m) => m !== id) : [...f.modules, id] }));
+  }
+
+  function toggleAccesExistant(u, moduleId) {
+    const modules = (u.modules || []).includes(moduleId) ? u.modules.filter((m) => m !== moduleId) : [...(u.modules || []), moduleId];
+    modifierAccesUtilisateur(u.uid, modules, user);
+  }
+
+  function submit(e) {
+    e.preventDefault();
+    if (!form.login.trim() || !form.nom.trim()) return;
+    addUser(form, user);
+    setOpen(false);
+    setForm(empty());
+  }
+
+  return (
+    <div className="min-h-screen relative">
+      <div className="mesh-bg">
+        <div className="blob" />
+      </div>
+
+      <div className="max-w-5xl mx-auto px-6 py-10">
+        <button onClick={() => navigate("/portal")} className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft hover:text-ink mb-4 transition-colors">
+          <ArrowLeft size={14} strokeWidth={2.4} /> Retour au portail
+        </button>
+
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-[26px] font-bold tracking-tight text-ink">Utilisateurs</h1>
+            <p className="text-[13.5px] text-ink-soft font-medium mt-0.5">Accès aux modules par utilisateur</p>
+          </div>
+          <Button icon={UserPlus} onClick={() => setOpen(true)}>Ajouter un utilisateur</Button>
+        </div>
+
+        <GlassCard className="p-2 overflow-hidden" hover={false}>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="text-left text-[11px] font-bold text-ink-soft uppercase tracking-wide">
+                <th className="px-4 py-3">Utilisateur</th>
+                <th className="px-4 py-3">Rôle</th>
+                <th className="px-4 py-3">Accès aux modules</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u, i) => {
+                const accesTotal = ROLES_ACCES_TOTAL.includes(u.role);
+                return (
+                  <motion.tr key={u.uid} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.02 }} className="text-[13.5px] hover:bg-white/50 transition-colors align-top">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-ink">{u.nom}</p>
+                      <p className="text-[11.5px] text-ink-soft">{u.login}</p>
+                    </td>
+                    <td className="px-4 py-3 text-ink-soft">{ROLES[u.role] || u.role}</td>
+                    <td className="px-4 py-3">
+                      {accesTotal ? (
+                        <Badge tone="accent">Accès total (rôle dirigeant)</Badge>
+                      ) : (
+                        <div className="flex flex-wrap gap-1.5">
+                          {MODULES_METIER.map((m) => {
+                            const actif = (u.modules || []).includes(m.id);
+                            return (
+                              <button
+                                key={m.id}
+                                onClick={() => toggleAccesExistant(u, m.id)}
+                                className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold transition-colors"
+                                style={actif ? { background: `${m.color}1f`, color: m.color } : { background: "rgba(0,0,0,0.04)", color: "#3c4048" }}
+                              >
+                                {actif && <Check size={10} strokeWidth={3} />} {m.nom}
+                              </button>
+                            );
+                          })}
+                          <button
+                            onClick={() => toggleAccesExistant(u, "depense")}
+                            className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold transition-colors"
+                            style={(u.modules || []).includes("depense") ? { background: "#0A84FF1f", color: "#0A84FF" } : { background: "rgba(0,0,0,0.04)", color: "#3c4048" }}
+                          >
+                            {(u.modules || []).includes("depense") && <Check size={10} strokeWidth={3} />} E-DÉPENSES
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </motion.tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </GlassCard>
+      </div>
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Ajouter un utilisateur"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
+            <Button icon={Plus} onClick={submit}>Créer l'utilisateur</Button>
+          </>
+        }
+      >
+        <form onSubmit={submit}>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Nom complet *">
+              <TextInput value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} placeholder="ex : A. KOFFI" />
+            </Field>
+            <Field label="Identifiant de connexion *">
+              <TextInput value={form.login} onChange={(e) => setForm({ ...form, login: e.target.value })} placeholder="ex : agent.agro2" />
+            </Field>
+          </div>
+          <Field label="Rôle">
+            <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
+              {Object.entries(ROLES).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </Select>
+          </Field>
+
+          {ROLES_ACCES_TOTAL.includes(form.role) ? (
+            <p className="text-[12.5px] text-ink-soft px-3.5 py-2.5 rounded-2xl bg-black/[0.03]">
+              Ce rôle a un accès total à tous les modules — aucune sélection nécessaire.
+            </p>
+          ) : (
+            <Field label="Modules accessibles">
+              <div className="flex flex-wrap gap-2">
+                {TOUS_LES_MODULES.map((m) => {
+                  const actif = form.modules.includes(m.id);
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => toggleModule(m.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[12.5px] font-semibold border transition-colors"
+                      style={actif ? { borderColor: m.color, background: `${m.color}1a`, color: m.color } : { borderColor: "rgba(0,0,0,0.1)", color: "#3c4048" }}
+                    >
+                      {actif && <Check size={12} strokeWidth={3} />} {m.nom}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          )}
+        </form>
+      </Modal>
+    </div>
+  );
+}
