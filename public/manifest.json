@@ -1,0 +1,14 @@
+{
+  "name": "E-DÉPENSES — LA TERMITIÈRE",
+  "short_name": "E-DÉPENSES",
+  "description": "Système de pilotage financier — LA TERMITIÈRE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#eef1f6",
+  "theme_color": "#7A1128",
+  "icons": [
+    { "src": "/logo_termitiere.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo_termitiere.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Loader2, DatabaseZap } from "lucide-react";
 import { useAuthStore } from "./store/authStore";
 import { supabaseConfigured } from "./lib/supabaseClient";
+import ErrorBoundary from "./components/ErrorBoundary";
 import AppLayout from "./components/layout/AppLayout";
 import BusinessLayout from "./components/layout/BusinessLayout";
 import ModuleGuard from "./components/ModuleGuard";
@@ -67,6 +68,7 @@ function ConfigManquante() {
 export default function App() {
   if (!supabaseConfigured) return <ConfigManquante />;
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
@@ -120,5 +122,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/portal" replace />} />
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
