@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Receipt, FileText, FileDown } from "lucide-react";
+import { Plus, Receipt, FileText, FileDown, Trash2 } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import Badge from "../../components/ui/Badge";
@@ -12,15 +12,26 @@ import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 import { fmtFCFA, statutLabel, verifierSeuilApprobation } from "../../lib/logic";
 import { exporterDepensesExcel } from "../../lib/exportExcel";
+import { ROLES_ACCES_TOTAL } from "../../lib/modules";
 
 export default function BusinessDepenses() {
   const config = useOutletContext();
-  const { depenses, categories, parametres, addDepense } = useDataStore();
+  const { depenses, categories, parametres, addDepense, supprimerDepense } = useDataStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState(null);
   const [form, setForm] = useState({ categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
+  const peutSupprimer = ROLES_ACCES_TOTAL.includes(user?.role);
+
+  async function supprimer(d) {
+    if (!window.confirm(`Supprimer définitivement cette dépense de ${fmtFCFA(d.montant)} ?`)) return;
+    setDeletingId(d.id);
+    const res = await supprimerDepense(d.id);
+    setDeletingId(null);
+    if (!res.ok) alert(res.error);
+  }
 
   const categoriesDuSecteur = useMemo(
     () => categories.filter((c) => c.secteurId === config.secteurId).map((c) => c.nom),
@@ -78,13 +89,14 @@ export default function BusinessDepenses() {
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3">Nature</th>
                 <th className="px-4 py-3">Statut</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
                 {liste.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune dépense pour ce secteur.</td>
+                    <td colSpan={6} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune dépense pour ce secteur.</td>
                   </tr>
                 )}
                 {liste.map((d, i) => {
@@ -96,6 +108,18 @@ export default function BusinessDepenses() {
                       <td className="px-4 py-3 text-right font-bold tabular text-ink">{fmtFCFA(d.montant)}</td>
                       <td className="px-4 py-3 capitalize text-ink-soft">{d.natureFlux}</td>
                       <td className="px-4 py-3"><Badge tone={st.tone}>{st.label}</Badge></td>
+                      <td className="px-3 py-3 text-right">
+                        {peutSupprimer && (
+                          <button
+                            onClick={() => supprimer(d)}
+                            disabled={deletingId === d.id}
+                            title="Supprimer"
+                            className="w-7 h-7 rounded-lg inline-flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
+                          >
+                            <Trash2 size={15} strokeWidth={2.2} />
+                          </button>
+                        )}
+                      </td>
                     </motion.tr>
                   );
                 })}

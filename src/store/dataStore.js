@@ -311,6 +311,22 @@ export const useDataStore = create((set, get) => ({
     return { ok: true };
   },
 
+  // Réservé aux approbateurs (RLS) — un agent ne peut pas effacer ce qu'il a
+  // saisi lui-même, seulement le soumettre au circuit d'autorisation.
+  supprimerDepense: async (id) => {
+    const { error } = await supabase.from("depenses").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerDepenses();
+    return { ok: true };
+  },
+
+  supprimerRecette: async (id) => {
+    const { error } = await supabase.from("recettes").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerRecettes();
+    return { ok: true };
+  },
+
   setBudget: async (secteurId, annee, mois, montant) => {
     const { error } = await supabase
       .from("budgets")

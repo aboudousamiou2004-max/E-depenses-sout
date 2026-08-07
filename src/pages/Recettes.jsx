@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Wallet, TrendingUp, AlertTriangle, Search, Eye } from "lucide-react";
+import { Plus, Wallet, TrendingUp, AlertTriangle, Search, Eye, Trash2 } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import StatTile from "../components/ui/StatTile";
@@ -12,6 +12,7 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte } from "../lib/logic";
+import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 const ORIGINES = ["Vente", "Prestation", "Facturation client", "Subvention"];
 
@@ -26,7 +27,7 @@ const ORIGINE_TONE = {
 };
 
 export default function Recettes() {
-  const { secteurs, recettes, budgets, depenses, addRecette } = useDataStore();
+  const { secteurs, recettes, budgets, depenses, addRecette, supprimerRecette } = useDataStore();
   const { secteurFiltre, periode } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -36,6 +37,17 @@ export default function Recettes() {
   const [recherche, setRecherche] = useState("");
   const [filtreOrigine, setFiltreOrigine] = useState("");
   const [detail, setDetail] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const peutSupprimer = ROLES_ACCES_TOTAL.includes(user?.role);
+
+  async function supprimer(recette) {
+    if (!window.confirm(`Supprimer définitivement cette recette de ${fmtFCFA(recette.montant)} ?`)) return;
+    setDeleting(true);
+    const res = await supprimerRecette(recette.id);
+    setDeleting(false);
+    if (!res.ok) return alert(res.error);
+    setDetail(null);
+  }
 
   // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
   // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
@@ -221,6 +233,16 @@ export default function Recettes() {
                         >
                           <Eye size={15} strokeWidth={2.2} />
                         </button>
+                        {peutSupprimer && (
+                          <button
+                            onClick={() => supprimer(r)}
+                            disabled={deleting}
+                            title="Supprimer"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
+                          >
+                            <Trash2 size={15} strokeWidth={2.2} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </motion.tr>
@@ -232,7 +254,18 @@ export default function Recettes() {
       </GlassCard>
 
       {/* Détail d'une recette */}
-      <Modal open={!!detail} onClose={() => setDetail(null)} title={detail?.origine || "Détail de la recette"}>
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail?.origine || "Détail de la recette"}
+        footer={
+          peutSupprimer && detail ? (
+            <Button variant="ghost" icon={Trash2} onClick={() => supprimer(detail)} disabled={deleting} className="text-[#FF453A]">
+              {deleting ? "Suppression…" : "Supprimer"}
+            </Button>
+          ) : undefined
+        }
+      >
         {detail && (
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between rounded-2xl bg-black/[0.03] px-3.5 py-2.5">
