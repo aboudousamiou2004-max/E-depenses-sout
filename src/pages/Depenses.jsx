@@ -13,22 +13,33 @@ import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, statutLabel, verifierSeuilApprobation } from "../lib/logic";
 import { exporterDepensesExcel } from "../lib/exportExcel";
 
-const CATEGORIES = ["Matériaux de construction", "Main d'œuvre", "Carburant", "Aliments bétail", "Vétérinaire & vaccins", "Matières premières", "Autre"];
-
 export default function Depenses() {
-  const { secteurs, depenses, addDepense } = useDataStore();
+  const { secteurs, depenses, categories, parametres, addDepense } = useDataStore();
   const { secteurFiltre } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ secteurId: "", categorie: CATEGORIES[0], montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
+  const [form, setForm] = useState({ secteurId: "", categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
+
+  const categoriesDuSecteur = useMemo(
+    () => categories.filter((c) => c.secteurId === form.secteurId).map((c) => c.nom),
+    [categories, form.secteurId]
+  );
 
   // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
   // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
   useEffect(() => {
     if (!form.secteurId && secteurs.length > 0) setForm((f) => ({ ...f, secteurId: secteurs[0].id }));
   }, [secteurs, form.secteurId]);
+
+  // La catégorie sélectionnée doit rester cohérente avec le secteur choisi —
+  // les catégories sont désormais propres à chaque secteur (voir Paramètres).
+  useEffect(() => {
+    if (categoriesDuSecteur.length > 0 && !categoriesDuSecteur.includes(form.categorie)) {
+      setForm((f) => ({ ...f, categorie: categoriesDuSecteur[0] }));
+    }
+  }, [categoriesDuSecteur, form.categorie]);
 
   const filtrees = useMemo(
     () => (secteurFiltre === "tous" ? depenses : depenses.filter((d) => d.secteurId === secteurFiltre)),
@@ -53,7 +64,7 @@ export default function Depenses() {
   }
 
   const montantNum = Number(form.montant || 0);
-  const declenche = verifierSeuilApprobation(montantNum);
+  const declenche = verifierSeuilApprobation(montantNum, parametres.seuilAutorisation);
 
   return (
     <div>
@@ -136,7 +147,8 @@ export default function Depenses() {
           </Field>
           <Field label="Catégorie">
             <Select value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })}>
-              {CATEGORIES.map((c) => (
+              {categoriesDuSecteur.length === 0 && <option value="">Aucune catégorie configurée pour ce secteur</option>}
+              {categoriesDuSecteur.map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </Select>
@@ -171,7 +183,7 @@ export default function Depenses() {
           <div className="flex items-center gap-2 text-[12.5px] font-medium px-3.5 py-2.5 rounded-2xl bg-black/[0.03] text-ink-soft">
             <FileText size={14} strokeWidth={2.2} className="shrink-0" />
             {declenche
-              ? "Ce montant déclenchera automatiquement le circuit d'autorisation — PAU et GE en seront notifiés (seuil : 30 000 FCFA)."
+              ? `Ce montant déclenchera automatiquement le circuit d'autorisation — PAU et GE en seront notifiés (seuil : ${fmtFCFA(parametres.seuilAutorisation)}).`
               : "Ce montant est inférieur au seuil d'autorisation — décaissement direct."}
           </div>
         </form>

@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  LayoutGrid, Receipt, Wallet, ShieldCheck, LineChart, TrendingUp, ScrollText, LogOut, ArrowLeft, Users,
+  LayoutGrid, Receipt, Wallet, ShieldCheck, LineChart, TrendingUp, ScrollText, LogOut, ArrowLeft, Users, Settings,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { ROLES_ACCES_TOTAL } from "../../lib/modules";
@@ -76,6 +76,19 @@ export default function Sidebar() {
               )}
             </NavLink>
           ))}
+          {peutGererUtilisateurs && (
+            <NavLink to="/depense/parametres">
+              {({ isActive }) => (
+                <div className="relative px-3 py-2.5 rounded-2xl flex items-center gap-3 group cursor-pointer">
+                  {isActive && (
+                    <motion.div layoutId="nav-pill" className="absolute inset-0 bg-white/85 shadow-[0_4px_16px_rgba(15,23,42,0.10)] rounded-2xl" transition={{ type: "spring", stiffness: 500, damping: 40 }} />
+                  )}
+                  <Settings size={18} strokeWidth={2.2} className={`relative z-10 transition-colors ${isActive ? "text-[#0A84FF]" : "text-ink-soft group-hover:text-ink"}`} />
+                  <span className={`relative z-10 text-[13.5px] font-semibold tracking-tight transition-colors ${isActive ? "text-ink" : "text-ink-soft group-hover:text-ink"}`}>Paramètres</span>
+                </div>
+              )}
+            </NavLink>
+          )}
         </nav>
 
         <div className="mt-2 pt-3 border-t border-black/5">

@@ -10,7 +10,8 @@ import { supabase, loginToEmail } from "../lib/supabaseClient";
 // exclusivement côté serveur (triggers SQL, voir supabase/schema.sql) — ce
 // store ne fait plus que lire le résultat et déclencher les INSERT bruts.
 
-const mapSecteur = (r) => ({ id: r.id, nom: r.nom, label: r.label, color: r.color });
+const mapSecteur = (r) => ({ id: r.id, nom: r.nom, label: r.label, color: r.color, actif: r.actif !== false });
+const mapCategorie = (r) => ({ id: r.id, secteurId: r.secteur_id, nom: r.nom });
 const mapBudget = (r) => ({ id: r.id, secteurId: r.secteur_id, annee: r.annee, mois: r.mois, montant: Number(r.montant) });
 const mapDepense = (r) => ({
   id: r.id,
@@ -82,6 +83,8 @@ export const useDataStore = create((set, get) => ({
   journal: [],
   notifications: [],
   users: [],
+  categories: [],
+  parametres: { seuilAutorisation: 30000 },
   loaded: false,
 
   // Charge toutes les données de l'app en une fois — appelé par authStore dès
@@ -89,7 +92,7 @@ export const useDataStore = create((set, get) => ({
   // (chacun ne peut de toute façon voir que les siennes, RLS l'impose déjà,
   // mais filtrer ici évite de dépendre de l'ordre des champs retournés).
   chargerTout: async (userId) => {
-    const [secteurs, budgets, depenses, recettes, journal, notifications, users] = await Promise.all([
+    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, config] = await Promise.all([
       supabase.from("secteurs").select("*").order("created_at"),
       supabase.from("budgets").select("*"),
       supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
@@ -99,6 +102,8 @@ export const useDataStore = create((set, get) => ({
         ? supabase.from("notifications").select("*").eq("destinataire_id", userId).order("timestamp", { ascending: false })
         : Promise.resolve({ data: [] }),
       supabase.from("profiles").select("*").order("nom"),
+      supabase.from("categories_depense").select("*").order("nom"),
+      supabase.from("app_config").select("*").maybeSingle(),
     ]);
     set({
       secteurs: (secteurs.data || []).map(mapSecteur),
@@ -108,11 +113,17 @@ export const useDataStore = create((set, get) => ({
       journal: (journal.data || []).map(mapJournalRow),
       notifications: (notifications.data || []).map(mapNotification),
       users: (users.data || []).map(mapUser),
+      categories: (categories.data || []).map(mapCategorie),
+      parametres: { seuilAutorisation: Number(config.data?.seuil_autorisation ?? 30000) },
       loaded: true,
     });
   },
 
-  reset: () => set({ secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [], loaded: false }),
+  reset: () =>
+    set({
+      secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [],
+      categories: [], parametres: { seuilAutorisation: 30000 }, loaded: false,
+    }),
 
   // Rechargements ciblés après une écriture — évitent de tout re-fetcher.
   chargerSecteurs: async () => {
@@ -143,6 +154,14 @@ export const useDataStore = create((set, get) => ({
   chargerUsers: async () => {
     const { data } = await supabase.from("profiles").select("*").order("nom");
     set({ users: (data || []).map(mapUser) });
+  },
+  chargerCategories: async () => {
+    const { data } = await supabase.from("categories_depense").select("*").order("nom");
+    set({ categories: (data || []).map(mapCategorie) });
+  },
+  chargerParametres: async () => {
+    const { data } = await supabase.from("app_config").select("*").maybeSingle();
+    set({ parametres: { seuilAutorisation: Number(data?.seuil_autorisation ?? 30000) } });
   },
 
   // Crée un compte Supabase Auth + déclenche la création du profil (trigger
@@ -201,6 +220,37 @@ export const useDataStore = create((set, get) => ({
     if (error) return { ok: false, error: error.message };
     await get().chargerSecteurs();
     return { ok: true, secteur: mapSecteur(data) };
+  },
+
+  modifierSecteur: async (id, payload) => {
+    const { error } = await supabase
+      .from("secteurs")
+      .update({ nom: payload.nom, label: payload.label, color: payload.color, actif: payload.actif })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerSecteurs();
+    return { ok: true };
+  },
+
+  setSeuilAutorisation: async (montant) => {
+    const { error } = await supabase.from("app_config").update({ seuil_autorisation: montant }).eq("id", true);
+    if (error) return { ok: false, error: error.message };
+    set({ parametres: { seuilAutorisation: Number(montant) } });
+    return { ok: true };
+  },
+
+  addCategorie: async (secteurId, nom) => {
+    const { error } = await supabase.from("categories_depense").insert({ secteur_id: secteurId, nom: nom.trim() });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerCategories();
+    return { ok: true };
+  },
+
+  supprimerCategorie: async (id) => {
+    const { error } = await supabase.from("categories_depense").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerCategories();
+    return { ok: true };
   },
 
   addDepense: async (payload, user) => {

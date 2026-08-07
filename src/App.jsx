@@ -15,6 +15,7 @@ import Autorisations from "./pages/Autorisations";
 import Analyses from "./pages/Analyses";
 import Flux from "./pages/Flux";
 import Journal from "./pages/Journal";
+import Parametres from "./pages/Parametres";
 import Utilisateurs from "./pages/admin/Utilisateurs";
 import BusinessDashboard from "./pages/business/BusinessDashboard";
 import BusinessFacturation from "./pages/business/BusinessFacturation";
@@ -93,6 +94,7 @@ export default function App() {
           <Route path="analyses" element={<Analyses />} />
           <Route path="flux" element={<Flux />} />
           <Route path="journal" element={<Journal />} />
+          <Route path="parametres" element={<Parametres />} />
         </Route>
 
         {MODULES_METIER.map((config) => (

@@ -90,6 +90,18 @@ body {
   50% { transform: translate(-4vw, 5vh) scale(0.95); }
 }
 
+.logo-ring-blink {
+  animation: logo-ring-blink 4s linear infinite;
+}
+@keyframes logo-ring-blink {
+  0%, 100% { border-color: #7A1128; }
+  16.6%    { border-color: #0A84FF; }
+  33.3%    { border-color: #30D158; }
+  50%      { border-color: #FF9F0A; }
+  66.6%    { border-color: #BF5AF2; }
+  83.3%    { border-color: #FF453A; }
+}
+
 /* ---------- glass surfaces ---------- */
 .glass {
   background: rgba(255, 255, 255, 0.62);

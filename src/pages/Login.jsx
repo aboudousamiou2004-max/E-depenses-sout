@@ -36,7 +36,7 @@ export default function Login() {
         className="glass-strong rounded-[32px] w-[420px] p-9"
       >
         <div className="flex flex-col items-center text-center mb-7">
-          <div className="w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl mb-4 border-4 border-[#7A1128] overflow-hidden">
+          <div className="logo-ring-blink w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl mb-4 border-4 overflow-hidden">
             <img src="/logo_termitiere.png" alt="Logo" className="w-full h-full object-contain p-1.5" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-ink">E-DÉPENSES</h1>
