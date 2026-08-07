@@ -12,10 +12,10 @@ const now = { annee: 2026, mois: 6 };
 
 export default function Portal() {
   const { user, logout } = useAuthStore();
-  const { depenses, budgets } = useDataStore();
+  const { depenses, budgets, secteurs } = useDataStore();
   const navigate = useNavigate();
 
-  const accessibles = useMemo(() => modulesAccessibles(user), [user]);
+  const accessibles = useMemo(() => modulesAccessibles(user, secteurs), [user, secteurs]);
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
 
   function kpiPourModule(m) {

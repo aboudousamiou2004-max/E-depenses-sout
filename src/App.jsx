@@ -4,7 +4,7 @@ import { useAuthStore } from "./store/authStore";
 import { supabaseConfigured } from "./lib/supabaseClient";
 import ErrorBoundary from "./components/ErrorBoundary";
 import AppLayout from "./components/layout/AppLayout";
-import BusinessLayout from "./components/layout/BusinessLayout";
+import BusinessRoute from "./components/layout/BusinessRoute";
 import ModuleGuard from "./components/ModuleGuard";
 import Login from "./pages/Login";
 import Portal from "./pages/Portal";
@@ -20,12 +20,7 @@ import Utilisateurs from "./pages/admin/Utilisateurs";
 import BusinessDashboard from "./pages/business/BusinessDashboard";
 import BusinessFacturation from "./pages/business/BusinessFacturation";
 import BusinessDepenses from "./pages/business/BusinessDepenses";
-import StockMateriel from "./pages/business/StockMateriel";
-import StockBriques from "./pages/business/StockBriques";
-import StockAnimaux from "./pages/business/StockAnimaux";
-import { MODULES_METIER } from "./lib/modules";
-
-const STOCK_PAGE = { materiel: StockMateriel, briques: StockBriques, animaux: StockAnimaux };
+import StockRouter from "./pages/business/StockRouter";
 
 function Protected({ children }) {
   const { user, status } = useAuthStore();
@@ -97,28 +92,19 @@ export default function App() {
           <Route path="parametres" element={<Parametres />} />
         </Route>
 
-        {MODULES_METIER.map((config) => (
-          <Route
-            key={config.id}
-            path={config.path}
-            element={
-              <Protected>
-                <ModuleGuard moduleId={config.id}>
-                  <BusinessLayout config={config} />
-                </ModuleGuard>
-              </Protected>
-            }
-          >
-            <Route index element={<BusinessDashboard />} />
-            <Route path="facturation" element={<BusinessFacturation />} />
-            <Route path="depenses" element={<BusinessDepenses />} />
-            {config.stock &&
-              (() => {
-                const StockPage = STOCK_PAGE[config.stock];
-                return <Route path="stock" element={<StockPage />} />;
-              })()}
-          </Route>
-        ))}
+        <Route
+          path="/secteur/:secteurId"
+          element={
+            <Protected>
+              <BusinessRoute />
+            </Protected>
+          }
+        >
+          <Route index element={<BusinessDashboard />} />
+          <Route path="facturation" element={<BusinessFacturation />} />
+          <Route path="depenses" element={<BusinessDepenses />} />
+          <Route path="stock" element={<StockRouter />} />
+        </Route>
 
         <Route path="/" element={<Navigate to="/portal" replace />} />
         <Route path="*" element={<Navigate to="/portal" replace />} />

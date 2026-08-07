@@ -10,7 +10,7 @@ import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 import { ROLES } from "../../data/seed";
-import { TOUS_LES_MODULES, MODULES_METIER, ROLES_ACCES_TOTAL } from "../../lib/modules";
+import { tousLesModules, modulesMetier, ROLES_ACCES_TOTAL } from "../../lib/modules";
 
 const empty = () => ({ login: "", nom: "", pass: "", role: "agent", secteur: "", poste: "", telephone: "", actif: true, modules: [] });
 
@@ -18,6 +18,7 @@ export default function Utilisateurs() {
   const { users, secteurs, addUser, modifierAccesUtilisateur } = useDataStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  const modulesM = modulesMetier(secteurs);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty());
   const [adminPass, setAdminPass] = useState("");
@@ -90,7 +91,7 @@ export default function Utilisateurs() {
                         <Badge tone="accent">Accès total (rôle dirigeant)</Badge>
                       ) : (
                         <div className="flex flex-wrap gap-1.5">
-                          {MODULES_METIER.map((m) => {
+                          {modulesM.map((m) => {
                             const actif = (u.modules || []).includes(m.id);
                             return (
                               <button
@@ -196,7 +197,7 @@ export default function Utilisateurs() {
           ) : (
             <Field label="Modules accessibles">
               <div className="flex flex-wrap gap-2">
-                {TOUS_LES_MODULES.map((m) => {
+                {tousLesModules(secteurs).map((m) => {
                   const actif = form.modules.includes(m.id);
                   return (
                     <button
