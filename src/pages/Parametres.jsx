@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, Plus, Trash2, FolderPlus, Building2 } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
@@ -37,16 +37,24 @@ function SectionSeuil({ parametres, setSeuilAutorisation }) {
   const [valeur, setValeur] = useState(parametres.seuilAutorisation);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+
+  // `parametres` se charge de façon asynchrone (Supabase) après le montage de
+  // ce composant — sans ce useEffect, le champ resterait figé sur la valeur
+  // par défaut (30000) capturée par useState au premier rendu.
+  useEffect(() => {
+    setValeur(parametres.seuilAutorisation);
+  }, [parametres.seuilAutorisation]);
 
   async function enregistrer() {
     setSaving(true);
     setSaved(false);
+    setError("");
     const res = await setSeuilAutorisation(Number(valeur));
     setSaving(false);
-    if (res.ok) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
-    }
+    if (!res.ok) return setError(res.error);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
   }
 
   return (
@@ -55,6 +63,7 @@ function SectionSeuil({ parametres, setSeuilAutorisation }) {
       <p className="text-[12.5px] text-ink-soft mb-4">
         Montant à partir duquel une dépense déclenche automatiquement le circuit d'approbation (PAU / GE / superviseur), au lieu d'un décaissement direct.
       </p>
+      {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
       <div className="flex items-end gap-3">
         <Field label="Montant (FCFA)">
           <TextInput type="number" value={valeur} onChange={(e) => setValeur(e.target.value)} className="w-56" />
