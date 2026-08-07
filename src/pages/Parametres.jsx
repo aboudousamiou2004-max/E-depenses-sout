@@ -11,7 +11,7 @@ import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 export default function Parametres() {
   const { user } = useAuthStore();
-  const { secteurs, categories, parametres, setSeuilAutorisation, addCategorie, supprimerCategorie, addSecteur, modifierSecteur } = useDataStore();
+  const { secteurs, categories, parametres, setSeuilAutorisation, addCategorie, supprimerCategorie, addSecteur, modifierSecteur, supprimerSecteur } = useDataStore();
 
   if (!ROLES_ACCES_TOTAL.includes(user?.role)) {
     return (
@@ -27,7 +27,7 @@ export default function Parametres() {
       <div className="flex flex-col gap-5">
         <SectionSeuil parametres={parametres} setSeuilAutorisation={setSeuilAutorisation} />
         <SectionCategories secteurs={secteurs} categories={categories} addCategorie={addCategorie} supprimerCategorie={supprimerCategorie} />
-        <SectionSecteurs secteurs={secteurs} addSecteur={addSecteur} modifierSecteur={modifierSecteur} />
+        <SectionSecteurs secteurs={secteurs} addSecteur={addSecteur} modifierSecteur={modifierSecteur} supprimerSecteur={supprimerSecteur} />
       </div>
     </div>
   );
@@ -130,7 +130,7 @@ function SectionCategories({ secteurs, categories, addCategorie, supprimerCatego
   );
 }
 
-function SectionSecteurs({ secteurs, addSecteur, modifierSecteur }) {
+function SectionSecteurs({ secteurs, addSecteur, modifierSecteur, supprimerSecteur }) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ nom: "", label: "", color: "#0A84FF" });
   const [saving, setSaving] = useState(false);
@@ -160,7 +160,7 @@ function SectionSecteurs({ secteurs, addSecteur, modifierSecteur }) {
 
       <div className="flex flex-col gap-2">
         {secteurs.map((s) => (
-          <RowSecteur key={s.id} secteur={s} modifierSecteur={modifierSecteur} />
+          <RowSecteur key={s.id} secteur={s} modifierSecteur={modifierSecteur} supprimerSecteur={supprimerSecteur} />
         ))}
       </div>
 
@@ -192,27 +192,49 @@ function SectionSecteurs({ secteurs, addSecteur, modifierSecteur }) {
   );
 }
 
-function RowSecteur({ secteur, modifierSecteur }) {
+function RowSecteur({ secteur, modifierSecteur, supprimerSecteur }) {
   const [nom, setNom] = useState(secteur.nom);
   const [color, setColor] = useState(secteur.color || "#0A84FF");
   const [actif, setActif] = useState(secteur.actif !== false);
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
   const dirty = nom !== secteur.nom || color !== (secteur.color || "#0A84FF") || actif !== (secteur.actif !== false);
 
   async function enregistrer() {
     await modifierSecteur(secteur.id, { nom, label: secteur.label, color, actif });
   }
 
+  async function supprimer() {
+    if (!window.confirm(`Supprimer définitivement le secteur « ${secteur.nom} » ? Cette action est irréversible.`)) return;
+    setDeleting(true);
+    setError("");
+    const res = await supprimerSecteur(secteur.id);
+    setDeleting(false);
+    if (!res.ok) setError(res.error);
+  }
+
   return (
-    <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-black/[0.02]">
-      <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-8 h-8 rounded-lg cursor-pointer shrink-0" />
-      <TextInput value={nom} onChange={(e) => setNom(e.target.value)} className="max-w-[220px]" />
-      <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink shrink-0">
-        <input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
-        Actif
-      </label>
-      {dirty && (
-        <Button variant="ghost" icon={Save} onClick={enregistrer} className="ml-auto shrink-0">Enregistrer</Button>
-      )}
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-3 px-3.5 py-2.5 rounded-2xl bg-black/[0.02]">
+        <input type="color" value={color} onChange={(e) => setColor(e.target.value)} className="w-8 h-8 rounded-lg cursor-pointer shrink-0" />
+        <TextInput value={nom} onChange={(e) => setNom(e.target.value)} className="max-w-[220px]" />
+        <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink shrink-0">
+          <input type="checkbox" checked={actif} onChange={(e) => setActif(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
+          Actif
+        </label>
+        {dirty && (
+          <Button variant="ghost" icon={Save} onClick={enregistrer} className="ml-auto shrink-0">Enregistrer</Button>
+        )}
+        <button
+          onClick={supprimer}
+          disabled={deleting}
+          title="Supprimer"
+          className={`w-8 h-8 rounded-xl flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors shrink-0 ${dirty ? "" : "ml-auto"}`}
+        >
+          <Trash2 size={15} strokeWidth={2.2} />
+        </button>
+      </div>
+      {error && <p className="text-[12px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2">{error}</p>}
     </div>
   );
 }

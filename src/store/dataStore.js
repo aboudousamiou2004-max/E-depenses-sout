@@ -232,6 +232,25 @@ export const useDataStore = create((set, get) => ({
     return { ok: true };
   },
 
+  // Refusée par PostgreSQL (contrainte de clé étrangère) si le secteur a déjà
+  // des dépenses, recettes, budgets ou utilisateurs rattachés — volontaire,
+  // pour ne jamais effacer silencieusement un historique financier. Dans ce
+  // cas, l'appelant doit proposer de désactiver le secteur à la place.
+  supprimerSecteur: async (id) => {
+    const { error } = await supabase.from("secteurs").delete().eq("id", id);
+    if (error) {
+      const bloque = error.code === "23503";
+      return {
+        ok: false,
+        error: bloque
+          ? "Ce secteur a déjà des dépenses, recettes, budgets ou utilisateurs rattachés — désactivez-le plutôt que de le supprimer."
+          : error.message,
+      };
+    }
+    await get().chargerSecteurs();
+    return { ok: true };
+  },
+
   setSeuilAutorisation: async (montant) => {
     const { error } = await supabase.from("app_config").update({ seuil_autorisation: montant }).eq("id", true);
     if (error) return { ok: false, error: error.message };
