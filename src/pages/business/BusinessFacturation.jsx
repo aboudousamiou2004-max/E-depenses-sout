@@ -1,38 +1,35 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, FileText, Trash2 } from "lucide-react";
+import { Plus, FileText } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
+import RecetteDetailModal from "../../components/RecetteDetailModal";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 import { useStockStore } from "../../store/stockStore";
-import { fmtFCFA, fmtCompact, totalMontant } from "../../lib/logic";
+import { useUIStore } from "../../store/uiStore";
+import { fmtFCFA, fmtCompact, totalMontant, matchPeriode } from "../../lib/logic";
 import { ROLES_ACCES_TOTAL } from "../../lib/modules";
 
 export default function BusinessFacturation() {
   const config = useOutletContext();
-  const { recettes, addRecette, supprimerRecette } = useDataStore();
+  const { secteurs, recettes, addRecette, modifierRecette, supprimerRecette } = useDataStore();
   const { user } = useAuthStore();
   const { typesBriques, stockBriques, venteBriques } = useStockStore();
+  const { periode, recherche } = useUIStore();
   const venteDeBriques = config.stock === "briques";
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [deletingId, setDeletingId] = useState(null);
-  const peutSupprimer = ROLES_ACCES_TOTAL.includes(user?.role);
+  const [respecterPeriode, setRespecterPeriode] = useState(false);
+  const [selection, setSelection] = useState(null);
+  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
 
-  async function supprimer(r) {
-    if (!window.confirm(`Supprimer définitivement cette facture de ${fmtFCFA(r.montant)} ?`)) return;
-    setDeletingId(r.id);
-    const res = await supprimerRecette(r.id);
-    setDeletingId(null);
-    if (!res.ok) alert(res.error);
-  }
   const [form, setForm] = useState({
     type: config.typesFacturation[0],
     client: "",
@@ -47,10 +44,15 @@ export default function BusinessFacturation() {
   const briqueChoisie = typesBriques.find((t) => t.id === form.briqueTypeId);
   const stockDispoBrique = briqueChoisie ? stockBriques[briqueChoisie.id]?.pret || 0 : 0;
 
-  const liste = useMemo(
-    () => recettes.filter((r) => r.secteurId === config.secteurId).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 60),
-    [recettes, config.secteurId]
-  );
+  const liste = useMemo(() => {
+    let rows = recettes.filter((r) => r.secteurId === config.secteurId).sort((a, b) => (a.date < b.date ? 1 : -1));
+    if (respecterPeriode) rows = rows.filter((r) => matchPeriode(r.date, periode));
+    if (recherche.trim()) {
+      const q = recherche.toLowerCase();
+      rows = rows.filter((r) => r.origine.toLowerCase().includes(q));
+    }
+    return rows.slice(0, 60);
+  }, [recettes, config.secteurId, respecterPeriode, periode, recherche]);
   const total = totalMontant(liste);
 
   async function submit(e) {
@@ -99,8 +101,12 @@ export default function BusinessFacturation() {
         <StatTile icon={FileText} label="Total facturé (affiché)" value={fmtCompact(total) + " FCFA"} tone={config.color} />
       </div>
 
-      <div className="flex justify-end mb-4">
-        <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }}>
+      <div className="flex items-center gap-3 mb-4">
+        <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
+          <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
+          Limiter à la période sélectionnée
+        </label>
+        <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }} className="ml-auto">
           Nouvelle facture
         </Button>
       </div>
@@ -114,17 +120,23 @@ export default function BusinessFacturation() {
                 <th className="px-4 py-3">Client</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Montant</th>
-                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {liste.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune facture pour ce secteur.</td>
+                  <td colSpan={4} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune facture pour ce secteur.</td>
                 </tr>
               )}
               {liste.map((r, i) => (
-                <motion.tr key={r.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.02 }} className="text-[13.5px] hover:bg-white/50 transition-colors">
+                <motion.tr
+                  key={r.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: Math.min(i, 8) * 0.02 }}
+                  onClick={() => setSelection(r)}
+                  className="text-[13.5px] hover:bg-white/50 transition-colors cursor-pointer"
+                >
                   <td className="px-4 py-3">
                     <span className="px-2.5 py-1 rounded-full text-[11px] font-bold" style={{ background: `${config.color}1f`, color: config.color }}>
                       {r.origine}
@@ -133,18 +145,6 @@ export default function BusinessFacturation() {
                   <td className="px-4 py-3 text-ink-soft">{r.client || "—"}</td>
                   <td className="px-4 py-3 text-ink-soft tabular">{new Date(r.date).toLocaleDateString("fr-FR")}</td>
                   <td className="px-4 py-3 text-right font-bold tabular text-[#1a7d34]">+{fmtFCFA(r.montant)}</td>
-                  <td className="px-3 py-3 text-right">
-                    {peutSupprimer && (
-                      <button
-                        onClick={() => supprimer(r)}
-                        disabled={deletingId === r.id}
-                        title="Supprimer"
-                        className="w-7 h-7 rounded-lg inline-flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
-                      >
-                        <Trash2 size={15} strokeWidth={2.2} />
-                      </button>
-                    )}
-                  </td>
                 </motion.tr>
               ))}
             </tbody>
@@ -216,6 +216,15 @@ export default function BusinessFacturation() {
           <p className="text-[12px] text-ink-soft">Cette facture sera comptée comme une recette du secteur {config.nom}, visible aussi dans E-DÉPENSES.</p>
         </form>
       </Modal>
+
+      <RecetteDetailModal
+        recette={selection}
+        secteurs={secteurs}
+        peutModifier={peutModifier}
+        modifierRecette={modifierRecette}
+        supprimerRecette={supprimerRecette}
+        onClose={() => setSelection(null)}
+      />
     </div>
   );
 }

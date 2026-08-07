@@ -304,6 +304,38 @@ export const useDataStore = create((set, get) => ({
     return { ok: true, recette: mapRecette(data) };
   },
 
+  // Réservé aux approbateurs (RLS, même policy que la suppression). Ne touche
+  // volontairement pas statut/seuil : le trigger qui les calcule ne s'exécute
+  // qu'à l'INSERT, et les recalculer ici rejouerait la validation de
+  // transition de statut pour un simple correctif (catégorie, montant, date).
+  modifierDepense: async (id, payload) => {
+    const { error } = await supabase
+      .from("depenses")
+      .update({
+        secteur_id: payload.secteurId,
+        categorie: payload.categorie,
+        montant: payload.montant,
+        date: payload.date,
+        description: payload.description || "",
+        nature_flux: payload.natureFlux,
+        source_financement: payload.sourceFinancement,
+      })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerDepenses();
+    return { ok: true };
+  },
+
+  modifierRecette: async (id, payload) => {
+    const { error } = await supabase
+      .from("recettes")
+      .update({ secteur_id: payload.secteurId, montant: payload.montant, date: payload.date, origine: payload.origine })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerRecettes();
+    return { ok: true };
+  },
+
   changerStatutDepense: async (id, statut) => {
     const { error } = await supabase.from("depenses").update({ statut }).eq("id", id);
     if (error) return { ok: false, error: error.message };

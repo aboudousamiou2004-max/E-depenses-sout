@@ -1,37 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Receipt, FileText, FileDown, Trash2 } from "lucide-react";
+import { Plus, Receipt, FileText, FileDown } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
+import DepenseDetailModal from "../../components/DepenseDetailModal";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
-import { fmtFCFA, statutLabel, verifierSeuilApprobation } from "../../lib/logic";
+import { useUIStore } from "../../store/uiStore";
+import { fmtFCFA, statutLabel, verifierSeuilApprobation, matchPeriode } from "../../lib/logic";
 import { exporterDepensesExcel } from "../../lib/exportExcel";
 import { ROLES_ACCES_TOTAL } from "../../lib/modules";
 
 export default function BusinessDepenses() {
   const config = useOutletContext();
-  const { depenses, categories, parametres, addDepense, supprimerDepense } = useDataStore();
+  const { secteurs, depenses, categories, parametres, addDepense, modifierDepense, supprimerDepense } = useDataStore();
   const { user } = useAuthStore();
+  const { periode, recherche } = useUIStore();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [deletingId, setDeletingId] = useState(null);
+  const [respecterPeriode, setRespecterPeriode] = useState(false);
+  const [selection, setSelection] = useState(null);
   const [form, setForm] = useState({ categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
-  const peutSupprimer = ROLES_ACCES_TOTAL.includes(user?.role);
-
-  async function supprimer(d) {
-    if (!window.confirm(`Supprimer définitivement cette dépense de ${fmtFCFA(d.montant)} ?`)) return;
-    setDeletingId(d.id);
-    const res = await supprimerDepense(d.id);
-    setDeletingId(null);
-    if (!res.ok) alert(res.error);
-  }
+  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
 
   const categoriesDuSecteur = useMemo(
     () => categories.filter((c) => c.secteurId === config.secteurId).map((c) => c.nom),
@@ -48,7 +44,16 @@ export default function BusinessDepenses() {
     () => depenses.filter((d) => d.secteurId === config.secteurId).sort((a, b) => (a.date < b.date ? 1 : -1)),
     [depenses, config.secteurId]
   );
-  const liste = useMemo(() => toutes.slice(0, 60), [toutes]);
+  const filtrees = useMemo(() => {
+    let rows = toutes;
+    if (respecterPeriode) rows = rows.filter((d) => matchPeriode(d.date, periode));
+    if (recherche.trim()) {
+      const q = recherche.toLowerCase();
+      rows = rows.filter((d) => d.categorie.toLowerCase().includes(q) || (d.description || "").toLowerCase().includes(q));
+    }
+    return rows;
+  }, [toutes, respecterPeriode, periode, recherche]);
+  const liste = useMemo(() => filtrees.slice(0, 60), [filtrees]);
 
   async function submit(e) {
     e.preventDefault();
@@ -68,15 +73,21 @@ export default function BusinessDepenses() {
     <div>
       <TopBarSimple title="Dépenses" subtitle={`${config.nom} — saisie des dépenses du secteur`} accent={config.color} />
 
-      <div className="flex justify-end gap-2.5 mb-4">
-        <Button
-          variant="ghost"
-          icon={FileDown}
-          onClick={() => exporterDepensesExcel(toutes, [{ id: config.secteurId, nom: config.nom }], `depenses-${config.secteurId}`)}
-        >
-          Exporter Excel
-        </Button>
-        <Button icon={Plus} onClick={() => setOpen(true)}>Nouvelle dépense</Button>
+      <div className="flex items-center gap-3 mb-4">
+        <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
+          <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
+          Limiter à la période sélectionnée
+        </label>
+        <div className="flex gap-2.5 ml-auto">
+          <Button
+            variant="ghost"
+            icon={FileDown}
+            onClick={() => exporterDepensesExcel(filtrees, [{ id: config.secteurId, nom: config.nom }], `depenses-${config.secteurId}`)}
+          >
+            Exporter Excel
+          </Button>
+          <Button icon={Plus} onClick={() => setOpen(true)}>Nouvelle dépense</Button>
+        </div>
       </div>
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
@@ -89,37 +100,31 @@ export default function BusinessDepenses() {
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3">Nature</th>
                 <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
                 {liste.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune dépense pour ce secteur.</td>
+                    <td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune dépense pour ce secteur.</td>
                   </tr>
                 )}
                 {liste.map((d, i) => {
                   const st = statutLabel(d.statut);
                   return (
-                    <motion.tr key={d.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.02 }} className="text-[13.5px] hover:bg-white/50 transition-colors">
+                    <motion.tr
+                      key={d.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: Math.min(i, 8) * 0.02 }}
+                      onClick={() => setSelection(d)}
+                      className="text-[13.5px] hover:bg-white/50 transition-colors cursor-pointer"
+                    >
                       <td className="px-4 py-3 font-semibold text-ink">{d.categorie}</td>
                       <td className="px-4 py-3 text-ink-soft tabular">{new Date(d.date).toLocaleDateString("fr-FR")}</td>
                       <td className="px-4 py-3 text-right font-bold tabular text-ink">{fmtFCFA(d.montant)}</td>
                       <td className="px-4 py-3 capitalize text-ink-soft">{d.natureFlux}</td>
                       <td className="px-4 py-3"><Badge tone={st.tone}>{st.label}</Badge></td>
-                      <td className="px-3 py-3 text-right">
-                        {peutSupprimer && (
-                          <button
-                            onClick={() => supprimer(d)}
-                            disabled={deletingId === d.id}
-                            title="Supprimer"
-                            className="w-7 h-7 rounded-lg inline-flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
-                          >
-                            <Trash2 size={15} strokeWidth={2.2} />
-                          </button>
-                        )}
-                      </td>
                     </motion.tr>
                   );
                 })}
@@ -184,6 +189,16 @@ export default function BusinessDepenses() {
           </div>
         </form>
       </Modal>
+
+      <DepenseDetailModal
+        depense={selection}
+        secteurs={secteurs}
+        categories={categories}
+        peutModifier={peutModifier}
+        modifierDepense={modifierDepense}
+        supprimerDepense={supprimerDepense}
+        onClose={() => setSelection(null)}
+      />
     </div>
   );
 }

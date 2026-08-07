@@ -1,29 +1,38 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Wallet, TrendingDown, Scale, PieChart as PieIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
 import GlassCard from "./ui/GlassCard";
 import StatTile from "./ui/StatTile";
 import ProgressRing from "./ui/ProgressRing";
 import Badge from "./ui/Badge";
+import TransactionsListModal from "./TransactionsListModal";
+import DepenseDetailModal from "./DepenseDetailModal";
+import RecetteDetailModal from "./RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
-import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months } from "../lib/logic";
+import { useAuthStore } from "../store/authStore";
+import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode } from "../lib/logic";
+import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 // Vue "un seul secteur" — utilisée à la fois par le tableau de bord E-DÉPENSES
 // (quand un secteur précis est sélectionné dans le filtre) et par le tableau de
 // bord des modules métier, pour ne jamais dupliquer ce calcul à deux endroits.
 export default function SecteurOverview({ secteurId, nom, color, labelRecettes = "Dernières recettes", onVoirDepenses, onVoirRecettes }) {
-  const { budgets, depenses, recettes } = useDataStore();
+  const { secteurs, budgets, depenses, recettes, categories, modifierDepense, supprimerDepense, modifierRecette, supprimerRecette } = useDataStore();
   const { periode } = useUIStore();
+  const { user } = useAuthStore();
+  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const [vueTransactions, setVueTransactions] = useState(null); // { type, title, items }
+  const [depenseSelectionnee, setDepenseSelectionnee] = useState(null);
+  const [recetteSelectionnee, setRecetteSelectionnee] = useState(null);
 
+  const suffixePeriode = periode.jour ? "du jour" : "du mois";
+
+  const depensesPeriode = depensesSecteurMois(depenses, secteurId, periode.annee, periode.mois, periode.jour);
+  const recettesPeriode = recettes.filter((r) => r.secteurId === secteurId && matchPeriode(r.date, periode));
   const budget = budgetSecteurMois(budgets, secteurId, periode.annee, periode.mois);
-  const depenseMois = totalMontant(depensesSecteurMois(depenses, secteurId, periode.annee, periode.mois));
-  const recetteMois = totalMontant(
-    recettes.filter((r) => {
-      const dt = new Date(r.date);
-      return r.secteurId === secteurId && dt.getFullYear() === periode.annee && dt.getMonth() === periode.mois;
-    })
-  );
+  const depenseMois = totalMontant(depensesPeriode);
+  const recetteMois = totalMontant(recettesPeriode);
   const pct = budget > 0 ? Math.round((depenseMois / budget) * 100) : depenseMois > 0 ? 100 : 0;
   const statut = statutBudget(pct / 100);
   const solde = recetteMois - depenseMois;
@@ -55,9 +64,27 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
   return (
     <div>
       <div className="grid grid-cols-4 gap-5 mb-5">
-        <StatTile icon={Wallet} label="Recettes du mois" value={fmtCompact(recetteMois) + " FCFA"} tone="#30D158" />
-        <StatTile icon={TrendingDown} label="Dépenses du mois" value={fmtCompact(depenseMois) + " FCFA"} tone={color} />
-        <StatTile icon={Scale} label="Solde" value={fmtCompact(solde) + " FCFA"} tone={solde >= 0 ? "#30D158" : "#FF453A"} />
+        <StatTile
+          icon={Wallet}
+          label={`Recettes ${suffixePeriode}`}
+          value={fmtCompact(recetteMois) + " FCFA"}
+          tone="#30D158"
+          onClick={() => setVueTransactions({ type: "recette", title: `Recettes ${suffixePeriode} — ${nom}`, items: recettesPeriode })}
+        />
+        <StatTile
+          icon={TrendingDown}
+          label={`Dépenses ${suffixePeriode}`}
+          value={fmtCompact(depenseMois) + " FCFA"}
+          tone={color}
+          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} — ${nom}`, items: depensesPeriode })}
+        />
+        <StatTile
+          icon={Scale}
+          label="Solde"
+          value={fmtCompact(solde) + " FCFA"}
+          tone={solde >= 0 ? "#30D158" : "#FF453A"}
+          onClick={() => setVueTransactions({ type: "recette", title: `Recettes et dépenses ${suffixePeriode} — ${nom}`, items: [...recettesPeriode].sort((a, b) => (a.date < b.date ? 1 : -1)) })}
+        />
         <StatTile icon={PieIcon} label="Budget alloué" value={budget ? fmtCompact(budget) + " FCFA" : "Non défini"} tone="#5E5CE6" />
       </div>
 
@@ -102,10 +129,10 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
           <div className="flex flex-col gap-2">
             {recentesDepenses.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucune dépense.</p>}
             {recentesDepenses.map((d) => (
-              <div key={d.id} className="flex items-center justify-between text-[12.5px] px-1">
+              <button key={d.id} onClick={() => setDepenseSelectionnee(d)} className="flex items-center justify-between text-[12.5px] px-1 py-0.5 rounded-lg hover:bg-black/[0.03] transition-colors text-left">
                 <span className="text-ink-soft truncate">{d.categorie}</span>
                 <span className="font-bold tabular text-ink shrink-0 ml-2">{fmtFCFA(d.montant)}</span>
-              </div>
+              </button>
             ))}
           </div>
           {onVoirDepenses && (
@@ -120,10 +147,10 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
           <div className="flex flex-col gap-2">
             {recentesRecettes.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucune recette.</p>}
             {recentesRecettes.map((r) => (
-              <div key={r.id} className="flex items-center justify-between text-[12.5px] px-1">
+              <button key={r.id} onClick={() => setRecetteSelectionnee(r)} className="flex items-center justify-between text-[12.5px] px-1 py-0.5 rounded-lg hover:bg-black/[0.03] transition-colors text-left">
                 <span className="text-ink-soft truncate">{r.origine}</span>
                 <span className="font-bold tabular text-[#1a7d34] shrink-0 ml-2">+{fmtFCFA(r.montant)}</span>
-              </div>
+              </button>
             ))}
           </div>
           {onVoirRecettes && (
@@ -133,6 +160,32 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
           )}
         </GlassCard>
       </div>
+
+      {vueTransactions && (
+        <TransactionsListModal
+          type={vueTransactions.type}
+          title={vueTransactions.title}
+          items={vueTransactions.items}
+          onClose={() => setVueTransactions(null)}
+        />
+      )}
+      <DepenseDetailModal
+        depense={depenseSelectionnee}
+        secteurs={secteurs}
+        categories={categories}
+        peutModifier={peutModifier}
+        modifierDepense={modifierDepense}
+        supprimerDepense={supprimerDepense}
+        onClose={() => setDepenseSelectionnee(null)}
+      />
+      <RecetteDetailModal
+        recette={recetteSelectionnee}
+        secteurs={secteurs}
+        peutModifier={peutModifier}
+        modifierRecette={modifierRecette}
+        supprimerRecette={supprimerRecette}
+        onClose={() => setRecetteSelectionnee(null)}
+      />
     </div>
   );
 }

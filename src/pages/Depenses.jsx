@@ -1,39 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Receipt, FileText, FileDown, Trash2 } from "lucide-react";
+import { Plus, Receipt, FileText, FileDown } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import Field, { TextInput, Select } from "../components/ui/Field";
+import DepenseDetailModal from "../components/DepenseDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
-import { fmtFCFA, statutLabel, verifierSeuilApprobation } from "../lib/logic";
+import { fmtFCFA, statutLabel, verifierSeuilApprobation, matchPeriode } from "../lib/logic";
 import { exporterDepensesExcel } from "../lib/exportExcel";
 import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 export default function Depenses() {
-  const { secteurs, depenses, categories, parametres, addDepense, supprimerDepense } = useDataStore();
-  const { secteurFiltre } = useUIStore();
+  const { secteurs, depenses, categories, parametres, addDepense, modifierDepense, supprimerDepense } = useDataStore();
+  const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [deletingId, setDeletingId] = useState(null);
+  const [respecterPeriode, setRespecterPeriode] = useState(false);
+  const [selection, setSelection] = useState(null);
   const [form, setForm] = useState({ secteurId: "", categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
   // Mêmes rôles que le circuit d'autorisation (is_approbateur côté RLS) — un
-  // agent peut soumettre une dépense mais pas l'effacer après coup.
-  const peutSupprimer = ROLES_ACCES_TOTAL.includes(user?.role);
-
-  async function supprimer(d) {
-    if (!window.confirm(`Supprimer définitivement cette dépense de ${fmtFCFA(d.montant)} ?`)) return;
-    setDeletingId(d.id);
-    const res = await supprimerDepense(d.id);
-    setDeletingId(null);
-    if (!res.ok) alert(res.error);
-  }
+  // agent peut soumettre une dépense mais pas la modifier/effacer après coup.
+  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
 
   const categoriesDuSecteur = useMemo(
     () => categories.filter((c) => c.secteurId === form.secteurId).map((c) => c.nom),
@@ -54,10 +48,15 @@ export default function Depenses() {
     }
   }, [categoriesDuSecteur, form.categorie]);
 
-  const filtrees = useMemo(
-    () => (secteurFiltre === "tous" ? depenses : depenses.filter((d) => d.secteurId === secteurFiltre)),
-    [depenses, secteurFiltre]
-  );
+  const filtrees = useMemo(() => {
+    let rows = secteurFiltre === "tous" ? depenses : depenses.filter((d) => d.secteurId === secteurFiltre);
+    if (respecterPeriode) rows = rows.filter((d) => matchPeriode(d.date, periode));
+    if (recherche.trim()) {
+      const q = recherche.toLowerCase();
+      rows = rows.filter((d) => d.categorie.toLowerCase().includes(q) || (d.description || "").toLowerCase().includes(q));
+    }
+    return rows;
+  }, [depenses, secteurFiltre, respecterPeriode, periode, recherche]);
   const list = useMemo(() => [...filtrees].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 60), [filtrees]);
 
   function secteurOf(id) {
@@ -83,11 +82,18 @@ export default function Depenses() {
     <div>
       <TopBar title="Dépenses" subtitle="Saisie et suivi des dépenses par secteur d'activité" />
 
-      <div className="flex justify-end gap-2.5 mb-4">
-        <Button variant="ghost" icon={FileDown} onClick={() => exporterDepensesExcel(filtrees, secteurs, "depenses-e-depenses")}>
-          Exporter Excel
-        </Button>
-        <Button icon={Plus} onClick={() => setOpen(true)}>Nouvelle dépense</Button>
+      <div className="flex items-center gap-3 mb-4">
+        <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
+          <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
+          Limiter à la période sélectionnée
+        </label>
+        <span className="text-[12.5px] text-ink-soft font-medium">{list.length} entrée(s)</span>
+        <div className="flex gap-2.5 ml-auto">
+          <Button variant="ghost" icon={FileDown} onClick={() => exporterDepensesExcel(filtrees, secteurs, "depenses-e-depenses")}>
+            Exporter Excel
+          </Button>
+          <Button icon={Plus} onClick={() => setOpen(true)}>Nouvelle dépense</Button>
+        </div>
       </div>
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
@@ -101,7 +107,6 @@ export default function Depenses() {
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3">Nature</th>
                 <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -115,7 +120,8 @@ export default function Depenses() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: Math.min(i, 8) * 0.02 }}
-                      className="text-[13.5px] hover:bg-white/50 rounded-2xl transition-colors"
+                      onClick={() => setSelection(d)}
+                      className="text-[13.5px] hover:bg-white/50 rounded-2xl transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -129,18 +135,6 @@ export default function Depenses() {
                       <td className="px-4 py-3 capitalize text-ink-soft">{d.natureFlux}</td>
                       <td className="px-4 py-3">
                         <Badge tone={st.tone}>{st.label}</Badge>
-                      </td>
-                      <td className="px-3 py-3 text-right">
-                        {peutSupprimer && (
-                          <button
-                            onClick={() => supprimer(d)}
-                            disabled={deletingId === d.id}
-                            title="Supprimer"
-                            className="w-7 h-7 rounded-lg inline-flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
-                          >
-                            <Trash2 size={15} strokeWidth={2.2} />
-                          </button>
-                        )}
                       </td>
                     </motion.tr>
                   );
@@ -214,6 +208,16 @@ export default function Depenses() {
           </div>
         </form>
       </Modal>
+
+      <DepenseDetailModal
+        depense={selection}
+        secteurs={secteurs}
+        categories={categories}
+        peutModifier={peutModifier}
+        modifierDepense={modifierDepense}
+        supprimerDepense={supprimerDepense}
+        onClose={() => setSelection(null)}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import Field, { TextInput } from "../components/ui/Field";
 import SecteurOverview from "../components/SecteurOverview";
+import TransactionsListModal from "../components/TransactionsListModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
@@ -30,6 +31,7 @@ export default function Dashboard() {
   const [ouvrirAjoutSecteur, setOuvrirAjoutSecteur] = useState(false);
   const [formSecteur, setFormSecteur] = useState({ nom: "", label: "", color: COULEURS_SUGGEREES[0] });
   const [savingSecteur, setSavingSecteur] = useState(false);
+  const [vueTransactions, setVueTransactions] = useState(null); // { type, title, items }
 
   async function creerSecteur() {
     setSavingSecteur(true);
@@ -42,8 +44,8 @@ export default function Dashboard() {
 
   const secteurActif = secteurFiltre !== "tous" ? secteurs.find((s) => s.id === secteurFiltre) : null;
 
-  const secteursData = useMemo(() => tableauSecteurs(secteurs, depenses, budgets, periode.annee, periode.mois), [secteurs, depenses, budgets, periode]);
-  const alertes = useMemo(() => secteursEnAlerte(secteurs, depenses, budgets, periode.annee, periode.mois), [secteurs, depenses, budgets, periode]);
+  const secteursData = useMemo(() => tableauSecteurs(secteurs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteurs, depenses, budgets, periode]);
+  const alertes = useMemo(() => secteursEnAlerte(secteurs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteurs, depenses, budgets, periode]);
 
   const totalDepense = totalMontant(secteursData.map((s) => ({ montant: s.depense })));
   const totalBudget = totalMontant(secteursData.map((s) => ({ montant: s.budget })));
@@ -55,7 +57,16 @@ export default function Dashboard() {
     secteurs.flatMap((s) => depensesSecteurMois(depenses, s.id, anneePrecedente, moisPrecedent))
   );
 
-  const demandesEnAttente = depenses.filter((d) => d.statut === "en_attente").length;
+  const depensesEnAttente = useMemo(() => depenses.filter((d) => d.statut === "en_attente"), [depenses]);
+  const depensesPeriodeToutes = useMemo(
+    () => secteurs.flatMap((s) => depensesSecteurMois(depenses, s.id, periode.annee, periode.mois, periode.jour)),
+    [secteurs, depenses, periode]
+  );
+  const depensesAlertes = useMemo(() => {
+    const idsAlertes = new Set(alertes.map((a) => a.id));
+    return depensesPeriodeToutes.filter((d) => idsAlertes.has(d.secteurId));
+  }, [depensesPeriodeToutes, alertes]);
+  const suffixePeriode = periode.jour ? "du jour" : "du mois";
 
   const barData = secteursData.map((s) => ({ nom: s.nom, depense: s.depense, budget: s.budget, fill: s.color }));
 
@@ -87,10 +98,35 @@ export default function Dashboard() {
       <TopBar title="Tableau de bord" subtitle="Vue consolidée — pilotage financier de LA TERMITIÈRE" />
 
       <div className="grid grid-cols-4 auto-rows-[172px] gap-5">
-        <StatTile icon={Wallet} label="Dépenses du mois" value={fmtCompact(totalDepense) + " FCFA"} trend={croissance(totalDepense, totalPrecedent)} tone="#0A84FF" />
-        <StatTile icon={TrendingUp} label="Budget consommé" value={`${Math.round(tauxGlobal * 100)}%`} tone="#30D158" />
-        <StatTile icon={AlertTriangle} label="Secteurs en alerte" value={alertes.length} tone="#FF9F0A" />
-        <StatTile icon={Clock3} label="Demandes en attente" value={demandesEnAttente} tone="#FF453A" />
+        <StatTile
+          icon={Wallet}
+          label={`Dépenses ${suffixePeriode}`}
+          value={fmtCompact(totalDepense) + " FCFA"}
+          trend={croissance(totalDepense, totalPrecedent)}
+          tone="#0A84FF"
+          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} — tous secteurs`, items: depensesPeriodeToutes })}
+        />
+        <StatTile
+          icon={TrendingUp}
+          label="Budget consommé"
+          value={`${Math.round(tauxGlobal * 100)}%`}
+          tone="#30D158"
+          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} — tous secteurs`, items: depensesPeriodeToutes })}
+        />
+        <StatTile
+          icon={AlertTriangle}
+          label="Secteurs en alerte"
+          value={alertes.length}
+          tone="#FF9F0A"
+          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses des secteurs en alerte ${suffixePeriode}`, items: depensesAlertes })}
+        />
+        <StatTile
+          icon={Clock3}
+          label="Demandes en attente"
+          value={depensesEnAttente.length}
+          tone="#FF453A"
+          onClick={() => setVueTransactions({ type: "depense", title: "Demandes en attente d'approbation", items: depensesEnAttente })}
+        />
 
         {/* Dépenses par secteur */}
         <GlassCard className="col-span-3 row-span-2 p-6 flex flex-col">
@@ -171,7 +207,12 @@ export default function Dashboard() {
               <motion.div
                 key={a.id}
                 whileHover={{ x: 3 }}
-                className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-2xl bg-white/50 hover:bg-white/75 transition-colors"
+                onClick={() => setVueTransactions({
+                  type: "depense",
+                  title: `Dépenses ${suffixePeriode} — ${a.nom}`,
+                  items: depensesPeriodeToutes.filter((d) => d.secteurId === a.id),
+                })}
+                className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-2xl bg-white/50 hover:bg-white/75 transition-colors cursor-pointer"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: a.color }} />
@@ -231,6 +272,15 @@ export default function Dashboard() {
           Le nouveau secteur apparaît aussitôt dans les filtres et les formulaires de dépense/recette. Aucun budget n'est défini par défaut — vous pourrez en saisir un dès le premier mois.
         </p>
       </Modal>
+
+      {vueTransactions && (
+        <TransactionsListModal
+          type={vueTransactions.type}
+          title={vueTransactions.title}
+          items={vueTransactions.items}
+          onClose={() => setVueTransactions(null)}
+        />
+      )}
     </div>
   );
 }

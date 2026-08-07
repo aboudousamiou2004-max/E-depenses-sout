@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
 import GlassCard from "./GlassCard";
 
-export default function StatTile({ icon: Icon, label, value, trend, tone = "#0A84FF", className = "" }) {
+export default function StatTile({ icon: Icon, label, value, trend, tone = "#0A84FF", className = "", onClick }) {
   return (
-    <GlassCard className={`p-5 flex flex-col justify-between ${className}`}>
+    <GlassCard
+      className={`p-5 flex flex-col justify-between ${onClick ? "cursor-pointer" : ""} ${className}`}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between">
         <div
           className="w-11 h-11 rounded-2xl flex items-center justify-center"

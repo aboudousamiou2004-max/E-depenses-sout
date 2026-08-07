@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Wallet, TrendingUp, AlertTriangle, Search, Eye, Trash2 } from "lucide-react";
+import { Plus, Wallet, TrendingUp, AlertTriangle } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import StatTile from "../components/ui/StatTile";
@@ -8,10 +8,11 @@ import Badge from "../components/ui/Badge";
 import Button from "../components/ui/Button";
 import Modal from "../components/ui/Modal";
 import Field, { TextInput, Select } from "../components/ui/Field";
+import RecetteDetailModal from "../components/RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
-import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte } from "../lib/logic";
+import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte, matchPeriode } from "../lib/logic";
 import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 const ORIGINES = ["Vente", "Prestation", "Facturation client", "Subvention"];
@@ -27,27 +28,17 @@ const ORIGINE_TONE = {
 };
 
 export default function Recettes() {
-  const { secteurs, recettes, budgets, depenses, addRecette, supprimerRecette } = useDataStore();
-  const { secteurFiltre, periode } = useUIStore();
+  const { secteurs, recettes, budgets, depenses, addRecette, modifierRecette, supprimerRecette } = useDataStore();
+  const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ secteurId: "", origine: ORIGINES[0], montant: "", date: "2026-07-27" });
-  const [recherche, setRecherche] = useState("");
+  const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [filtreOrigine, setFiltreOrigine] = useState("");
   const [detail, setDetail] = useState(null);
-  const [deleting, setDeleting] = useState(false);
-  const peutSupprimer = ROLES_ACCES_TOTAL.includes(user?.role);
-
-  async function supprimer(recette) {
-    if (!window.confirm(`Supprimer définitivement cette recette de ${fmtFCFA(recette.montant)} ?`)) return;
-    setDeleting(true);
-    const res = await supprimerRecette(recette.id);
-    setDeleting(false);
-    if (!res.ok) return alert(res.error);
-    setDetail(null);
-  }
+  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
 
   // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
   // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
@@ -59,12 +50,14 @@ export default function Recettes() {
     return secteurs.find((s) => s.id === id);
   }
 
-  // Base filtrée (secteur — filtre global de la TopBar — + source + recherche),
-  // sans le mois : sert de socle aux KPI par secteur ci-dessous, qui ont leur
-  // propre période (mois en cours), indépendante du tableau détaillé.
+  // Base filtrée (secteur — filtre global de la TopBar — + source + recherche
+  // + éventuellement la période de la TopBar, activable via la case à cocher
+  // ci-dessous) : sert de socle à la fois au tableau détaillé et aux KPI par
+  // secteur (qui, eux, restent toujours calculés sur la période en cours).
   const baseFiltree = useMemo(() => {
     let rows = secteurFiltre === "tous" ? recettes : recettes.filter((r) => r.secteurId === secteurFiltre);
     if (filtreOrigine) rows = rows.filter((r) => r.origine === filtreOrigine);
+    if (respecterPeriode) rows = rows.filter((r) => matchPeriode(r.date, periode));
     if (recherche.trim()) {
       const q = recherche.toLowerCase();
       rows = rows.filter(
@@ -72,7 +65,7 @@ export default function Recettes() {
       );
     }
     return rows;
-  }, [recettes, secteurFiltre, filtreOrigine, recherche, secteurs]);
+  }, [recettes, secteurFiltre, filtreOrigine, recherche, secteurs, respecterPeriode, periode]);
 
   const list = useMemo(() => [...baseFiltree].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 60), [baseFiltree]);
   const totalPeriode = totalMontant(list);
@@ -115,8 +108,6 @@ export default function Recettes() {
     setForm((f) => ({ ...f, montant: "" }));
   }
 
-  const secteurDetail = detail ? secteurOf(detail.secteurId) : null;
-
   return (
     <div>
       <TopBar title="Recettes" subtitle="Suivi des encaissements par secteur d'activité" />
@@ -157,20 +148,8 @@ export default function Recettes() {
         </GlassCard>
       )}
 
-      {/* Filtres — recherche, source, + bouton d'ajout */}
+      {/* Filtres — source, période, + bouton d'ajout (la recherche est dans la TopBar) */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div className="w-56">
-          <label className="block text-[11.5px] font-semibold text-ink-soft mb-1.5 ml-1">Recherche</label>
-          <div className="glass rounded-2xl px-3 py-2.5 flex items-center gap-2">
-            <Search size={15} className="text-ink-soft" strokeWidth={2.2} />
-            <input
-              value={recherche}
-              onChange={(e) => setRecherche(e.target.value)}
-              placeholder="Origine, secteur…"
-              className="bg-transparent outline-none text-sm text-ink placeholder:text-ink-soft/60 w-full"
-            />
-          </div>
-        </div>
         <div className="w-48">
           <label className="block text-[11.5px] font-semibold text-ink-soft mb-1.5 ml-1">Source</label>
           <Select value={filtreOrigine} onChange={(e) => setFiltreOrigine(e.target.value)}>
@@ -180,6 +159,10 @@ export default function Recettes() {
             ))}
           </Select>
         </div>
+        <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft mb-2.5 cursor-pointer">
+          <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
+          Limiter à la période sélectionnée
+        </label>
         <span className="text-[12.5px] text-ink-soft font-medium mb-2.5">{list.length} entrée(s) · {fmtFCFA(totalPeriode)}</span>
         <Button icon={Plus} onClick={() => setOpen(true)} className="ml-auto">Nouvelle recette</Button>
       </div>
@@ -193,13 +176,12 @@ export default function Recettes() {
                 <th className="px-4 py-3">Origine</th>
                 <th className="px-4 py-3">Date</th>
                 <th className="px-4 py-3 text-right">Montant</th>
-                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune recette trouvée.</td>
+                  <td colSpan={4} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune recette trouvée.</td>
                 </tr>
               )}
               {list.map((r, i) => {
@@ -224,27 +206,6 @@ export default function Recettes() {
                     </td>
                     <td className="px-4 py-3 text-ink-soft tabular">{new Date(r.date).toLocaleDateString("fr-FR")}</td>
                     <td className="px-4 py-3 text-right font-bold tabular text-[#1a7d34]">+{fmtFCFA(r.montant)}</td>
-                    <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center justify-end">
-                        <button
-                          onClick={() => setDetail(r)}
-                          title="Voir le détail"
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-soft hover:bg-black/5 hover:text-ink transition-colors"
-                        >
-                          <Eye size={15} strokeWidth={2.2} />
-                        </button>
-                        {peutSupprimer && (
-                          <button
-                            onClick={() => supprimer(r)}
-                            disabled={deleting}
-                            title="Supprimer"
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
-                          >
-                            <Trash2 size={15} strokeWidth={2.2} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
                   </motion.tr>
                 );
               })}
@@ -253,40 +214,14 @@ export default function Recettes() {
         </div>
       </GlassCard>
 
-      {/* Détail d'une recette */}
-      <Modal
-        open={!!detail}
+      <RecetteDetailModal
+        recette={detail}
+        secteurs={secteurs}
+        peutModifier={peutModifier}
+        modifierRecette={modifierRecette}
+        supprimerRecette={supprimerRecette}
         onClose={() => setDetail(null)}
-        title={detail?.origine || "Détail de la recette"}
-        footer={
-          peutSupprimer && detail ? (
-            <Button variant="ghost" icon={Trash2} onClick={() => supprimer(detail)} disabled={deleting} className="text-[#FF453A]">
-              {deleting ? "Suppression…" : "Supprimer"}
-            </Button>
-          ) : undefined
-        }
-      >
-        {detail && (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center justify-between rounded-2xl bg-black/[0.03] px-3.5 py-2.5">
-              <span className="text-[13px] text-ink-soft">Secteur</span>
-              <span className="text-[13px] font-bold" style={{ color: secteurDetail?.color }}>{secteurDetail?.nom}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-black/[0.03] px-3.5 py-2.5">
-              <span className="text-[13px] text-ink-soft">Source</span>
-              <Badge tone={ORIGINE_TONE[detail.origine] || "ink"}>{detail.origine}</Badge>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-black/[0.03] px-3.5 py-2.5">
-              <span className="text-[13px] text-ink-soft">Date</span>
-              <span className="text-[13px] font-bold text-ink">{new Date(detail.date).toLocaleDateString("fr-FR")}</span>
-            </div>
-            <div className="flex items-center justify-between rounded-2xl bg-black/[0.03] px-3.5 py-2.5">
-              <span className="text-[13px] text-ink-soft">Montant</span>
-              <span className="text-[13px] font-bold text-[#1a7d34]">+{fmtFCFA(detail.montant)}</span>
-            </div>
-          </div>
-        )}
-      </Modal>
+      />
 
       {/* Nouvelle recette */}
       <Modal

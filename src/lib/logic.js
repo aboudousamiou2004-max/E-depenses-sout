@@ -16,15 +16,27 @@ export function monthKey(date) {
   return `${d.getFullYear()}-${d.getMonth()}`;
 }
 
+// `periode` = { annee, mois, jour } — `jour` à null compare le mois entier
+// (comportement historique), une valeur 1-31 restreint à cette seule journée.
+export function matchPeriode(date, periode) {
+  const dt = new Date(date);
+  if (dt.getFullYear() !== periode.annee || dt.getMonth() !== periode.mois) return false;
+  return periode.jour ? dt.getDate() === periode.jour : true;
+}
+
 export function budgetSecteurMois(budgets, secteurId, annee, mois) {
   return budgets.find((b) => b.secteurId === secteurId && b.annee === annee && b.mois === mois)?.montant ?? 0;
 }
 
-export function depensesSecteurMois(depenses, secteurId, annee, mois) {
+export function depensesSecteurMois(depenses, secteurId, annee, mois, jour = null) {
   return depenses.filter((d) => {
-    const dt = new Date(d.date);
-    return d.secteurId === secteurId && dt.getFullYear() === annee && dt.getMonth() === mois && d.statut !== "refusee";
+    if (d.secteurId !== secteurId || d.statut === "refusee") return false;
+    return matchPeriode(d.date, { annee, mois, jour });
   });
+}
+
+export function recettesSecteurPeriode(recettes, secteurId, periode) {
+  return recettes.filter((r) => r.secteurId === secteurId && matchPeriode(r.date, periode));
 }
 
 export function totalMontant(list) {
@@ -42,11 +54,11 @@ export function statutBudget(taux) {
   return { label: "Dans le budget", tone: "mint" };
 }
 
-export function secteursEnAlerte(secteurs, depenses, budgets, annee, mois) {
+export function secteursEnAlerte(secteurs, depenses, budgets, annee, mois, jour = null) {
   return secteurs
     .map((s) => {
       const budget = budgetSecteurMois(budgets, s.id, annee, mois);
-      const depense = totalMontant(depensesSecteurMois(depenses, s.id, annee, mois));
+      const depense = totalMontant(depensesSecteurMois(depenses, s.id, annee, mois, jour));
       const taux = tauxConsommation(depense, budget);
       return { ...s, budget, depense, taux, ...statutBudget(taux) };
     })
@@ -54,10 +66,10 @@ export function secteursEnAlerte(secteurs, depenses, budgets, annee, mois) {
     .sort((a, b) => b.taux - a.taux);
 }
 
-export function tableauSecteurs(secteurs, depenses, budgets, annee, mois) {
+export function tableauSecteurs(secteurs, depenses, budgets, annee, mois, jour = null) {
   return secteurs.map((s) => {
     const budget = budgetSecteurMois(budgets, s.id, annee, mois);
-    const depense = totalMontant(depensesSecteurMois(depenses, s.id, annee, mois));
+    const depense = totalMontant(depensesSecteurMois(depenses, s.id, annee, mois, jour));
     const taux = tauxConsommation(depense, budget);
     return { ...s, budget, depense, taux, ...statutBudget(taux) };
   });
