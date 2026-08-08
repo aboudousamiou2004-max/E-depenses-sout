@@ -21,10 +21,10 @@ const PUSH_LABEL = {
 };
 
 const PUSH_CAPTION = {
-  actif: "Tu reçois les alertes même app fermée",
-  inactif: "Reçois les alertes même app fermée",
-  refuse: "Débloque-les dans les réglages du navigateur",
-  "non-supporte": "Ce navigateur n'est pas compatible",
+  actif: "Actives, même app fermée",
+  inactif: "Reçois les alertes app fermée",
+  refuse: "Bloquées — réglages du navigateur",
+  "non-supporte": "Navigateur non compatible",
 };
 
 // Formatage relatif court ("à l'instant", "12 min", "3 h", "2 j") — au-delà
@@ -168,7 +168,7 @@ export default function NotificationBell() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] font-semibold text-ink leading-snug">{PUSH_LABEL[pushStatut]}</p>
-                    <p className="text-[11px] text-ink-soft leading-snug mt-0.5 truncate">{PUSH_CAPTION[pushStatut]}</p>
+                    <p className="text-[11px] text-ink-soft leading-snug mt-0.5">{PUSH_CAPTION[pushStatut]}</p>
                   </div>
                   <Toggle on={pushStatut === "actif"} disabled={pushStatut === "refuse" || pushStatut === "non-supporte"} loading={pushLoading} />
                 </button>
