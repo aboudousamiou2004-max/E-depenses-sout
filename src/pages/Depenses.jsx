@@ -11,12 +11,12 @@ import DepenseDetailModal from "../components/DepenseDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
-import { fmtFCFA, statutLabel, verifierSeuilApprobation, matchPeriode } from "../lib/logic";
+import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode } from "../lib/logic";
 import { exporterDepensesExcel } from "../lib/exportExcel";
 import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 export default function Depenses() {
-  const { secteurs, depenses, categories, parametres, addDepense, modifierDepense, supprimerDepense } = useDataStore();
+  const { secteurs, depenses, categories, budgets, addDepense, modifierDepense, supprimerDepense } = useDataStore();
   const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -76,7 +76,8 @@ export default function Depenses() {
   }
 
   const montantNum = Number(form.montant || 0);
-  const declenche = verifierSeuilApprobation(montantNum, parametres.seuilAutorisation);
+  const dateForm = form.date ? new Date(form.date) : new Date();
+  const evaluation = evaluationAutorisation(depenses, budgets, form.secteurId, dateForm.getFullYear(), dateForm.getMonth(), montantNum);
 
   return (
     <div>
@@ -202,9 +203,11 @@ export default function Depenses() {
 
           <div className="flex items-center gap-2 text-[12.5px] font-medium px-3.5 py-2.5 rounded-2xl bg-black/[0.03] text-ink-soft">
             <FileText size={14} strokeWidth={2.2} className="shrink-0" />
-            {declenche
-              ? `Ce montant déclenchera automatiquement le circuit d'autorisation — PAU et GE en seront notifiés (seuil : ${fmtFCFA(parametres.seuilAutorisation)}).`
-              : "Ce montant est inférieur au seuil d'autorisation — décaissement direct."}
+            {evaluation.declenche
+              ? evaluation.budget === 0
+                ? "Aucun budget défini pour ce secteur ce mois-ci — cette dépense déclenchera automatiquement le circuit d'autorisation (PAU et GE en seront notifiés)."
+                : `Ce montant dépasserait le budget restant du secteur (${fmtFCFA(evaluation.restant)} sur ${fmtFCFA(evaluation.budget)}) — le circuit d'autorisation sera déclenché, PAU et GE en seront notifiés.`
+              : `Ce montant reste dans le budget alloué (${fmtFCFA(evaluation.restant)} restant sur ${fmtFCFA(evaluation.budget)}) — décaissement direct.`}
           </div>
         </form>
       </Modal>

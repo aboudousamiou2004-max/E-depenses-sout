@@ -9,8 +9,9 @@ const TYPE_TONE = { warning: "#FF9F0A", info: "#0A84FF", success: "#30D158", dan
 
 // Cloche de notifications — chaque utilisateur ne voit que les siennes
 // (destinataireUid). Alimentée par le circuit d'autorisation des dépenses :
-// demande envoyée à PAU/GE au-dessus du seuil, puis réponse (approuvée /
-// refusée / décaissée) renvoyée au secteur qui a fait la demande.
+// demande envoyée à PAU/GE dès dépassement du budget alloué au secteur,
+// puis réponse (approuvée / refusée / décaissée) renvoyée au secteur qui a
+// fait la demande.
 export default function NotificationBell() {
   const { notifications, marquerNotificationLue, marquerToutesNotificationsLues } = useDataStore();
   const { user } = useAuthStore();

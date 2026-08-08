@@ -96,8 +96,16 @@ export function croissance(actuel, precedent) {
   return (actuel - precedent) / precedent;
 }
 
-export function verifierSeuilApprobation(montant, seuil = 30000) {
-  return montant >= seuil;
+// Reproduit côté client, pour l'indication affichée dans le formulaire de
+// saisie, la même règle que le trigger serveur `compute_depense_statut` :
+// le circuit d'autorisation se déclenche par dépassement du budget alloué
+// au secteur pour le mois, pas par un seuil fixe. Le trigger reste seul
+// juge côté serveur — ceci n'est qu'un indicateur, jamais appliqué tel quel.
+export function evaluationAutorisation(depenses, budgets, secteurId, annee, mois, montantSaisi) {
+  const budget = budgetSecteurMois(budgets, secteurId, annee, mois);
+  const dejaDepense = totalMontant(depensesSecteurMois(depenses, secteurId, annee, mois));
+  const declenche = budget === 0 || dejaDepense + (Number(montantSaisi) || 0) > budget;
+  return { declenche, budget, dejaDepense, restant: Math.max(0, budget - dejaDepense) };
 }
 
 export function statutLabel(statut) {

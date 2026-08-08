@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Save, Plus, Trash2, FolderPlus, Building2 } from "lucide-react";
+import { useState } from "react";
+import { Save, Plus, Trash2, FolderPlus, Building2, ShieldCheck } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import Button from "../components/ui/Button";
@@ -11,7 +11,7 @@ import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 export default function Parametres() {
   const { user } = useAuthStore();
-  const { secteurs, categories, parametres, setSeuilAutorisation, addCategorie, supprimerCategorie, addSecteur, modifierSecteur, supprimerSecteur } = useDataStore();
+  const { secteurs, categories, addCategorie, supprimerCategorie, addSecteur, modifierSecteur, supprimerSecteur } = useDataStore();
 
   if (!ROLES_ACCES_TOTAL.includes(user?.role)) {
     return (
@@ -25,7 +25,7 @@ export default function Parametres() {
     <div>
       <TopBar title="Paramètres" subtitle="Configuration du module E-DÉPENSES" />
       <div className="flex flex-col gap-5">
-        <SectionSeuil parametres={parametres} setSeuilAutorisation={setSeuilAutorisation} />
+        <SectionCircuitAutorisation />
         <SectionCategories secteurs={secteurs} categories={categories} addCategorie={addCategorie} supprimerCategorie={supprimerCategorie} />
         <SectionSecteurs secteurs={secteurs} addSecteur={addSecteur} modifierSecteur={modifierSecteur} supprimerSecteur={supprimerSecteur} />
       </div>
@@ -33,46 +33,19 @@ export default function Parametres() {
   );
 }
 
-function SectionSeuil({ parametres, setSeuilAutorisation }) {
-  const [valeur, setValeur] = useState(parametres.seuilAutorisation);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
-
-  // `parametres` se charge de façon asynchrone (Supabase) après le montage de
-  // ce composant — sans ce useEffect, le champ resterait figé sur la valeur
-  // par défaut (30000) capturée par useState au premier rendu.
-  useEffect(() => {
-    setValeur(parametres.seuilAutorisation);
-  }, [parametres.seuilAutorisation]);
-
-  async function enregistrer() {
-    setSaving(true);
-    setSaved(false);
-    setError("");
-    const res = await setSeuilAutorisation(Number(valeur));
-    setSaving(false);
-    if (!res.ok) return setError(res.error);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
-  }
-
+// Le circuit d'autorisation n'a plus de seuil fixe à configurer : il se
+// déclenche automatiquement dès qu'une dépense ferait dépasser le budget
+// alloué au secteur pour le mois (voir Tableau de bord → Budget par
+// secteur) — panneau purement informatif, rien à enregistrer ici.
+function SectionCircuitAutorisation() {
   return (
     <GlassCard className="p-6" hover={false}>
-      <h3 className="font-bold tracking-tight text-ink mb-1">Seuil d'autorisation</h3>
-      <p className="text-[12.5px] text-ink-soft mb-4">
-        Montant à partir duquel une dépense déclenche automatiquement le circuit d'approbation (PAU / GE / superviseur), au lieu d'un décaissement direct.
+      <h3 className="font-bold tracking-tight text-ink mb-1 flex items-center gap-2">
+        <ShieldCheck size={17} className="text-ink-soft" /> Circuit d'autorisation
+      </h3>
+      <p className="text-[12.5px] text-ink-soft">
+        Une dépense déclenche automatiquement le circuit d'approbation (PAU / GE / direction) dès que son montant, ajouté aux dépenses déjà saisies ce mois-ci pour le secteur, dépasserait le budget alloué à ce secteur. En l'absence de budget défini pour le secteur et le mois, toute dépense passe systématiquement en attente d'approbation. Il n'y a plus de seuil fixe à configurer : ajustez plutôt le budget de chaque secteur, mois par mois, depuis le tableau de bord.
       </p>
-      {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
-      <div className="flex items-end gap-3">
-        <Field label="Montant (FCFA)">
-          <TextInput type="number" value={valeur} onChange={(e) => setValeur(e.target.value)} className="w-56" />
-        </Field>
-        <Button icon={Save} onClick={enregistrer} disabled={saving} className="mb-3.5">
-          {saving ? "Enregistrement…" : "Enregistrer"}
-        </Button>
-        {saved && <span className="text-[12.5px] font-semibold text-[#30D158] mb-4">Enregistré ✓</span>}
-      </div>
     </GlassCard>
   );
 }

@@ -84,7 +84,6 @@ export const useDataStore = create((set, get) => ({
   notifications: [],
   users: [],
   categories: [],
-  parametres: { seuilAutorisation: 30000 },
   loaded: false,
 
   // Charge toutes les données de l'app en une fois — appelé par authStore dès
@@ -92,7 +91,7 @@ export const useDataStore = create((set, get) => ({
   // (chacun ne peut de toute façon voir que les siennes, RLS l'impose déjà,
   // mais filtrer ici évite de dépendre de l'ordre des champs retournés).
   chargerTout: async (userId) => {
-    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, config] = await Promise.all([
+    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories] = await Promise.all([
       supabase.from("secteurs").select("*").order("created_at"),
       supabase.from("budgets").select("*"),
       supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
@@ -103,7 +102,6 @@ export const useDataStore = create((set, get) => ({
         : Promise.resolve({ data: [] }),
       supabase.from("profiles").select("*").order("nom"),
       supabase.from("categories_depense").select("*").order("nom"),
-      supabase.from("app_config").select("*").maybeSingle(),
     ]);
     set({
       secteurs: (secteurs.data || []).map(mapSecteur),
@@ -114,7 +112,6 @@ export const useDataStore = create((set, get) => ({
       notifications: (notifications.data || []).map(mapNotification),
       users: (users.data || []).map(mapUser),
       categories: (categories.data || []).map(mapCategorie),
-      parametres: { seuilAutorisation: Number(config.data?.seuil_autorisation ?? 30000) },
       loaded: true,
     });
   },
@@ -122,7 +119,7 @@ export const useDataStore = create((set, get) => ({
   reset: () =>
     set({
       secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [],
-      categories: [], parametres: { seuilAutorisation: 30000 }, loaded: false,
+      categories: [], loaded: false,
     }),
 
   // Rechargements ciblés après une écriture — évitent de tout re-fetcher.
@@ -158,10 +155,6 @@ export const useDataStore = create((set, get) => ({
   chargerCategories: async () => {
     const { data } = await supabase.from("categories_depense").select("*").order("nom");
     set({ categories: (data || []).map(mapCategorie) });
-  },
-  chargerParametres: async () => {
-    const { data } = await supabase.from("app_config").select("*").maybeSingle();
-    set({ parametres: { seuilAutorisation: Number(data?.seuil_autorisation ?? 30000) } });
   },
 
   // Crée un compte Supabase Auth + déclenche la création du profil (trigger
@@ -248,13 +241,6 @@ export const useDataStore = create((set, get) => ({
       };
     }
     await get().chargerSecteurs();
-    return { ok: true };
-  },
-
-  setSeuilAutorisation: async (montant) => {
-    const { error } = await supabase.from("app_config").update({ seuil_autorisation: montant }).eq("id", true);
-    if (error) return { ok: false, error: error.message };
-    set({ parametres: { seuilAutorisation: Number(montant) } });
     return { ok: true };
   },
 

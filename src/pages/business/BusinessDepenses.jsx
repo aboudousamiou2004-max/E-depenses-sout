@@ -12,13 +12,13 @@ import DepenseDetailModal from "../../components/DepenseDetailModal";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
-import { fmtFCFA, statutLabel, verifierSeuilApprobation, matchPeriode } from "../../lib/logic";
+import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode } from "../../lib/logic";
 import { exporterDepensesExcel } from "../../lib/exportExcel";
 import { ROLES_ACCES_TOTAL } from "../../lib/modules";
 
 export default function BusinessDepenses() {
   const config = useOutletContext();
-  const { secteurs, depenses, categories, parametres, addDepense, modifierDepense, supprimerDepense } = useDataStore();
+  const { secteurs, depenses, categories, budgets, addDepense, modifierDepense, supprimerDepense } = useDataStore();
   const { user } = useAuthStore();
   const { periode, recherche } = useUIStore();
   const [open, setOpen] = useState(false);
@@ -67,7 +67,8 @@ export default function BusinessDepenses() {
     setForm((f) => ({ ...f, montant: "", description: "" }));
   }
 
-  const declenche = verifierSeuilApprobation(Number(form.montant || 0), parametres.seuilAutorisation);
+  const dateForm = form.date ? new Date(form.date) : new Date();
+  const evaluation = evaluationAutorisation(depenses, budgets, config.secteurId, dateForm.getFullYear(), dateForm.getMonth(), Number(form.montant || 0));
 
   return (
     <div>
@@ -183,9 +184,11 @@ export default function BusinessDepenses() {
           </Field>
           <div className="flex items-center gap-2 text-[12.5px] font-medium px-3.5 py-2.5 rounded-2xl bg-black/[0.03] text-ink-soft">
             <FileText size={14} strokeWidth={2.2} className="shrink-0" />
-            {declenche
-              ? `Ce montant déclenchera automatiquement le circuit d'autorisation d'E-DÉPENSES — PAU et GE en seront notifiés (seuil : ${fmtFCFA(parametres.seuilAutorisation)}).`
-              : "Ce montant est inférieur au seuil d'autorisation — décaissement direct."}
+            {evaluation.declenche
+              ? evaluation.budget === 0
+                ? "Aucun budget défini pour ce secteur ce mois-ci — cette dépense déclenchera automatiquement le circuit d'autorisation d'E-DÉPENSES (PAU et GE en seront notifiés)."
+                : `Ce montant dépasserait le budget restant du secteur (${fmtFCFA(evaluation.restant)} sur ${fmtFCFA(evaluation.budget)}) — le circuit d'autorisation d'E-DÉPENSES sera déclenché, PAU et GE en seront notifiés.`
+              : `Ce montant reste dans le budget alloué (${fmtFCFA(evaluation.restant)} restant sur ${fmtFCFA(evaluation.budget)}) — décaissement direct.`}
           </div>
         </form>
       </Modal>
