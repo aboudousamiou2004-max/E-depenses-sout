@@ -120,7 +120,7 @@ export default function NotificationBell() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/10 backdrop-blur-[2px] lg:bg-transparent lg:backdrop-blur-none"
+              className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none"
               onClick={() => setOpen(false)}
             />
             <motion.div
