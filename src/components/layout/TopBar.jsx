@@ -14,14 +14,19 @@ export default function TopBar({ title, subtitle }) {
 
   return (
     <div className="flex items-center justify-between mb-6 gap-4 flex-wrap">
-      <div>
-        <h1 className="text-[26px] font-bold tracking-tight text-ink">{title}</h1>
-        {subtitle && <p className="text-[13.5px] text-ink-soft font-medium mt-0.5">{subtitle}</p>}
+      <div className="flex items-center justify-between w-full sm:w-auto gap-3">
+        <div>
+          <h1 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-ink">{title}</h1>
+          {subtitle && <p className="text-[13.5px] text-ink-soft font-medium mt-0.5">{subtitle}</p>}
+        </div>
+        <div className="sm:hidden shrink-0">
+          <NotificationBell />
+        </div>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="glass rounded-2xl px-3 py-2 flex items-center gap-2 w-56">
-          <Search size={16} className="text-ink-soft" strokeWidth={2.2} />
+      <div className="flex items-center gap-3 flex-wrap w-full sm:w-auto">
+        <div className="glass rounded-2xl px-3 py-2 flex items-center gap-2 w-full sm:w-56">
+          <Search size={16} className="text-ink-soft shrink-0" strokeWidth={2.2} />
           <input
             value={recherche}
             onChange={(e) => setRecherche(e.target.value)}
@@ -35,7 +40,7 @@ export default function TopBar({ title, subtitle }) {
         <select
           value={secteurFiltre}
           onChange={(e) => setSecteurFiltre(e.target.value)}
-          className="glass rounded-2xl px-3.5 py-2.5 text-sm font-semibold text-ink outline-none cursor-pointer"
+          className="glass rounded-2xl px-3.5 py-2.5 text-sm font-semibold text-ink outline-none cursor-pointer flex-1 sm:flex-none min-w-0"
         >
           <option value="tous">Tous les secteurs</option>
           {secteurs.map((s) => (
@@ -45,7 +50,9 @@ export default function TopBar({ title, subtitle }) {
           ))}
         </select>
 
-        <NotificationBell />
+        <div className="hidden sm:block">
+          <NotificationBell />
+        </div>
       </div>
     </div>
   );

@@ -28,9 +28,9 @@ export default function Autorisations() {
 
   return (
     <div>
-      <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses — seuil : 30 000 FCFA (PAU ou GE)" />
+      <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses — dès dépassement du budget alloué (PAU ou GE)" />
 
-      <div className="grid grid-cols-3 gap-5 mb-5">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
         <GlassCard className="p-5">
           <p className="text-[12.5px] font-semibold text-ink-soft">En attente d'approbation</p>
           <p className="text-3xl font-bold tracking-tight tabular text-[#9a5f00] mt-1.5">{enAttente.length}</p>

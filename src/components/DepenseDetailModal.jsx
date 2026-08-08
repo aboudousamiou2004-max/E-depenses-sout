@@ -126,7 +126,7 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
               {categoriesDuSecteur.map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Montant (FCFA)">
               <TextInput type="number" value={form.montant} onChange={(e) => setForm({ ...form, montant: e.target.value })} />
             </Field>
@@ -134,7 +134,7 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
               <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nature du flux">
               <Select value={form.natureFlux} onChange={(e) => setForm({ ...form, natureFlux: e.target.value })}>
                 <option value="exploitation">Exploitation</option>

@@ -108,7 +108,7 @@ export default function RecetteDetailModal({ recette, secteurs, peutModifier, mo
               {ORIGINES.map((o) => <option key={o} value={o}>{o}</option>)}
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Montant (FCFA)">
               <TextInput type="number" value={form.montant} onChange={(e) => setForm({ ...form, montant: e.target.value })} />
             </Field>

@@ -54,21 +54,21 @@ export default function Utilisateurs() {
         <div className="blob" />
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <button onClick={() => navigate("/portal")} className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft hover:text-ink mb-4 transition-colors">
           <ArrowLeft size={14} strokeWidth={2.4} /> Retour au portail
         </button>
 
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-6">
           <div>
-            <h1 className="text-[26px] font-bold tracking-tight text-ink">Utilisateurs</h1>
+            <h1 className="text-[22px] sm:text-[26px] font-bold tracking-tight text-ink">Utilisateurs</h1>
             <p className="text-[13.5px] text-ink-soft font-medium mt-0.5">Accès aux modules par utilisateur</p>
           </div>
           <Button icon={UserPlus} onClick={() => setOpen(true)}>Ajouter un utilisateur</Button>
         </div>
 
-        <GlassCard className="p-2 overflow-hidden" hover={false}>
-          <table className="w-full border-collapse">
+        <GlassCard className="p-2 overflow-auto" hover={false}>
+          <table className="w-full min-w-[560px] border-collapse">
             <thead>
               <tr className="text-left text-[11px] font-bold text-ink-soft uppercase tracking-wide">
                 <th className="px-4 py-3">Utilisateur</th>
@@ -135,7 +135,7 @@ export default function Utilisateurs() {
       >
         <form onSubmit={submit}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nom complet *">
               <TextInput value={form.nom} onChange={(e) => setForm({ ...form, nom: e.target.value })} placeholder="ex : A. KOFFI" />
             </Field>
@@ -143,7 +143,7 @@ export default function Utilisateurs() {
               <TextInput value={form.login} onChange={(e) => setForm({ ...form, login: e.target.value })} placeholder="ex : agent.agro2" />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Mot de passe *">
               <TextInput type="password" value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} placeholder="••••••••" />
             </Field>
@@ -155,7 +155,7 @@ export default function Utilisateurs() {
               </Select>
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Secteur">
               <Select value={form.secteur} onChange={(e) => setForm({ ...form, secteur: e.target.value })}>
                 <option value="">Aucun</option>
@@ -168,7 +168,7 @@ export default function Utilisateurs() {
               <TextInput value={form.poste} onChange={(e) => setForm({ ...form, poste: e.target.value })} placeholder="ex : Agent de saisie" />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Téléphone WhatsApp">
               <TextInput type="tel" value={form.telephone} onChange={(e) => setForm({ ...form, telephone: e.target.value })} placeholder="ex : 90 00 00 00" />
             </Field>

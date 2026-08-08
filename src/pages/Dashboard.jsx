@@ -97,7 +97,7 @@ export default function Dashboard() {
     <div>
       <TopBar title="Tableau de bord" subtitle="Vue consolidée — pilotage financier de LA TERMITIÈRE" />
 
-      <div className="grid grid-cols-4 auto-rows-[172px] gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 lg:auto-rows-[172px] gap-4 sm:gap-5">
         <StatTile
           icon={Wallet}
           label={`Dépenses ${suffixePeriode}`}
@@ -129,8 +129,8 @@ export default function Dashboard() {
         />
 
         {/* Dépenses par secteur */}
-        <GlassCard className="col-span-3 row-span-2 p-6 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
+        <GlassCard className="col-span-2 lg:col-span-3 lg:row-span-2 p-5 sm:p-6 flex flex-col">
+          <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div>
               <h3 className="font-bold tracking-tight text-ink">Dépenses par secteur</h3>
               <p className="text-[12.5px] text-ink-soft font-medium">Mois en cours — comparé au budget alloué</p>
@@ -148,7 +148,7 @@ export default function Dashboard() {
               </button>
             </div>
           </div>
-          <div className="flex-1 -ml-2">
+          <div className="flex-1 h-64 lg:h-auto -ml-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={barData} barGap={6}>
                 <CartesianGrid strokeDasharray="3 6" vertical={false} stroke="rgba(15,23,42,0.08)" />
@@ -172,7 +172,7 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Budget global ring */}
-        <GlassCard className="col-span-1 row-span-2 p-5 flex flex-col items-center justify-center gap-3">
+        <GlassCard className="col-span-2 lg:col-span-1 lg:row-span-2 p-5 flex flex-col items-center justify-center gap-3">
           <p className="text-[12.5px] font-semibold text-ink-soft text-center">Consommation budgétaire globale</p>
           <ProgressRing value={tauxGlobal} color={tauxGlobal >= 1 ? "#FF453A" : tauxGlobal >= 0.8 ? "#FF9F0A" : "#30D158"} size={128} />
           <p className="text-[11.5px] text-ink-soft text-center leading-snug">
@@ -181,10 +181,10 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Tendance 12 mois */}
-        <GlassCard className="col-span-2 row-span-2 p-6 flex flex-col">
+        <GlassCard className="col-span-2 lg:row-span-2 p-5 sm:p-6 flex flex-col">
           <h3 className="font-bold tracking-tight text-ink mb-0.5">Tendance des dépenses</h3>
           <p className="text-[12.5px] text-ink-soft font-medium mb-2">12 derniers mois — tous secteurs</p>
-          <div className="flex-1 -ml-2">
+          <div className="flex-1 h-64 lg:h-auto -ml-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trend}>
                 <CartesianGrid strokeDasharray="3 6" vertical={false} stroke="rgba(15,23,42,0.08)" />
@@ -198,10 +198,10 @@ export default function Dashboard() {
         </GlassCard>
 
         {/* Alertes */}
-        <GlassCard className="col-span-2 row-span-2 p-6 flex flex-col">
+        <GlassCard className="col-span-2 lg:row-span-2 p-5 sm:p-6 flex flex-col">
           <h3 className="font-bold tracking-tight text-ink mb-0.5">Alertes budgétaires</h3>
           <p className="text-[12.5px] text-ink-soft font-medium mb-3">Secteurs ayant franchi le seuil d'attention (80 %)</p>
-          <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1">
+          <div className="lg:flex-1 max-h-72 lg:max-h-none overflow-y-auto flex flex-col gap-2.5 pr-1">
             {alertes.length === 0 && <p className="text-[13px] text-ink-soft italic mt-4">Aucune alerte pour la période sélectionnée.</p>}
             {alertes.map((a) => (
               <motion.div

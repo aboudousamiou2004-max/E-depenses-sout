@@ -25,17 +25,17 @@ export default function Flux() {
     <div>
       <TopBar title="Flux de trésorerie" subtitle="Entrées, sorties et solde net par nature de flux" />
 
-      <div className="grid grid-cols-4 gap-5 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={ArrowUpCircle} label="Recettes du mois" value={fmtCompact(flux.totalRec) + " FCFA"} tone="#30D158" />
         <StatTile icon={ArrowDownCircle} label="Exploitation" value={fmtCompact(flux.exploitation) + " FCFA"} tone="#FF9F0A" />
         <StatTile icon={ArrowDownCircle} label="Investissement" value={fmtCompact(flux.investissement) + " FCFA"} tone="#5E5CE6" />
         <StatTile icon={Scale} label="Solde net" value={fmtCompact(flux.solde) + " FCFA"} tone={flux.solde >= 0 ? "#30D158" : "#FF453A"} />
       </div>
 
-      <GlassCard className="p-6" hover={false}>
+      <GlassCard className="p-4 sm:p-6" hover={false}>
         <h3 className="font-bold tracking-tight text-ink mb-0.5">Évolution des flux — 12 derniers mois</h3>
         <p className="text-[12.5px] text-ink-soft font-medium mb-3">Entrées vs sorties, tous secteurs confondus</p>
-        <div className="h-[340px] -ml-2">
+        <div className="h-[260px] sm:h-[340px] -ml-2">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={trend}>
               <defs>

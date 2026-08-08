@@ -32,7 +32,7 @@ export default function PeriodeFilter() {
   const annees = [periode.annee - 1, periode.annee, periode.annee + 1];
 
   return (
-    <div className="glass rounded-2xl p-1 flex items-center gap-1">
+    <div className="glass rounded-2xl p-1 flex items-center gap-1 flex-wrap max-w-full">
       <button
         onClick={toggleMode}
         className={`px-2.5 py-1.5 rounded-xl text-[12px] font-semibold transition-colors ${!modeJour ? "bg-white/80 text-ink shadow-sm" : "text-ink-soft"}`}

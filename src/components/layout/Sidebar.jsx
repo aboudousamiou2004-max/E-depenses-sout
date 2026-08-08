@@ -16,16 +16,29 @@ const NAV = [
   { to: "/depense/journal", label: "Journal", icon: ScrollText },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ open = false, onClose }) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
 
+  function go(to) {
+    navigate(to);
+    onClose?.();
+  }
+
   return (
-    <aside className="w-[264px] shrink-0 h-screen sticky top-0 p-4 flex flex-col">
-      <div className="glass-strong rounded-[28px] flex-1 flex flex-col p-4">
+    <>
+      {open && (
+        <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={onClose} />
+      )}
+      <aside
+        className={`w-[264px] shrink-0 h-screen fixed lg:sticky top-0 left-0 z-50 p-4 flex flex-col transition-transform duration-300 ease-out lg:translate-x-0 ${
+          open ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+      <div className="glass-strong rounded-[28px] flex-1 flex flex-col p-4 overflow-y-auto">
         <button
-          onClick={() => navigate("/portal")}
+          onClick={() => go("/portal")}
           className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-soft hover:text-ink px-2 mb-2 transition-colors"
         >
           <ArrowLeft size={13} strokeWidth={2.4} /> Retour au portail
@@ -41,7 +54,7 @@ export default function Sidebar() {
 
         <nav className="mt-4 flex-1 flex flex-col gap-1">
           {peutGererUtilisateurs && (
-            <NavLink to="/utilisateurs">
+            <NavLink to="/utilisateurs" onClick={onClose}>
               {({ isActive }) => (
                 <div className="relative px-3 py-2.5 rounded-2xl flex items-center gap-3 group cursor-pointer">
                   {isActive && (
@@ -54,7 +67,7 @@ export default function Sidebar() {
             </NavLink>
           )}
           {NAV.map((item) => (
-            <NavLink key={item.to} to={item.to} end={item.end}>
+            <NavLink key={item.to} to={item.to} end={item.end} onClick={onClose}>
               {({ isActive }) => (
                 <div className="relative px-3 py-2.5 rounded-2xl flex items-center gap-3 group cursor-pointer">
                   {isActive && (
@@ -77,7 +90,7 @@ export default function Sidebar() {
             </NavLink>
           ))}
           {peutGererUtilisateurs && (
-            <NavLink to="/depense/parametres">
+            <NavLink to="/depense/parametres" onClick={onClose}>
               {({ isActive }) => (
                 <div className="relative px-3 py-2.5 rounded-2xl flex items-center gap-3 group cursor-pointer">
                   {isActive && (
@@ -110,7 +123,8 @@ export default function Sidebar() {
           </div>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
 

@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, Menu } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -13,6 +14,7 @@ export default function BusinessLayout({ config }) {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const stockNav = STOCK_NAV[config.stock];
+  const [menuOuvert, setMenuOuvert] = useState(false);
 
   const NAV = [
     { to: config.path, label: "Tableau de bord", icon: LayoutGrid, end: true },
@@ -21,16 +23,40 @@ export default function BusinessLayout({ config }) {
     ...(stockNav ? [{ to: `${config.path}/stock`, label: stockNav.label, icon: stockNav.icon }] : []),
   ];
 
+  function go(to) {
+    navigate(to);
+    setMenuOuvert(false);
+  }
+
   return (
     <div className="min-h-screen flex">
       <div className="mesh-bg">
         <div className="blob" />
       </div>
 
-      <aside className="w-[264px] shrink-0 h-screen sticky top-0 p-4 flex flex-col">
-        <div className="glass-strong rounded-[28px] flex-1 flex flex-col p-4">
+      <header className="lg:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 px-4 py-3 glass-strong m-3 rounded-2xl">
+        <button
+          onClick={() => setMenuOuvert(true)}
+          className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-ink-soft hover:bg-black/5 transition-colors"
+        >
+          <Menu size={20} strokeWidth={2.2} />
+        </button>
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: config.color }}>
+          <config.icon size={14} className="text-white" strokeWidth={2.4} />
+        </div>
+        <p className="font-bold tracking-tight text-[14px] text-ink truncate">{config.nom}</p>
+      </header>
+
+      {menuOuvert && <div className="fixed inset-0 z-40 bg-black/30 lg:hidden" onClick={() => setMenuOuvert(false)} />}
+
+      <aside
+        className={`w-[264px] shrink-0 h-screen fixed lg:sticky top-0 left-0 z-50 p-4 flex flex-col transition-transform duration-300 ease-out lg:translate-x-0 ${
+          menuOuvert ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="glass-strong rounded-[28px] flex-1 flex flex-col p-4 overflow-y-auto">
           <button
-            onClick={() => navigate("/portal")}
+            onClick={() => go("/portal")}
             className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-soft hover:text-ink px-2 mb-2 transition-colors"
           >
             <ArrowLeft size={13} strokeWidth={2.4} /> Retour au portail
@@ -48,7 +74,7 @@ export default function BusinessLayout({ config }) {
 
           <nav className="mt-4 flex-1 flex flex-col gap-1">
             {NAV.map((item) => (
-              <NavLink key={item.to} to={item.to} end={item.end}>
+              <NavLink key={item.to} to={item.to} end={item.end} onClick={() => setMenuOuvert(false)}>
                 {({ isActive }) => (
                   <div className="relative px-3 py-2.5 rounded-2xl flex items-center gap-3 group cursor-pointer">
                     {isActive && (
@@ -93,7 +119,7 @@ export default function BusinessLayout({ config }) {
         </div>
       </aside>
 
-      <main className="flex-1 min-w-0 p-4 pl-0">
+      <main className="flex-1 min-w-0 p-4 pt-[76px] lg:pt-4 lg:pl-0">
         <div className="h-full overflow-y-auto pr-1 pb-8">
           <Outlet context={config} />
         </div>

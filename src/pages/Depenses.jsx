@@ -83,23 +83,23 @@ export default function Depenses() {
     <div>
       <TopBar title="Dépenses" subtitle="Saisie et suivi des dépenses par secteur d'activité" />
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
           <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
           Limiter à la période sélectionnée
         </label>
         <span className="text-[12.5px] text-ink-soft font-medium">{list.length} entrée(s)</span>
-        <div className="flex gap-2.5 ml-auto">
-          <Button variant="ghost" icon={FileDown} onClick={() => exporterDepensesExcel(filtrees, secteurs, "depenses-e-depenses")}>
+        <div className="flex gap-2.5 w-full sm:w-auto sm:ml-auto">
+          <Button variant="ghost" icon={FileDown} onClick={() => exporterDepensesExcel(filtrees, secteurs, "depenses-e-depenses")} className="flex-1 sm:flex-none">
             Exporter Excel
           </Button>
-          <Button icon={Plus} onClick={() => setOpen(true)}>Nouvelle dépense</Button>
+          <Button icon={Plus} onClick={() => setOpen(true)} className="flex-1 sm:flex-none">Nouvelle dépense</Button>
         </div>
       </div>
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
-        <div className="max-h-[calc(100vh-230px)] overflow-y-auto">
-          <table className="w-full border-collapse">
+        <div className="max-h-[calc(100vh-230px)] overflow-auto">
+          <table className="w-full min-w-[640px] border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
                 <th className="px-4 py-3">Secteur</th>
@@ -174,7 +174,7 @@ export default function Depenses() {
               ))}
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Montant (FCFA)">
               <TextInput type="number" value={form.montant} onChange={(e) => setForm({ ...form, montant: e.target.value })} placeholder="35 000" />
             </Field>
@@ -182,7 +182,7 @@ export default function Depenses() {
               <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Nature du flux">
               <Select value={form.natureFlux} onChange={(e) => setForm({ ...form, natureFlux: e.target.value })}>
                 <option value="exploitation">Exploitation</option>

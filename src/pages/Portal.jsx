@@ -36,16 +36,16 @@ export default function Portal() {
         <div className="blob" />
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-10">
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
+          <div className="flex items-center gap-3 sm:gap-4">
             <div className="flex flex-col items-center shrink-0">
-              <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="w-12 h-12 rounded-2xl object-contain glass" />
+              <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-contain glass" />
               <span className="text-[9px] font-bold text-ink-soft tracking-wide mt-1">E-DÉPENSES</span>
             </div>
             <div>
-              <h1 className="text-[26px] font-bold tracking-tight text-ink">LA TERMITIÈRE</h1>
-              <p className="text-[13.5px] text-ink-soft font-medium mt-0.5">
+              <h1 className="text-[20px] sm:text-[26px] font-bold tracking-tight text-ink">LA TERMITIÈRE</h1>
+              <p className="text-[12.5px] sm:text-[13.5px] text-ink-soft font-medium mt-0.5">
                 Bonjour {user?.nom} — choisissez un module
               </p>
             </div>
@@ -54,16 +54,16 @@ export default function Portal() {
             {peutGererUtilisateurs && (
               <button
                 onClick={() => navigate("/utilisateurs")}
-                className="glass rounded-2xl px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
+                className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
               >
-                <Users size={15} strokeWidth={2.2} /> Utilisateurs
+                <Users size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Utilisateurs</span>
               </button>
             )}
             <button
               onClick={logout}
-              className="glass rounded-2xl px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
+              className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
             >
-              <LogOut size={15} strokeWidth={2.2} /> Se déconnecter
+              <LogOut size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Se déconnecter</span>
             </button>
           </div>
         </div>
@@ -73,7 +73,7 @@ export default function Portal() {
             <p className="text-ink-soft">Aucun module ne vous a encore été attribué. Contactez un administrateur.</p>
           </GlassCard>
         ) : (
-          <div className="grid grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {accessibles.map((m, i) => (
               <motion.button
                 key={m.id}

@@ -64,22 +64,22 @@ export default function StockMateriel() {
     <div>
       <TopBarSimple title="Stock magasin" subtitle={`${config.nom} — matériel disponible et mouvements`} accent={config.color} />
 
-      <div className="grid grid-cols-4 gap-5 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Boxes} label="Articles référencés" value={String(lignes.length)} tone={config.color} />
         <StatTile icon={PackageCheck} label="Valeur du stock (estimée)" value={Math.round(valeurTotale / 1000) + "k FCFA"} tone="#30D158" />
         <StatTile icon={ArrowDownCircle} label="Articles en rupture" value={String(enRupture)} tone={enRupture > 0 ? "#FF453A" : "#8E8E93"} />
         <StatTile icon={ArrowUpCircle} label="Mouvements enregistrés" value={String(mouvementsMateriel.length)} tone="#5E5CE6" />
       </div>
 
-      <div className="flex justify-end gap-2.5 mb-4">
+      <div className="flex flex-wrap justify-end gap-2.5 mb-4">
         <Button variant="ghost" icon={Plus} onClick={() => setOpenArticle(true)}>Nouvel article</Button>
         <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }}>Nouveau mouvement</Button>
       </div>
 
-      <div className="grid grid-cols-3 gap-5">
-        <GlassCard className="p-2 overflow-hidden col-span-2" hover={false}>
-          <div className="max-h-[calc(100vh-380px)] overflow-y-auto">
-            <table className="w-full border-collapse">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <GlassCard className="p-2 overflow-hidden lg:col-span-2" hover={false}>
+          <div className="max-h-[calc(100vh-380px)] overflow-auto">
+            <table className="w-full min-w-[420px] border-collapse">
               <thead className="sticky top-0 z-10">
                 <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
                   <th className="px-4 py-3">Article</th>
@@ -143,7 +143,7 @@ export default function StockMateriel() {
               {Object.entries(TYPES_MOUVEMENT_MATERIEL).map(([id, t]) => <option key={id} value={id}>{t.label}</option>)}
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Quantité">
               <TextInput type="number" value={form.quantite} onChange={(e) => setForm({ ...form, quantite: e.target.value })} placeholder="5" />
             </Field>
@@ -172,7 +172,7 @@ export default function StockMateriel() {
               {CAT_MATERIEL.map((c) => <option key={c} value={c}>{c}</option>)}
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Unité">
               <TextInput value={articleForm.unite} onChange={(e) => setArticleForm({ ...articleForm, unite: e.target.value })} placeholder="unités" />
             </Field>

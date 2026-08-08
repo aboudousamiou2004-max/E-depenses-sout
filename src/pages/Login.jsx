@@ -24,7 +24,7 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden px-4">
       <div className="mesh-bg">
         <div className="blob" />
       </div>
@@ -33,7 +33,7 @@ export default function Login() {
         initial={{ opacity: 0, y: 24, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        className="glass-strong rounded-[32px] w-[420px] p-9"
+        className="glass-strong rounded-[32px] w-full max-w-[420px] p-6 sm:p-9"
       >
         <div className="flex flex-col items-center text-center mb-7">
           <div className="logo-ring-blink w-20 h-20 rounded-full bg-white flex items-center justify-center shadow-xl mb-4 border-4 overflow-hidden">

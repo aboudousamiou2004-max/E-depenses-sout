@@ -97,23 +97,23 @@ export default function BusinessFacturation() {
     <div>
       <TopBarSimple title="Facturation" subtitle={`${config.nom} — prestations et locations facturées`} accent={config.color} />
 
-      <div className="grid grid-cols-4 gap-5 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={FileText} label="Total facturé (affiché)" value={fmtCompact(total) + " FCFA"} tone={config.color} />
       </div>
 
-      <div className="flex items-center gap-3 mb-4">
+      <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
           <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
           Limiter à la période sélectionnée
         </label>
-        <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }} className="ml-auto">
+        <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }} className="w-full sm:w-auto sm:ml-auto">
           Nouvelle facture
         </Button>
       </div>
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
-        <div className="max-h-[calc(100vh-320px)] overflow-y-auto">
-          <table className="w-full border-collapse">
+        <div className="max-h-[calc(100vh-320px)] overflow-auto">
+          <table className="w-full min-w-[520px] border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
                 <th className="px-4 py-3">Type</th>
@@ -178,7 +178,7 @@ export default function BusinessFacturation() {
 
           {isVenteBriques ? (
             <>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Field label="Type de brique">
                   <Select value={form.briqueTypeId} onChange={(e) => setForm({ ...form, briqueTypeId: e.target.value })}>
                     {typesBriques.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
@@ -196,7 +196,7 @@ export default function BusinessFacturation() {
               </p>
             </>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Field label="Montant (FCFA)">
                 <TextInput type="number" value={form.montant} onChange={(e) => setForm({ ...form, montant: e.target.value })} placeholder="150 000" />
               </Field>

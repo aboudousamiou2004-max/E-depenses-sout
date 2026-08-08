@@ -114,7 +114,7 @@ export default function Recettes() {
 
       {/* KPI par secteur — revenu du mois en cours */}
       {kpiParSecteur.length > 0 && (
-        <div className="grid grid-cols-3 gap-5 mb-5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
           {kpiParSecteur.map(({ secteur, montant }) => (
             <StatTile key={secteur.id} icon={TrendingUp} label={secteur.nom} value={fmtCompact(montant) + " FCFA"} tone={secteur.color} />
           ))}
@@ -150,7 +150,7 @@ export default function Recettes() {
 
       {/* Filtres — source, période, + bouton d'ajout (la recherche est dans la TopBar) */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
-        <div className="w-48">
+        <div className="w-full sm:w-48">
           <label className="block text-[11.5px] font-semibold text-ink-soft mb-1.5 ml-1">Source</label>
           <Select value={filtreOrigine} onChange={(e) => setFiltreOrigine(e.target.value)}>
             <option value="">Toutes</option>
@@ -168,8 +168,8 @@ export default function Recettes() {
       </div>
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
-        <div className="max-h-[calc(100vh-420px)] overflow-y-auto">
-          <table className="w-full border-collapse">
+        <div className="max-h-[calc(100vh-420px)] overflow-auto">
+          <table className="w-full min-w-[560px] border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
                 <th className="px-4 py-3">Secteur</th>
@@ -251,7 +251,7 @@ export default function Recettes() {
               ))}
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Montant (FCFA)">
               <TextInput type="number" value={form.montant} onChange={(e) => setForm({ ...form, montant: e.target.value })} placeholder="180 000" />
             </Field>

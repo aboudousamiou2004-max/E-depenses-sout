@@ -34,12 +34,12 @@ export default function Analyses() {
     <div>
       <TopBar title="Analyses & rentabilité" subtitle="Comparaison recettes / dépenses et marge par secteur" />
 
-      <div className="grid grid-cols-3 gap-5">
-        <GlassCard className="col-span-2 p-6" hover={false}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <GlassCard className="lg:col-span-2 p-4 sm:p-6" hover={false}>
           <h3 className="font-bold tracking-tight text-ink mb-4">Rentabilité par secteur</h3>
           <div className="flex flex-col gap-2">
             {rentabilite.map((s) => (
-              <div key={s.id} className="flex items-center justify-between px-4 py-3.5 rounded-2xl bg-white/50">
+              <div key={s.id} className="flex items-center justify-between gap-3 flex-wrap px-4 py-3.5 rounded-2xl bg-white/50">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s.color }} />
                   <div className="min-w-0">
@@ -47,7 +47,7 @@ export default function Analyses() {
                     <p className="text-[11.5px] text-ink-soft truncate">{s.label}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6 shrink-0">
+                <div className="flex items-center gap-4 sm:gap-6 shrink-0">
                   <div className="text-right">
                     <p className="text-[11px] text-ink-soft font-semibold">Recettes</p>
                     <p className="text-[13px] font-bold tabular text-[#1a7d34]">{fmtCompact(s.rec)}</p>

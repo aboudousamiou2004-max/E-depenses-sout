@@ -73,20 +73,20 @@ export default function StockBriques() {
     <div>
       <TopBarSimple title="Stock de briques" subtitle={`${config.nom} — production, séchage et matières premières`} accent={config.color} />
 
-      <div className="grid grid-cols-4 gap-5 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Factory} label="En appâtam" value={String(totalAppatam)} tone="#8E8E93" />
         <StatTile icon={Layers} label="Prêt à la vente" value={String(totalPret)} tone="#30D158" />
         <StatTile icon={Factory} label="Caillasses (pertes)" value={String(totalCaillasses)} tone="#FF453A" />
         <StatTile icon={Layers} label="Valeur du stock prêt" value={Math.round(valeurPret / 1000) + "k FCFA"} tone={config.color} />
       </div>
 
-      <div className="flex justify-end gap-2.5 mb-4">
+      <div className="flex flex-wrap justify-end gap-2.5 mb-4">
         <Button variant="ghost" icon={Plus} onClick={() => setOpenProd(true)}>Nouvelle production</Button>
         <Button icon={ArrowRight} onClick={() => setOpenTrans(true)} style={{ background: config.color }}>Faire transiter</Button>
       </div>
 
-      <GlassCard className="p-2 overflow-hidden mb-5" hover={false}>
-        <table className="w-full border-collapse">
+      <GlassCard className="p-2 overflow-auto mb-5" hover={false}>
+        <table className="w-full min-w-[480px] border-collapse">
           <thead>
             <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
               <th className="px-4 py-3">Type de brique</th>
@@ -108,13 +108,13 @@ export default function StockBriques() {
         </table>
       </GlassCard>
 
-      <div className="grid grid-cols-3 gap-5">
-        <GlassCard className="p-5 col-span-2" hover={false}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <GlassCard className="p-5 lg:col-span-2" hover={false}>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold tracking-tight text-ink">Matières premières</h3>
             <Button variant="ghost" icon={Plus} onClick={() => setOpenMatiere(true)}>Mouvement</Button>
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {referentielMatieres.map((m) => (
               <div key={m.id} className="glass rounded-2xl p-4">
                 <p className="text-[12px] text-ink-soft font-semibold">{m.nom}</p>
@@ -162,7 +162,7 @@ export default function StockBriques() {
               {typesBriques.map((t) => <option key={t.id} value={t.id}>{t.nom}</option>)}
             </Select>
           </Field>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="De">
               <Select value={transForm.de} onChange={(e) => setTransForm({ ...transForm, de: e.target.value })}>
                 {ETATS_BRIQUE.map((e) => <option key={e.id} value={e.id}>{e.label}</option>)}

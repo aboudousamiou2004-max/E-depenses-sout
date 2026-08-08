@@ -63,7 +63,7 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
 
   return (
     <div>
-      <div className="grid grid-cols-4 gap-5 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile
           icon={Wallet}
           label={`Recettes ${suffixePeriode}`}
@@ -111,7 +111,7 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
         </div>
       </GlassCard>
 
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <GlassCard className="p-6 flex flex-col items-center justify-center gap-3" hover={false}>
           <p className="text-[12.5px] font-semibold text-ink-soft text-center">Consommation du budget — {nom}</p>
           {budget > 0 ? (
