@@ -1,25 +1,50 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell } from "lucide-react";
+import { Bell, BellRing, BellOff, Loader2 } from "lucide-react";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
+import { pushSupporte, statutAbonnementPush, activerNotificationsPush, desactiverNotificationsPush } from "../../lib/push";
 
 const TYPE_TONE = { warning: "#FF9F0A", info: "#0A84FF", success: "#30D158", danger: "#FF453A" };
+
+const PUSH_LABEL = {
+  actif: "Notifications push activées",
+  inactif: "Activer les notifications push",
+  refuse: "Notifications bloquées par le navigateur",
+  "non-supporte": "Notifications push non disponibles sur ce navigateur",
+};
 
 // Cloche de notifications — chaque utilisateur ne voit que les siennes
 // (destinataireUid). Alimentée par le circuit d'autorisation des dépenses :
 // demande envoyée à PAU/GE dès dépassement du budget alloué au secteur,
 // puis réponse (approuvée / refusée / décaissée) renvoyée au secteur qui a
-// fait la demande.
+// fait la demande — désormais aussi relayée en notification navigateur
+// (Web Push) en plus de cette cloche in-app, voir src/lib/push.js.
 export default function NotificationBell() {
   const { notifications, marquerNotificationLue, marquerToutesNotificationsLues } = useDataStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [pushStatut, setPushStatut] = useState("inactif");
+  const [pushLoading, setPushLoading] = useState(false);
 
   const mesNotifs = notifications.filter((n) => n.destinataireUid === user?.uid).slice(0, 30);
   const nonLues = mesNotifs.filter((n) => !n.lu).length;
+
+  useEffect(() => {
+    if (open) statutAbonnementPush().then(setPushStatut);
+  }, [open]);
+
+  async function togglePush() {
+    if (pushStatut === "refuse" || pushStatut === "non-supporte" || pushLoading) return;
+    setPushLoading(true);
+    const res =
+      pushStatut === "actif" ? await desactiverNotificationsPush() : await activerNotificationsPush(user?.uid);
+    setPushLoading(false);
+    if (!res.ok) return alert(res.error);
+    setPushStatut(await statutAbonnementPush());
+  }
 
   async function onClickNotif(n) {
     setOpen(false);
@@ -60,6 +85,24 @@ export default function NotificationBell() {
                   </button>
                 )}
               </div>
+              {pushSupporte && (
+                <button
+                  onClick={togglePush}
+                  disabled={pushStatut === "refuse" || pushLoading}
+                  className={`w-full flex items-center gap-2.5 px-2.5 py-2.5 mb-1 rounded-2xl text-left transition-colors ${
+                    pushStatut === "refuse" ? "cursor-not-allowed opacity-60" : "hover:bg-black/5"
+                  } ${pushStatut === "actif" ? "bg-[#30D158]/10" : "bg-black/[0.03]"}`}
+                >
+                  {pushLoading ? (
+                    <Loader2 size={15} className="animate-spin text-ink-soft shrink-0" />
+                  ) : pushStatut === "actif" ? (
+                    <BellRing size={15} className="text-[#1a7d34] shrink-0" strokeWidth={2.2} />
+                  ) : (
+                    <BellOff size={15} className="text-ink-soft shrink-0" strokeWidth={2.2} />
+                  )}
+                  <span className="text-[12px] font-semibold text-ink leading-snug">{PUSH_LABEL[pushStatut]}</span>
+                </button>
+              )}
               {mesNotifs.length === 0 && <p className="text-[13px] text-ink-soft italic text-center py-8">Aucune notification.</p>}
               {mesNotifs.map((n) => (
                 <button
