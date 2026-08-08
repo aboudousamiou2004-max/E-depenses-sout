@@ -122,7 +122,7 @@ export default function NotificationBell() {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.97 }}
               transition={{ duration: 0.18 }}
-              className="absolute right-0 top-12 z-50 w-[340px] max-w-[calc(100vw-2rem)] glass-strong rounded-[24px] overflow-hidden flex flex-col"
+              className="fixed left-3 right-3 top-[76px] lg:absolute lg:left-auto lg:right-0 lg:top-12 z-50 lg:w-[340px] max-w-full lg:max-w-[calc(100vw-2rem)] glass-strong rounded-[24px] overflow-hidden flex flex-col"
             >
               {/* En-tête */}
               <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-black/[0.06]">
