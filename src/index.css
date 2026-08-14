@@ -130,11 +130,11 @@ body {
    utilitaires où la lisibilité prime sur l'effet. */
 .glass-hero {
   position: relative;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.32));
-  backdrop-filter: blur(34px) saturate(220%);
-  -webkit-backdrop-filter: blur(34px) saturate(220%);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  box-shadow: var(--shadow-glass-lg), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.2));
+  backdrop-filter: blur(26px) saturate(220%);
+  -webkit-backdrop-filter: blur(26px) saturate(220%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: var(--shadow-glass-lg), inset 0 1px 0 rgba(255, 255, 255, 0.95);
   overflow: hidden;
 }
 .glass-hero::before,
@@ -142,24 +142,30 @@ body {
   content: "";
   position: absolute;
   border-radius: 9999px;
-  filter: blur(50px);
-  opacity: 0.55;
+  filter: blur(40px);
+  opacity: 0.8;
   pointer-events: none;
   z-index: 0;
+  animation: hero-blob-drift 14s ease-in-out infinite alternate;
 }
 .glass-hero::before {
-  width: 260px;
-  height: 260px;
-  top: -120px;
-  left: -60px;
-  background: radial-gradient(circle, #7dd3fc, transparent 70%);
+  width: 280px;
+  height: 280px;
+  top: -140px;
+  left: -70px;
+  background: radial-gradient(circle, #0a84ff, transparent 72%);
 }
 .glass-hero::after {
-  width: 240px;
-  height: 240px;
-  bottom: -130px;
-  right: -50px;
-  background: radial-gradient(circle, #fbcfe8, transparent 70%);
+  width: 260px;
+  height: 260px;
+  bottom: -140px;
+  right: -60px;
+  background: radial-gradient(circle, #bf5af2, transparent 72%);
+  animation-delay: -7s;
+}
+@keyframes hero-blob-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(24px, 16px) scale(1.12); }
 }
 .glass-hero > * {
   position: relative;
