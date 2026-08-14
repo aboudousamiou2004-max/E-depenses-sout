@@ -84,7 +84,7 @@ export default function Portal() {
           <div className="absolute bottom-0 left-1/3 w-72 h-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
 
           <div className="relative flex items-center gap-5">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shrink-0 shadow-[0_0_0_6px_rgba(255,255,255,0.12),0_0_40px_rgba(255,255,255,0.35)]">
+            <div className="logo-ring-blink w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shrink-0 border-4 shadow-[0_0_40px_rgba(255,255,255,0.35)]">
               <img src="/logo_termitiere.png" alt="Logo LA TERMITIÈRE" className="w-[70%] h-[70%] object-contain" />
             </div>
             <div className="min-w-0">
