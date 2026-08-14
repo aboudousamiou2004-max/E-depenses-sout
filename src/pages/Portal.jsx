@@ -42,15 +42,18 @@ export default function Portal() {
       </div>
 
       <div className="sticky top-0 z-30 px-3 sm:px-6 pt-3 sm:pt-4">
-        <nav className="max-w-5xl mx-auto glass-strong rounded-[22px] px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-contain glass shrink-0 p-1" />
+        <nav className="relative overflow-hidden max-w-5xl mx-auto glass-strong rounded-[22px] px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="absolute -top-10 left-16 w-32 h-32 rounded-full bg-[#7A1128]/20 blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-12 right-24 w-40 h-40 rounded-full bg-[#0A84FF]/15 blur-2xl pointer-events-none" />
+
+          <div className="relative flex items-center gap-2.5 min-w-0">
+            <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="logo-ring-blink-white w-9 h-9 sm:w-10 sm:h-10 rounded-full object-contain bg-white border-2 shrink-0 p-1" />
             <div className="min-w-0 leading-none">
               <p className="font-bold tracking-tight text-[#7A1128] text-[14.5px] sm:text-[16px]">LA TERMITIÈRE</p>
               <p className="text-[10.5px] sm:text-[11.5px] text-ink-soft font-semibold mt-1">Accueil</p>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="relative flex items-center gap-2 shrink-0">
             {peutGererUtilisateurs && (
               <button
                 onClick={() => navigate("/utilisateurs")}
