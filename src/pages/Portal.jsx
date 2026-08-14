@@ -7,6 +7,7 @@ import { useDataStore } from "../store/dataStore";
 import { modulesAccessibles, MODULE_DEPENSE, ROLES_ACCES_TOTAL } from "../lib/modules";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtCompact } from "../lib/logic";
 import GlassCard from "../components/ui/GlassCard";
+import NotificationBell from "../components/layout/NotificationBell";
 
 const now = { annee: 2026, mois: 6 };
 
@@ -17,6 +18,10 @@ export default function Portal() {
 
   const accessibles = useMemo(() => modulesAccessibles(user, secteurs), [user, secteurs]);
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
+  const heure = new Date().getHours();
+  const salutation = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
+  const dateBrute = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const dateDuJour = dateBrute.charAt(0).toUpperCase() + dateBrute.slice(1);
 
   function kpiPourModule(m) {
     if (m.id === MODULE_DEPENSE.id) {
@@ -36,37 +41,66 @@ export default function Portal() {
         <div className="blob" />
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex flex-col items-center shrink-0">
-              <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-contain glass" />
-              <span className="text-[9px] font-bold text-ink-soft tracking-wide mt-1">E-DÉPENSES</span>
-            </div>
-            <div>
-              <h1 className="text-[20px] sm:text-[26px] font-bold tracking-tight text-ink">LA TERMITIÈRE</h1>
-              <p className="text-[12.5px] sm:text-[13.5px] text-ink-soft font-medium mt-0.5">
-                Bonjour {user?.nom} — choisissez un module
-              </p>
+      <nav className="sticky top-0 z-30 glass-strong border-b border-white/50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-contain glass shrink-0 p-1" />
+            <div className="min-w-0 leading-none">
+              <p className="font-bold tracking-tight text-[#7A1128] text-[14.5px] sm:text-[16px]">LA TERMITIÈRE</p>
+              <p className="text-[10.5px] sm:text-[11.5px] text-ink-soft font-semibold mt-1">Accueil</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {peutGererUtilisateurs && (
               <button
                 onClick={() => navigate("/utilisateurs")}
-                className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
+                className="glass rounded-2xl px-3 sm:px-4 py-2 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-[#7A1128]/10 hover:text-[#7A1128] transition-colors"
               >
                 <Users size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Utilisateurs</span>
               </button>
             )}
+            <NotificationBell />
+            <span className="hidden sm:inline text-[13px] font-semibold text-ink ml-1">{user?.nom}</span>
             <button
               onClick={logout}
-              className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl glass flex items-center justify-center text-ink-soft hover:bg-[#7A1128]/10 hover:text-[#7A1128] transition-colors shrink-0"
+              title="Se déconnecter"
             >
-              <LogOut size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Se déconnecter</span>
+              <LogOut size={16} strokeWidth={2.2} />
             </button>
           </div>
         </div>
+      </nav>
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="relative overflow-hidden rounded-[28px] p-6 sm:p-8 mb-8"
+          style={{ background: "linear-gradient(120deg, #9c3a3a 0%, #7A1128 55%, #4d0d18 100%)" }}
+        >
+          <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full bg-black/15 blur-2xl pointer-events-none" />
+          <div className="absolute bottom-0 left-1/3 w-72 h-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+
+          <div className="relative flex items-center gap-5">
+            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shrink-0 shadow-[0_0_0_6px_rgba(255,255,255,0.12),0_0_40px_rgba(255,255,255,0.35)]">
+              <img src="/logo_termitiere.png" alt="Logo LA TERMITIÈRE" className="w-[70%] h-[70%] object-contain" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] sm:text-[12px] font-bold text-white/70 uppercase tracking-widest mb-1">
+                {dateDuJour}
+              </p>
+              <h1 className="text-[24px] sm:text-[32px] font-bold tracking-tight text-white leading-none">
+                {salutation}, {user?.nom} 👋
+              </h1>
+              <p className="flex items-center gap-2 text-[12.5px] sm:text-[13.5px] text-white/75 font-medium mt-3">
+                <span className="px-2 py-[3px] rounded-full bg-white/15 text-white text-[10.5px] font-bold tracking-wide">Info</span>
+                Sélectionnez un module pour continuer
+              </p>
+            </div>
+          </div>
+        </motion.div>
 
         {accessibles.length === 0 ? (
           <GlassCard className="p-10 text-center" hover={false}>
