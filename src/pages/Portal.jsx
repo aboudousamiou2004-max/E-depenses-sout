@@ -19,7 +19,8 @@ export default function Portal() {
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
   const heure = new Date().getHours();
   const salutation = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
-  const dateDuJour = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  const dateBrute = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+  const dateDuJour = dateBrute.charAt(0).toUpperCase() + dateBrute.slice(1);
 
   function kpiPourModule(m) {
     if (m.id === MODULE_DEPENSE.id) {
@@ -60,7 +61,7 @@ export default function Portal() {
                 {salutation}, {user?.nom}
               </p>
               <h1 className="text-[20px] sm:text-[28px] font-bold tracking-tight text-ink leading-none">LA TERMITIÈRE</h1>
-              <p className="text-[12px] sm:text-[13.5px] text-ink-soft font-medium mt-1.5 capitalize">
+              <p className="text-[12px] sm:text-[13.5px] text-ink-soft font-medium mt-1.5">
                 {dateDuJour} — choisissez un module pour continuer
               </p>
             </div>
