@@ -102,6 +102,14 @@ body {
   83.3%    { border-color: #FF453A; }
 }
 
+.logo-ring-blink-white {
+  animation: logo-ring-blink-white 1.8s ease-in-out infinite;
+}
+@keyframes logo-ring-blink-white {
+  0%, 100% { border-color: rgba(255, 255, 255, 1); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.55); }
+  50%      { border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 0 22px 4px rgba(255, 255, 255, 0.5); }
+}
+
 /* ---------- glass surfaces ---------- */
 .glass {
   background: rgba(255, 255, 255, 0.62);

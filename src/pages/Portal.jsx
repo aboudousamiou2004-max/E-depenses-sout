@@ -41,8 +41,8 @@ export default function Portal() {
         <div className="blob" />
       </div>
 
-      <nav className="sticky top-0 z-30 glass-strong border-b border-white/50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+      <div className="sticky top-0 z-30 px-3 sm:px-6 pt-3 sm:pt-4">
+        <nav className="max-w-5xl mx-auto glass-strong rounded-[22px] px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-contain glass shrink-0 p-1" />
             <div className="min-w-0 leading-none">
@@ -69,8 +69,8 @@ export default function Portal() {
               <LogOut size={16} strokeWidth={2.2} />
             </button>
           </div>
-        </div>
-      </nav>
+        </nav>
+      </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <motion.div
@@ -84,7 +84,7 @@ export default function Portal() {
           <div className="absolute bottom-0 left-1/3 w-72 h-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
 
           <div className="relative flex items-center gap-5">
-            <div className="logo-ring-blink w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shrink-0 border-4 shadow-[0_0_40px_rgba(255,255,255,0.35)]">
+            <div className="logo-ring-blink-white w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shrink-0 border-4">
               <img src="/logo_termitiere.png" alt="Logo LA TERMITIÈRE" className="w-[70%] h-[70%] object-contain" />
             </div>
             <div className="min-w-0">
