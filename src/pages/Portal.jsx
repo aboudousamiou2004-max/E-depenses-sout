@@ -45,42 +45,43 @@ export default function Portal() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="glass-strong rounded-[28px] p-4 sm:p-6 flex items-center justify-between gap-4 flex-wrap mb-8"
+          className="glass-strong rounded-[28px] p-4 sm:p-6 mb-8"
         >
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="relative shrink-0">
-              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg ring-4 ring-white/50 overflow-hidden">
-                <img src="/logo_termitiere.png" alt="Logo LA TERMITIÈRE" className="w-full h-full object-contain p-1.5" />
-              </div>
-              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-[3px] rounded-full bg-[#0A84FF] text-white text-[7.5px] sm:text-[8px] font-bold tracking-wide shadow-[0_2px_8px_rgba(10,132,255,0.5)] whitespace-nowrap">
+          <div className="flex items-center justify-between gap-3">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg ring-4 ring-white/50 overflow-hidden shrink-0">
+              <img src="/logo_termitiere.png" alt="Logo LA TERMITIÈRE" className="w-full h-full object-contain p-1.5" />
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {peutGererUtilisateurs && (
+                <button
+                  onClick={() => navigate("/utilisateurs")}
+                  className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-[#0A84FF]/10 hover:text-[#0A84FF] transition-colors"
+                >
+                  <Users size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Utilisateurs</span>
+                </button>
+              )}
+              <button
+                onClick={logout}
+                className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
+              >
+                <LogOut size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Se déconnecter</span>
+              </button>
+            </div>
+          </div>
+          <div className="mt-3 sm:mt-4">
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#0A84FF]" />
+              <p className="text-[10.5px] sm:text-[11px] font-bold text-[#0A84FF] uppercase tracking-wider">
+                {salutation}, {user?.nom}
+              </p>
+              <span className="px-1.5 py-[2px] rounded-full bg-[#0A84FF]/10 text-[#0A84FF] text-[9px] sm:text-[9.5px] font-bold tracking-wide ml-1">
                 E-DÉPENSES
               </span>
             </div>
-            <div className="min-w-0">
-              <p className="text-[10.5px] sm:text-[11px] font-bold text-[#0A84FF] uppercase tracking-wider mb-0.5">
-                {salutation}, {user?.nom}
-              </p>
-              <h1 className="text-[20px] sm:text-[28px] font-bold tracking-tight text-ink leading-none">LA TERMITIÈRE</h1>
-              <p className="text-[12px] sm:text-[13.5px] text-ink-soft font-medium mt-1.5">
-                {dateDuJour} — choisissez un module pour continuer
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {peutGererUtilisateurs && (
-              <button
-                onClick={() => navigate("/utilisateurs")}
-                className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-[#0A84FF]/10 hover:text-[#0A84FF] transition-colors"
-              >
-                <Users size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Utilisateurs</span>
-              </button>
-            )}
-            <button
-              onClick={logout}
-              className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
-            >
-              <LogOut size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Se déconnecter</span>
-            </button>
+            <h1 className="text-[24px] sm:text-[28px] font-bold tracking-tight text-ink leading-none">LA TERMITIÈRE</h1>
+            <p className="text-[12px] sm:text-[13.5px] text-ink-soft font-medium mt-1.5">
+              {dateDuJour} — choisissez un module pour continuer
+            </p>
           </div>
         </motion.div>
 
