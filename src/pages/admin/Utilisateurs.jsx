@@ -144,7 +144,7 @@ export default function Utilisateurs() {
             </Field>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Mot de passe *">
+            <Field label="Mot de passe *" hint="6 caractères minimum">
               <TextInput type="password" value={form.pass} onChange={(e) => setForm({ ...form, pass: e.target.value })} placeholder="••••••••" />
             </Field>
             <Field label="Rôle">

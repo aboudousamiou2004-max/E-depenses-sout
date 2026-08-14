@@ -1,8 +1,9 @@
-export default function Field({ label, children }) {
+export default function Field({ label, hint, children }) {
   return (
     <label className="block mb-3.5">
       <span className="text-[12.5px] font-semibold text-ink-soft ml-1">{label}</span>
       <div className="mt-1.5">{children}</div>
+      {hint && <span className="block text-[11px] text-ink-soft/80 mt-1 ml-1">{hint}</span>}
     </label>
   );
 }

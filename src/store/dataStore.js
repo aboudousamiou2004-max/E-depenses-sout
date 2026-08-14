@@ -10,6 +10,18 @@ import { supabase, loginToEmail } from "../lib/supabaseClient";
 // exclusivement côté serveur (triggers SQL, voir supabase/schema.sql) — ce
 // store ne fait plus que lire le résultat et déclencher les INSERT bruts.
 
+// Supabase Auth renvoie ses messages d'erreur en anglais — traduction des cas
+// les plus courants pour rester cohérent avec le reste de l'interface,
+// sinon on retombe sur le message original plutôt que de le masquer.
+const ERREURS_AUTH_FR = {
+  "Password should be at least 6 characters.": "Le mot de passe doit contenir au moins 6 caractères.",
+  "User already registered": "Cet identifiant est déjà utilisé.",
+  "Invalid login credentials": "Identifiant ou mot de passe incorrect.",
+};
+function traduireErreurAuth(message) {
+  return ERREURS_AUTH_FR[message] || message;
+}
+
 const mapSecteur = (r) => ({ id: r.id, nom: r.nom, label: r.label, color: r.color, actif: r.actif !== false });
 const mapCategorie = (r) => ({ id: r.id, secteurId: r.secteur_id, nom: r.nom });
 const mapBudget = (r) => ({ id: r.id, secteurId: r.secteur_id, annee: r.annee, mois: r.mois, montant: Number(r.montant) });
@@ -179,7 +191,7 @@ export const useDataStore = create((set, get) => ({
         },
       },
     });
-    if (signUpError) return { ok: false, error: signUpError.message };
+    if (signUpError) return { ok: false, error: traduireErreurAuth(signUpError.message) };
 
     const { error: reloginError } = await supabase.auth.signInWithPassword({
       email: loginToEmail(auteur.login),
