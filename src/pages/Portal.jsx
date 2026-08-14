@@ -17,6 +17,9 @@ export default function Portal() {
 
   const accessibles = useMemo(() => modulesAccessibles(user, secteurs), [user, secteurs]);
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
+  const heure = new Date().getHours();
+  const salutation = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
+  const dateDuJour = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 
   function kpiPourModule(m) {
     if (m.id === MODULE_DEPENSE.id) {
@@ -37,36 +40,48 @@ export default function Portal() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <div className="flex items-center justify-between gap-4 flex-wrap mb-8">
-          <div className="flex items-center gap-3 sm:gap-4">
-            <div className="flex flex-col items-center shrink-0">
-              <img src="/logo_termitiere.png" alt="Logo E-DÉPENSES" className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl object-contain glass" />
-              <span className="text-[9px] font-bold text-ink-soft tracking-wide mt-1">E-DÉPENSES</span>
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+          className="glass-strong rounded-[28px] p-4 sm:p-6 flex items-center justify-between gap-4 flex-wrap mb-8"
+        >
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-white flex items-center justify-center shadow-lg ring-4 ring-white/50 overflow-hidden">
+                <img src="/logo_termitiere.png" alt="Logo LA TERMITIÈRE" className="w-full h-full object-contain p-1.5" />
+              </div>
+              <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 px-1.5 py-[3px] rounded-full bg-[#0A84FF] text-white text-[7.5px] sm:text-[8px] font-bold tracking-wide shadow-[0_2px_8px_rgba(10,132,255,0.5)] whitespace-nowrap">
+                E-DÉPENSES
+              </span>
             </div>
-            <div>
-              <h1 className="text-[20px] sm:text-[26px] font-bold tracking-tight text-ink">LA TERMITIÈRE</h1>
-              <p className="text-[12.5px] sm:text-[13.5px] text-ink-soft font-medium mt-0.5">
-                Bonjour {user?.nom} — choisissez un module
+            <div className="min-w-0">
+              <p className="text-[10.5px] sm:text-[11px] font-bold text-[#0A84FF] uppercase tracking-wider mb-0.5">
+                {salutation}, {user?.nom}
+              </p>
+              <h1 className="text-[20px] sm:text-[28px] font-bold tracking-tight text-ink leading-none">LA TERMITIÈRE</h1>
+              <p className="text-[12px] sm:text-[13.5px] text-ink-soft font-medium mt-1.5 capitalize">
+                {dateDuJour} — choisissez un module pour continuer
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {peutGererUtilisateurs && (
               <button
                 onClick={() => navigate("/utilisateurs")}
-                className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
+                className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-[#0A84FF]/10 hover:text-[#0A84FF] transition-colors"
               >
                 <Users size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Utilisateurs</span>
               </button>
             )}
             <button
               onClick={logout}
-              className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-white/70 transition-colors"
+              className="glass rounded-2xl px-3 sm:px-4 py-2.5 flex items-center gap-2 text-[13px] font-semibold text-ink hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors"
             >
               <LogOut size={15} strokeWidth={2.2} /> <span className="hidden sm:inline">Se déconnecter</span>
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {accessibles.length === 0 ? (
           <GlassCard className="p-10 text-center" hover={false}>
