@@ -80,25 +80,25 @@ export default function Portal() {
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="relative overflow-hidden rounded-[28px] p-6 sm:p-8 mb-8"
+          className="relative overflow-hidden rounded-[20px] sm:rounded-[28px] p-4 sm:p-8 mb-6 sm:mb-8"
           style={{ background: "linear-gradient(120deg, #9c3a3a 0%, #7A1128 55%, #4d0d18 100%)" }}
         >
           <div className="absolute -top-16 -right-10 w-64 h-64 rounded-full bg-black/15 blur-2xl pointer-events-none" />
           <div className="absolute bottom-0 left-1/3 w-72 h-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
 
-          <div className="relative flex items-center gap-5">
-            <div className="logo-ring-blink-white w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shrink-0 border-4">
+          <div className="relative flex items-center gap-3 sm:gap-5">
+            <div className="logo-ring-blink-white w-12 h-12 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shrink-0 border-[3px] sm:border-4">
               <img src="/logo_termitiere.png" alt="Logo LA TERMITIÈRE" className="w-[70%] h-[70%] object-contain" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] sm:text-[12px] font-bold text-white/70 uppercase tracking-widest mb-1">
+              <p className="text-[9.5px] sm:text-[12px] font-bold text-white/70 uppercase tracking-widest mb-0.5 sm:mb-1">
                 {dateDuJour}
               </p>
-              <h1 className="text-[24px] sm:text-[32px] font-bold tracking-tight text-white leading-none">
+              <h1 className="text-[16px] sm:text-[32px] font-bold tracking-tight text-white leading-tight sm:leading-none">
                 {salutation}, {user?.nom} 👋
               </h1>
-              <p className="flex items-center gap-2 text-[12.5px] sm:text-[13.5px] text-white/75 font-medium mt-3">
-                <span className="px-2 py-[3px] rounded-full bg-white/15 text-white text-[10.5px] font-bold tracking-wide">Info</span>
+              <p className="flex items-center gap-1.5 sm:gap-2 text-[10.5px] sm:text-[13.5px] text-white/75 font-medium mt-1.5 sm:mt-3">
+                <span className="px-1.5 sm:px-2 py-[2px] sm:py-[3px] rounded-full bg-white/15 text-white text-[9px] sm:text-[10.5px] font-bold tracking-wide shrink-0">Info</span>
                 Sélectionnez un module pour continuer
               </p>
             </div>
