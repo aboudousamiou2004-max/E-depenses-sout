@@ -10,7 +10,7 @@
 // code. `PRESETS` ne fait que personnaliser l'icône/le stock des secteurs déjà
 // connus à la conception de l'application — un secteur inconnu reçoit une
 // icône et un comportement génériques, identiques à E-FONCIER/E-GARDERIE.
-import { Wallet, Wheat, Truck, Factory, MapPinned, Baby, Building2 } from "lucide-react";
+import { Wallet, Wheat, Truck, Factory, MapPinned, Baby, Building2, Briefcase } from "lucide-react";
 
 export const MODULE_DEPENSE = {
   id: "depense",
@@ -31,6 +31,7 @@ const PRESETS = {
   briqueterie: { icon: Factory, description: "Production & vente de briques", typesFacturation: ["Prestation", "Vente de briques"], stock: "briques" },
   foncier: { icon: MapPinned, description: "Gestion foncière", typesFacturation: ["Prestation", "Location"] },
   garderie: { icon: Baby, description: "Garderie LA TERMITIÈRE", typesFacturation: ["Prestation", "Frais d'inscription"] },
+  egpro: { icon: Briefcase, description: "Gestion des projets de l'entreprise", typesFacturation: ["Prestation", "Facturation de projet"] },
 };
 
 function moduleFromSecteur(secteur) {
