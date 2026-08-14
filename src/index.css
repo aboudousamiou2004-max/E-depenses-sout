@@ -124,6 +124,48 @@ body {
   box-shadow: var(--shadow-glass-lg);
 }
 
+/* Verre "hero" : plus transparent que .glass-strong pour laisser deviner les
+   blobs du mesh-bg et des halos de couleur internes à travers le flou —
+   réservé aux surfaces d'accroche (en-tête de portail), pas aux cartes
+   utilitaires où la lisibilité prime sur l'effet. */
+.glass-hero {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.32));
+  backdrop-filter: blur(34px) saturate(220%);
+  -webkit-backdrop-filter: blur(34px) saturate(220%);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow: var(--shadow-glass-lg), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+}
+.glass-hero::before,
+.glass-hero::after {
+  content: "";
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(50px);
+  opacity: 0.55;
+  pointer-events: none;
+  z-index: 0;
+}
+.glass-hero::before {
+  width: 260px;
+  height: 260px;
+  top: -120px;
+  left: -60px;
+  background: radial-gradient(circle, #7dd3fc, transparent 70%);
+}
+.glass-hero::after {
+  width: 240px;
+  height: 240px;
+  bottom: -130px;
+  right: -50px;
+  background: radial-gradient(circle, #fbcfe8, transparent 70%);
+}
+.glass-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: rgba(15,23,42,0.15); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(15,23,42,0.25); }
