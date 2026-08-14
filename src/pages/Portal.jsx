@@ -110,7 +110,7 @@ export default function Portal() {
             <p className="text-ink-soft">Aucun module ne vous a encore été attribué. Contactez un administrateur.</p>
           </GlassCard>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
             {accessibles.map((m, i) => (
               <motion.button
                 key={m.id}
@@ -119,23 +119,23 @@ export default function Portal() {
                 transition={{ delay: i * 0.05, duration: 0.4 }}
                 whileHover={{ y: -4 }}
                 onClick={() => navigate(m.path)}
-                className="glass rounded-[28px] p-6 text-left flex flex-col gap-4 group"
+                className="glass rounded-[18px] sm:rounded-[28px] p-3.5 sm:p-6 text-left flex flex-col gap-2 sm:gap-4 group"
               >
                 <div className="flex items-center justify-between">
-                  <div className="w-12 h-12 rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: `${m.color}1f` }}>
+                  <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: `${m.color}1f` }}>
                     {m.id === MODULE_DEPENSE.id ? (
-                      <img src="/logo_termitiere.png" alt="" className="w-8 h-8 object-contain" />
+                      <img src="/logo_termitiere.png" alt="" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
                     ) : (
-                      <m.icon size={22} strokeWidth={2.2} style={{ color: m.color }} />
+                      <m.icon size={17} strokeWidth={2.2} style={{ color: m.color }} className="w-[17px] h-[17px] sm:w-[22px] sm:h-[22px]" />
                     )}
                   </div>
-                  <ChevronRight size={18} className="text-ink-soft group-hover:translate-x-1 group-hover:text-ink transition-all" />
+                  <ChevronRight size={16} className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-ink-soft group-hover:translate-x-1 group-hover:text-ink transition-all" />
                 </div>
                 <div>
-                  <p className="font-bold tracking-tight text-ink">{m.nom}</p>
-                  <p className="text-[12.5px] text-ink-soft font-medium mt-0.5">{m.description}</p>
+                  <p className="font-bold tracking-tight text-ink text-[13.5px] sm:text-[15px]">{m.nom}</p>
+                  <p className="text-[11px] sm:text-[12.5px] text-ink-soft font-medium mt-0.5">{m.description}</p>
                 </div>
-                <p className="text-[12px] font-semibold" style={{ color: m.color }}>
+                <p className="text-[10.5px] sm:text-[12px] font-semibold" style={{ color: m.color }}>
                   {kpiPourModule(m)}
                 </p>
               </motion.button>
