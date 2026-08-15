@@ -69,7 +69,7 @@ export default function Utilisateurs() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
-        <button onClick={() => navigate("/portal")} className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft hover:text-ink mb-4 transition-colors">
+        <button onClick={() => navigate("/portal")} className="glass rounded-2xl px-3.5 py-2 flex items-center gap-1.5 text-[12.5px] font-semibold text-ink hover:bg-white/70 transition-colors mb-4">
           <ArrowLeft size={14} strokeWidth={2.4} /> Retour au portail
         </button>
 
