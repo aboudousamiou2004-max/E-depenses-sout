@@ -90,12 +90,26 @@ body {
   50% { transform: translate(-4vw, 5vh) scale(0.95); }
 }
 
-.logo-ring-blink {
-  animation: logo-ring-blink 1.6s ease-in-out infinite;
+/* Bordure du logo (page de connexion) : anneau plein qui pulse en rouge
+   bordeaux + un anneau "écho" qui grandit et s'estompe en boucle derrière
+   lui, pour l'effet de traînée — le logo au centre (élément séparé dans le
+   markup) n'est jamais concerné par ces transformations. */
+.logo-ring-pulse {
+  border-color: #7A1128;
+  animation: logo-ring-pulse 1.6s ease-in-out infinite;
 }
-@keyframes logo-ring-blink {
+@keyframes logo-ring-pulse {
   0%, 100% { border-color: #7A1128; transform: scale(1); }
-  50%      { border-color: #C4476A; transform: scale(1.1); }
+  50%      { border-color: #C4476A; transform: scale(1.12); }
+}
+
+.logo-ring-echo {
+  border-color: #7A1128;
+  animation: logo-ring-echo 1.6s ease-out infinite;
+}
+@keyframes logo-ring-echo {
+  0%   { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.6); opacity: 0; }
 }
 
 .logo-ring-blink-white {
