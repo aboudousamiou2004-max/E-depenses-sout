@@ -14,11 +14,14 @@ import { supabase, loginToEmail } from "../lib/supabaseClient";
 // les plus courants pour rester cohérent avec le reste de l'interface,
 // sinon on retombe sur le message original plutôt que de le masquer.
 const ERREURS_AUTH_FR = {
-  "Password should be at least 6 characters.": "Le mot de passe doit contenir au moins 6 caractères.",
   "User already registered": "Cet identifiant est déjà utilisé.",
   "Invalid login credentials": "Identifiant ou mot de passe incorrect.",
 };
 function traduireErreurAuth(message) {
+  // Le nombre de caractères minimum est configurable côté Supabase (Dashboard),
+  // donc traduit dynamiquement plutôt que sur un texte figé à "6".
+  const longueurMin = message?.match(/Password should be at least (\d+) characters?\.?/);
+  if (longueurMin) return `Le mot de passe doit contenir au moins ${longueurMin[1]} caractères.`;
   return ERREURS_AUTH_FR[message] || message;
 }
 
