@@ -5,7 +5,7 @@ Sur [supabase.com](https://supabase.com) → *New Project* → choisir une régi
 
 ## 2. Désactiver la confirmation par e-mail
 *Authentication → Providers → Email* → désactiver **"Confirm email"**.
-Nécessaire car l'app utilise des adresses synthétiques (`identifiant@e-depenses.local`) qui ne reçoivent jamais de vrai courrier.
+Nécessaire car l'app utilise des adresses synthétiques (`identifiant@e-depenses.app`) qui ne reçoivent jamais de vrai courrier.
 
 ## 3. Exécuter le script SQL
 *SQL Editor → New query* → coller l'intégralité de [`schema.sql`](./schema.sql) → *Run*.

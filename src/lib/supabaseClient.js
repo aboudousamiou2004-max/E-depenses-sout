@@ -16,6 +16,10 @@ export const supabase = supabaseConfigured ? createClient(url, anonKey) : null;
 
 // Domaine synthétique utilisé pour transformer l'« identifiant » affiché dans
 // l'UI en e-mail Supabase Auth — voir supabase/schema.sql (handle_new_user)
-// et authStore.js.
-export const AUTH_EMAIL_DOMAIN = "e-depenses.local";
+// et authStore.js. Le TLD .local (RFC 6762, réservé au mDNS) est rejeté par
+// la validation d'e-mail de Supabase Auth à la création d'un nouvel
+// utilisateur (though les comptes déjà créés continuaient de se connecter
+// sans problème) — .app est un TLD syntaxiquement standard qui passe cette
+// validation, sans jamais servir à l'envoi de vrais e-mails.
+export const AUTH_EMAIL_DOMAIN = "e-depenses.app";
 export const loginToEmail = (login) => `${login.trim().toLowerCase()}@${AUTH_EMAIL_DOMAIN}`;

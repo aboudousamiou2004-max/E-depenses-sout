@@ -204,8 +204,30 @@ export const useDataStore = create((set, get) => ({
     return { ok: true, utilisateur: signUpData.user };
   },
 
+  supprimerUtilisateur: async (uid) => {
+    const { error } = await supabase.rpc("supprimer_utilisateur", { p_user_id: uid });
+    if (error) {
+      const bloque = error.code === "23503";
+      return {
+        ok: false,
+        error: bloque
+          ? "Cet utilisateur a déjà des dépenses, recettes, budgets ou entrées de journal à son nom — désactivez-le plutôt que de le supprimer."
+          : error.message,
+      };
+    }
+    await get().chargerUsers();
+    return { ok: true };
+  },
+
   modifierAccesUtilisateur: async (uid, modules) => {
     const { error } = await supabase.from("profiles").update({ modules }).eq("id", uid);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerUsers();
+    return { ok: true };
+  },
+
+  modifierActifUtilisateur: async (uid, actif) => {
+    const { error } = await supabase.from("profiles").update({ actif }).eq("id", uid);
     if (error) return { ok: false, error: error.message };
     await get().chargerUsers();
     return { ok: true };

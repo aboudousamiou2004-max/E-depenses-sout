@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Plus, UserPlus, Check } from "lucide-react";
+import { ArrowLeft, Plus, UserPlus, Check, Trash2 } from "lucide-react";
 import GlassCard from "../../components/ui/GlassCard";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
@@ -15,7 +15,7 @@ import { tousLesModules, modulesMetier, ROLES_ACCES_TOTAL } from "../../lib/modu
 const empty = () => ({ login: "", nom: "", pass: "", role: "agent", secteur: "", poste: "", telephone: "", actif: true, modules: [] });
 
 export default function Utilisateurs() {
-  const { users, secteurs, addUser, modifierAccesUtilisateur } = useDataStore();
+  const { users, secteurs, addUser, modifierAccesUtilisateur, modifierActifUtilisateur, supprimerUtilisateur } = useDataStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const modulesM = modulesMetier(secteurs);
@@ -24,6 +24,7 @@ export default function Utilisateurs() {
   const [adminPass, setAdminPass] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [supprimantId, setSupprimantId] = useState(null);
 
   function toggleModule(id) {
     setForm((f) => ({ ...f, modules: f.modules.includes(id) ? f.modules.filter((m) => m !== id) : [...f.modules, id] }));
@@ -32,6 +33,19 @@ export default function Utilisateurs() {
   async function toggleAccesExistant(u, moduleId) {
     const modules = (u.modules || []).includes(moduleId) ? u.modules.filter((m) => m !== moduleId) : [...(u.modules || []), moduleId];
     const res = await modifierAccesUtilisateur(u.uid, modules, user);
+    if (!res.ok) alert(res.error);
+  }
+
+  async function toggleActif(u) {
+    const res = await modifierActifUtilisateur(u.uid, !u.actif);
+    if (!res.ok) alert(res.error);
+  }
+
+  async function supprimer(u) {
+    if (!window.confirm(`Supprimer définitivement le compte de ${u.nom} (${u.login}) ? Cette action est irréversible.`)) return;
+    setSupprimantId(u.uid);
+    const res = await supprimerUtilisateur(u.uid);
+    setSupprimantId(null);
     if (!res.ok) alert(res.error);
   }
 
@@ -74,6 +88,8 @@ export default function Utilisateurs() {
                 <th className="px-4 py-3">Utilisateur</th>
                 <th className="px-4 py-3">Rôle</th>
                 <th className="px-4 py-3">Accès aux modules</th>
+                <th className="px-4 py-3">Statut</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -112,6 +128,28 @@ export default function Utilisateurs() {
                             {(u.modules || []).includes("depense") && <Check size={10} strokeWidth={3} />} E-DÉPENSES
                           </button>
                         </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        onClick={() => toggleActif(u)}
+                        disabled={u.uid === user?.uid}
+                        className="disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={u.uid === user?.uid ? "Impossible de modifier son propre statut" : undefined}
+                      >
+                        <Badge tone={u.actif ? "mint" : "ink"}>{u.actif ? "Actif" : "Désactivé"}</Badge>
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.uid !== user?.uid && (
+                        <button
+                          onClick={() => supprimer(u)}
+                          disabled={supprimantId === u.uid}
+                          title="Supprimer"
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors disabled:opacity-50"
+                        >
+                          <Trash2 size={15} strokeWidth={2.2} />
+                        </button>
                       )}
                     </td>
                   </motion.tr>
