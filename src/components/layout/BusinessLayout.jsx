@@ -57,9 +57,16 @@ export default function BusinessLayout({ config }) {
         <div className="glass-strong rounded-[28px] flex-1 flex flex-col p-4 overflow-y-auto">
           <button
             onClick={() => go("/portal")}
-            className="flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-soft hover:text-ink px-2 mb-2 transition-colors"
+            className="btn-signal-glow flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-soft hover:text-ink px-2 py-1 rounded-xl mb-2 transition-colors"
           >
-            <ArrowLeft size={13} strokeWidth={2.4} /> Retour au portail
+            <motion.span
+              className="flex items-center"
+              animate={{ x: [0, -4, 0] }}
+              transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <ArrowLeft size={13} strokeWidth={2.4} />
+            </motion.span>
+            Retour au portail
           </button>
 
           <div className="flex items-center gap-2.5 px-2 py-3">
