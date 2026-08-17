@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { supabase, supabaseConfigured, loginToEmail } from "../lib/supabaseClient";
 import { useDataStore } from "./dataStore";
 import { useStockStore } from "./stockStore";
+import { useSanteStore } from "./santeStore";
 
 // Même mapping snake_case → camelCase que dataStore.js (mapUser) — dupliqué en
 // petit ici plutôt qu'importé, pour ne pas créer un couplage entre les deux
@@ -40,6 +41,7 @@ export const useAuthStore = create((set, get) => ({
         set({ user: null, status: "unauthenticated" });
         useDataStore.getState().reset();
         useStockStore.getState().reset();
+        useSanteStore.getState().reset();
       }
     });
   },
@@ -50,6 +52,7 @@ export const useAuthStore = create((set, get) => ({
       set({ user: null, status: "unauthenticated" });
       useDataStore.getState().reset();
       useStockStore.getState().reset();
+      useSanteStore.getState().reset();
       return;
     }
     set({ user: mapProfil(data), status: "authenticated" });
