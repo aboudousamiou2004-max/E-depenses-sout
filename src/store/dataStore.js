@@ -28,7 +28,15 @@ function traduireErreurAuth(message) {
 
 const mapSecteur = (r) => ({ id: r.id, nom: r.nom, label: r.label, color: r.color, actif: r.actif !== false });
 const mapCategorie = (r) => ({ id: r.id, secteurId: r.secteur_id, nom: r.nom });
-const mapBudget = (r) => ({ id: r.id, secteurId: r.secteur_id, annee: r.annee, mois: r.mois, montant: Number(r.montant) });
+const mapBudget = (r) => ({
+  id: r.id, secteurId: r.secteur_id, annee: r.annee, mois: r.mois, montant: Number(r.montant),
+  revisions: r.revisions || [],
+  montantPropose: r.montant_propose != null ? Number(r.montant_propose) : null,
+  motifPropose: r.motif_propose || null,
+  statutValidation: r.statut_validation || null,
+  proposeParText: r.propose_par_text || null,
+  proposeLe: r.propose_le || null,
+});
 const mapDepense = (r) => ({
   id: r.id,
   secteurId: r.secteur_id,
@@ -455,10 +463,65 @@ export const useDataStore = create((set, get) => ({
     return { ok: true };
   },
 
-  setBudget: async (secteurId, annee, mois, montant) => {
-    const { error } = await supabase
-      .from("budgets")
-      .upsert({ secteur_id: secteurId, annee, mois, montant }, { onConflict: "secteur_id,annee,mois" });
+  // Alloue (1ère fois) ou révise le budget d'un secteur pour un mois — trace
+  // chaque changement (ancien/nouveau/motif/auteur/date) dans `revisions`.
+  // `requiertValidation` (calculé par l'appelant selon si le secteur a une
+  // équipe identifiable, cf. Recettes.jsx) : si vrai, le montant reste
+  // « proposé » jusqu'à confirmation de réception (validerReceptionBudget)
+  // au lieu de s'appliquer immédiatement — même logique que
+  // termitiere-platform/src/modules/depense/RecettesDepenses.jsx.
+  allouerOuReviserBudget: async ({ secteurId, annee, mois, montant, motif, user, requiertValidation }) => {
+    const existant = get().budgets.find((b) => b.secteurId === secteurId && b.annee === annee && b.mois === mois);
+    const ancien = existant?.montant || 0;
+    const motifFinal = motif?.trim() || "Allocation initiale";
+    const auteur = user?.nom || user?.login || "—";
+
+    if (requiertValidation) {
+      const { error } = await supabase.from("budgets").upsert(
+        {
+          secteur_id: secteurId, annee, mois, montant: ancien, revisions: existant?.revisions || [],
+          montant_propose: montant, motif_propose: motifFinal, statut_validation: "en_attente",
+          propose_par_text: auteur, propose_par_uid: user?.uid || null, propose_le: new Date().toISOString(),
+        },
+        { onConflict: "secteur_id,annee,mois" }
+      );
+      if (error) return { ok: false, error: error.message };
+      await get().chargerBudgets();
+      return { ok: true, propose: true };
+    }
+
+    const entry = { id: crypto.randomUUID(), ancien, nouveau: montant, motif: motifFinal, date: Date.now(), auteur };
+    const revisions = [...(existant?.revisions || []), entry];
+    const { error } = await supabase.from("budgets").upsert(
+      { secteur_id: secteurId, annee, mois, montant, revisions, montant_propose: null, motif_propose: null, statut_validation: null },
+      { onConflict: "secteur_id,annee,mois" }
+    );
+    if (error) return { ok: false, error: error.message };
+    await get().chargerBudgets();
+    return { ok: true, propose: false };
+  },
+
+  // Le secteur confirme avoir reçu le budget proposé → il devient le montant actif.
+  validerReceptionBudget: async (budgetId, user) => {
+    const b = get().budgets.find((x) => x.id === budgetId);
+    if (!b || b.montantPropose == null) return { ok: false, error: "Rien à confirmer" };
+    const entry = {
+      id: crypto.randomUUID(), ancien: b.montant, nouveau: b.montantPropose,
+      motif: `${b.motifPropose || "Allocation"} — confirmé reçu`, date: Date.now(),
+      auteur: user?.nom || user?.login || "—",
+    };
+    const revisions = [...(b.revisions || []), entry];
+    const { error } = await supabase.from("budgets").update({
+      montant: b.montantPropose, revisions, montant_propose: null, motif_propose: null, statut_validation: null,
+    }).eq("id", budgetId);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerBudgets();
+    return { ok: true };
+  },
+
+  // Retour à « Non défini » — supprime le budget (et son historique) pour ce mois.
+  supprimerBudget: async (id) => {
+    const { error } = await supabase.from("budgets").delete().eq("id", id);
     if (error) return { ok: false, error: error.message };
     await get().chargerBudgets();
     return { ok: true };

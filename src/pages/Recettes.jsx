@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Wallet, TrendingUp, AlertTriangle } from "lucide-react";
+import { Plus, Wallet, TrendingUp, AlertTriangle, History, Send, CheckCircle2, Trash2 } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import StatTile from "../components/ui/StatTile";
@@ -12,7 +12,7 @@ import RecetteDetailModal from "../components/RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
-import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte, matchPeriode } from "../lib/logic";
+import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte, matchPeriode, budgetSecteurMois, depensesSecteurMois, statutBudget } from "../lib/logic";
 import { ROLES_ACCES_TOTAL } from "../lib/modules";
 
 const ORIGINES = ["Vente", "Prestation", "Facturation client", "Subvention"];
@@ -28,7 +28,7 @@ const ORIGINE_TONE = {
 };
 
 export default function Recettes() {
-  const { secteurs, recettes, budgets, depenses, addRecette, modifierRecette, supprimerRecette } = useDataStore();
+  const { secteurs, recettes, budgets, depenses, users, addRecette, modifierRecette, supprimerRecette, allouerOuReviserBudget, validerReceptionBudget, supprimerBudget } = useDataStore();
   const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -39,6 +39,69 @@ export default function Recettes() {
   const [filtreOrigine, setFiltreOrigine] = useState("");
   const [detail, setDetail] = useState(null);
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+
+  // ── Budget par secteur (allocation / révision) ──
+  const [revision, setRevision] = useState(null); // { budget, secteur, requiertValidation }
+  const [revMontant, setRevMontant] = useState("");
+  const [revMotif, setRevMotif] = useState("");
+  const [revSaving, setRevSaving] = useState(false);
+  const [revError, setRevError] = useState("");
+  const [validationBusy, setValidationBusy] = useState(null);
+
+  const budgetParSecteur = useMemo(() => {
+    return secteurs.map((s) => {
+      const budget = budgets.find((b) => b.secteurId === s.id && b.annee === periode.annee && b.mois === periode.mois);
+      const alloue = budgetSecteurMois(budgets, s.id, periode.annee, periode.mois);
+      const depense = totalMontant(depensesSecteurMois(depenses, s.id, periode.annee, periode.mois));
+      const pct = alloue > 0 ? Math.round((depense / alloue) * 100) : depense > 0 ? 100 : 0;
+      // « Équipe identifiable » : au moins un profil ayant ce secteur dans ses modules
+      // — décide si la proposition de budget doit être confirmée par le secteur avant
+      // de s'appliquer (comme termitiere-platform), calculé dynamiquement puisque les
+      // secteurs sont créables à la volée ici (pas de liste figée).
+      const requiertValidation = users.some((u) => (u.modules || []).includes(s.id));
+      return { secteur: s, budget, alloue, depense, reste: alloue - depense, pct, statut: statutBudget(pct / 100), requiertValidation };
+    });
+  }, [secteurs, budgets, depenses, users, periode]);
+
+  function ouvrirRevision(bs) {
+    setRevision(bs);
+    setRevMontant(String(bs.alloue || ""));
+    setRevMotif("");
+    setRevError("");
+  }
+
+  async function confirmerRevision() {
+    if (!revision) return;
+    const nouveau = Number(revMontant);
+    if (revMontant === "" || nouveau < 0) return setRevError("Montant requis");
+    const estAllocation = revision.alloue === 0;
+    if (!estAllocation && !revMotif.trim()) return setRevError("Motif de révision requis");
+    setRevSaving(true);
+    setRevError("");
+    const res = await allouerOuReviserBudget({
+      secteurId: revision.secteur.id, annee: periode.annee, mois: periode.mois,
+      montant: nouveau, motif: revMotif, user, requiertValidation: revision.requiertValidation,
+    });
+    setRevSaving(false);
+    if (!res.ok) return setRevError(res.error);
+    setRevision(null);
+  }
+
+  async function confirmerReception(bs) {
+    if (validationBusy) return;
+    setValidationBusy(bs.budget.id);
+    await validerReceptionBudget(bs.budget.id, user);
+    setValidationBusy(null);
+  }
+
+  async function supprimerBudgetActuel() {
+    if (!revision?.budget) return;
+    if (!window.confirm(`Supprimer le budget alloué de ${revision.secteur.nom} pour cette période ?`)) return;
+    setRevSaving(true);
+    await supprimerBudget(revision.budget.id);
+    setRevSaving(false);
+    setRevision(null);
+  }
 
   // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
   // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
@@ -147,6 +210,77 @@ export default function Recettes() {
           </div>
         </GlassCard>
       )}
+
+      {/* Budget par secteur — allocation / révision, avec historique */}
+      <GlassCard className="p-5 mb-5" hover={false}>
+        <div className="flex items-center gap-2 mb-3">
+          <Wallet size={16} className="text-[#B45309]" strokeWidth={2.4} />
+          <h3 className="font-bold tracking-tight text-ink">Budget par secteur</h3>
+          <span className="text-[12.5px] text-ink-soft font-medium">
+            — {new Date(periode.annee, periode.mois).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+          </span>
+        </div>
+        <div className="flex flex-col gap-2">
+          {budgetParSecteur.map((bs) => (
+            <div key={bs.secteur.id} className="rounded-2xl bg-white/50 overflow-hidden">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-3.5 py-2.5">
+                <div className="flex min-w-[130px] items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: bs.secteur.color }} />
+                  <span className="text-[13px] font-semibold text-ink">{bs.secteur.nom}</span>
+                </div>
+                <span className="text-[12.5px] font-bold text-ink-soft">
+                  {bs.alloue > 0 ? `${fmtFCFA(bs.alloue)}` : <span className="font-normal text-ink-soft/50">Non défini</span>}
+                </span>
+                {peutModifier && (
+                  bs.alloue > 0 ? (
+                    <button onClick={() => ouvrirRevision(bs)} className="rounded-xl border border-[#B45309]/30 bg-white px-3 py-1 text-[11.5px] font-semibold text-[#B45309] hover:bg-[#B45309]/5 transition-colors">
+                      🔄 Réviser
+                    </button>
+                  ) : (
+                    <button onClick={() => ouvrirRevision(bs)} className="rounded-xl bg-[#B45309] px-3 py-1 text-[11.5px] font-bold text-white hover:bg-[#93400a] transition-colors">
+                      + Allouer un budget
+                    </button>
+                  )
+                )}
+                {bs.budget?.revisions?.length > 0 && (
+                  <button onClick={() => ouvrirRevision(bs)} className="flex items-center gap-1 rounded-full bg-black/5 px-2 py-0.5 text-[10px] font-bold text-ink-soft hover:bg-black/10">
+                    <History size={11} /> {bs.budget.revisions.length}
+                  </button>
+                )}
+                {bs.alloue > 0 && (
+                  <span className="ml-auto flex items-center gap-3 text-[12px]">
+                    <span className="text-ink-soft">Reste <strong className={bs.reste < 0 ? "text-[#b3241b]" : "text-[#1a7d34]"}>{fmtFCFA(bs.reste)}</strong></span>
+                    <Badge tone={bs.statut.tone}>{bs.pct}%</Badge>
+                  </span>
+                )}
+              </div>
+              {bs.alloue > 0 && (
+                <div className="px-3.5 pb-2.5">
+                  <div className="h-1.5 rounded-full bg-black/5 overflow-hidden">
+                    <div className="h-1.5 rounded-full" style={{ width: `${Math.min(100, bs.pct)}%`, background: bs.statut.tone === "coral" ? "#FF453A" : bs.statut.tone === "amber" ? "#FF9F0A" : "#30D158" }} />
+                  </div>
+                </div>
+              )}
+              {bs.budget?.montantPropose != null && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-[#B45309]/10 bg-[#B45309]/5 px-3.5 py-2">
+                  <Send size={12} className="shrink-0 text-[#B45309]" />
+                  <span className="text-[11.5px] text-[#93400a]">
+                    <strong>{fmtFCFA(bs.budget.montantPropose)}</strong> proposés par {bs.budget.proposeParText}
+                    {bs.budget.motifPropose ? ` — ${bs.budget.motifPropose}` : ""} · en attente de confirmation
+                  </span>
+                  {peutModifier && (
+                    <button onClick={() => confirmerReception(bs)} disabled={validationBusy === bs.budget.id}
+                      className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#30D158] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#29b84c] disabled:opacity-60 transition-colors">
+                      <CheckCircle2 size={12} /> {validationBusy === bs.budget.id ? "Confirmation…" : "Confirmer la réception"}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          {budgetParSecteur.length === 0 && <p className="text-center py-6 text-[13px] text-ink-soft italic">Aucun secteur.</p>}
+        </div>
+      </GlassCard>
 
       {/* Filtres — source, période, + bouton d'ajout (la recherche est dans la TopBar) */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
@@ -260,6 +394,71 @@ export default function Recettes() {
             </Field>
           </div>
         </form>
+      </Modal>
+
+      {/* Allocation (1ère fois) ou révision du budget d'un secteur */}
+      <Modal
+        open={!!revision}
+        onClose={() => setRevision(null)}
+        title={revision ? `${revision.alloue > 0 ? "Réviser" : "Allouer"} le budget — ${revision.secteur.nom}` : "Budget"}
+      >
+        {revision && (() => {
+          const estAllocation = revision.alloue === 0;
+          return (
+            <div className="space-y-3">
+              {revError && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2">{revError}</p>}
+              {revision.requiertValidation && (
+                <p className="rounded-xl border border-[#FF9F0A]/30 bg-[#FF9F0A]/10 px-3 py-2 text-[11px] text-[#93400a]">
+                  <Send size={12} className="inline mr-1" /> Ce montant sera envoyé à l'équipe du secteur pour confirmation — il ne comptera comme « Budget alloué » qu'une fois la réception confirmée.
+                </p>
+              )}
+              {estAllocation ? (
+                <Field label="Montant à allouer (FCFA)">
+                  <TextInput type="number" min="0" value={revMontant} onChange={(e) => setRevMontant(e.target.value)} autoFocus placeholder="0" />
+                </Field>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <p className="text-[10.5px] font-semibold uppercase text-ink-soft/70 mb-1">Budget actuel</p>
+                      <p className="text-[13.5px] font-bold text-ink">{fmtFCFA(revision.alloue)}</p>
+                    </div>
+                    <Field label="Nouveau montant (FCFA)">
+                      <TextInput type="number" min="0" value={revMontant} onChange={(e) => setRevMontant(e.target.value)} />
+                    </Field>
+                  </div>
+                  <Field label="Motif de la révision">
+                    <TextInput value={revMotif} onChange={(e) => setRevMotif(e.target.value)} placeholder="ex : Ajustement suite à hausse des prix…" />
+                  </Field>
+                </>
+              )}
+
+              <div className="flex items-center justify-between gap-2 pt-1">
+                {revision.alloue > 0 ? (
+                  <Button variant="danger" onClick={supprimerBudgetActuel} disabled={revSaving}><Trash2 size={14} className="mr-1" />Supprimer</Button>
+                ) : <span />}
+                <Button onClick={confirmerRevision} disabled={revSaving}>
+                  {revSaving ? "Enregistrement…" : revision.requiertValidation ? "Envoyer au secteur" : estAllocation ? "Allouer" : "Confirmer la révision"}
+                </Button>
+              </div>
+
+              {revision.budget?.revisions?.length > 0 && (
+                <div className="rounded-xl bg-black/[0.03] p-3">
+                  <p className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase text-ink-soft/70"><History size={12} /> Historique</p>
+                  <div className="max-h-48 space-y-2 overflow-y-auto">
+                    {[...revision.budget.revisions].reverse().map((r) => (
+                      <div key={r.id} className="rounded-lg bg-white/70 px-3 py-2 text-[12px]">
+                        <p className="font-semibold text-ink">{fmtFCFA(r.ancien)} → {fmtFCFA(r.nouveau)}</p>
+                        <p className="mt-0.5 text-ink-soft">{r.motif}</p>
+                        <p className="mt-0.5 text-[10.5px] text-ink-soft/60">par {r.auteur || "—"} · {new Date(r.date).toLocaleString("fr-FR")}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Modal>
     </div>
   );
