@@ -15,7 +15,7 @@ const mapArticle = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, unite: r.unite, c
 const mapMouvementMateriel = (r) => ({ id: r.id, date: r.date, articleId: r.article_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
 const mapMatiere = (r) => ({ id: r.id, nom: r.nom, unite: r.unite });
 const mapMouvementMatiere = (r) => ({ id: r.id, date: r.date, matiereId: r.matiere_id, type: r.type, quantite: Number(r.quantite), agentNom: r.agent_nom });
-const mapTypeBrique = (r) => ({ id: r.id, nom: r.nom, tarifVente: Number(r.tarif_vente) });
+const mapTypeBrique = (r) => ({ id: r.id, nom: r.nom, tarifVente: Number(r.tarif_vente), rendement: Number(r.rendement) || 0 });
 const mapJournalBrique = (r) => ({
   id: r.id,
   date: r.date,
@@ -44,8 +44,10 @@ export const useStockStore = create((set, get) => ({
   mouvementsAnimaux: [],
   soldeAnimaux: {},
 
+  prixSacCiment: 0,
+
   chargerTout: async () => {
-    const [refMat, mvtMat, soldeMat, refMatieres, mvtMatieres, soldeMatieres, typesBriques, soldeBriques, journalBriques, refAnimaux, mvtAnimaux, soldeAnimaux] =
+    const [refMat, mvtMat, soldeMat, refMatieres, mvtMatieres, soldeMatieres, typesBriques, soldeBriques, journalBriques, refAnimaux, mvtAnimaux, soldeAnimaux, briqueterieConfig] =
       await Promise.all([
         supabase.from("referentiel_materiel").select("*"),
         supabase.from("mouvements_materiel").select("*").order("created_at", { ascending: false }),
@@ -59,6 +61,7 @@ export const useStockStore = create((set, get) => ({
         supabase.from("referentiel_animaux").select("*"),
         supabase.from("mouvements_animaux").select("*").order("created_at", { ascending: false }),
         supabase.from("v_effectif_animaux").select("*"),
+        supabase.from("briqueterie_config").select("*").eq("id", "defaut").maybeSingle(),
       ]);
 
     const stockBriques = {};
@@ -80,6 +83,7 @@ export const useStockStore = create((set, get) => ({
       referentielAnimaux: (refAnimaux.data || []).map(mapEspece),
       mouvementsAnimaux: (mvtAnimaux.data || []).map(mapMouvementAnimal),
       soldeAnimaux: Object.fromEntries((soldeAnimaux.data || []).map((r) => [r.espece_id, Number(r.effectif)])),
+      prixSacCiment: Number(briqueterieConfig.data?.prix_sac_ciment) || 0,
     });
   },
 
@@ -89,6 +93,7 @@ export const useStockStore = create((set, get) => ({
       referentielMatieres: [], mouvementsMatieres: [], soldeMatieres: {},
       typesBriques: [], stockBriques: {}, journalBriques: [],
       referentielAnimaux: [], mouvementsAnimaux: [], soldeAnimaux: {},
+      prixSacCiment: 0,
     }),
 
   stockArticle: (articleId) => get().soldeMateriel[articleId] || 0,
@@ -229,6 +234,20 @@ export const useStockStore = create((set, get) => ({
     });
     if (error) return { ok: false, error: error.message };
     await get().chargerStockBriques();
+    return { ok: true };
+  },
+
+  enregistrerPrixSacCiment: async (prix) => {
+    const { error } = await supabase.from("briqueterie_config").update({ prix_sac_ciment: Number(prix) || 0, updated_at: new Date().toISOString() }).eq("id", "defaut");
+    if (error) return { ok: false, error: error.message };
+    set({ prixSacCiment: Number(prix) || 0 });
+    return { ok: true };
+  },
+
+  enregistrerRendement: async (typeId, rendement) => {
+    const { error } = await supabase.from("types_briques").update({ rendement: Number(rendement) || 0 }).eq("id", typeId);
+    if (error) return { ok: false, error: error.message };
+    set((s) => ({ typesBriques: s.typesBriques.map((t) => (t.id === typeId ? { ...t, rendement: Number(rendement) || 0 } : t)) }));
     return { ok: true };
   },
 

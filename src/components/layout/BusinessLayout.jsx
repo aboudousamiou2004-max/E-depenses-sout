@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Menu } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, Menu } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -27,6 +27,9 @@ export default function BusinessLayout({ config }) {
       { to: `${config.path}/saisie`, label: "Saisie journalière", icon: ClipboardList },
       { to: `${config.path}/sante`, label: "Santé animale", icon: HeartPulse },
     ] : []),
+    // Marge & Bénéfice : spécifique à la briqueterie — cf.
+    // termitiere-platform/src/modules/evenementiel/Marge.jsx.
+    ...(config.stock === "briques" ? [{ to: `${config.path}/marge`, label: "Marge & Bénéfice", icon: Scale }] : []),
   ];
 
   function go(to) {
