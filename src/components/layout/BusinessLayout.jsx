@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, Menu } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Menu } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -30,6 +30,9 @@ export default function BusinessLayout({ config }) {
     // Marge & Bénéfice : spécifique à la briqueterie — cf.
     // termitiere-platform/src/modules/evenementiel/Marge.jsx.
     ...(config.stock === "briques" ? [{ to: `${config.path}/marge`, label: "Marge & Bénéfice", icon: Scale }] : []),
+    // Dossiers fonciers : spécifique à E-FONCIER — cf.
+    // termitiere-platform/src/modules/foncier/Dossiers.jsx.
+    ...(config.id === "foncier" ? [{ to: `${config.path}/dossiers`, label: "Dossiers fonciers", icon: FolderOpen }] : []),
   ];
 
   function go(to) {
