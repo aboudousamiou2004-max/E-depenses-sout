@@ -20,9 +20,10 @@ export default function BusinessFacturation() {
   const config = useOutletContext();
   const { secteurs, recettes, addRecette, modifierRecette, supprimerRecette } = useDataStore();
   const { user } = useAuthStore();
-  const { typesBriques, stockBriques, venteBriques } = useStockStore();
+  const { typesBriques, stockBriques, venteBriques, referentielMateriel, addMouvementMateriel } = useStockStore();
   const { periode, recherche } = useUIStore();
   const venteDeBriques = config.stock === "briques";
+  const locationMateriel = config.stock === "materiel";
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -38,11 +39,21 @@ export default function BusinessFacturation() {
     date: "2026-07-27",
     briqueTypeId: typesBriques[0]?.id,
     briqueQuantite: "",
+    articleId: referentielMateriel[0]?.id,
+    articleQuantite: 1,
+    jours: 1,
   });
 
   const isVenteBriques = venteDeBriques && form.type === "Vente de briques";
   const briqueChoisie = typesBriques.find((t) => t.id === form.briqueTypeId);
   const stockDispoBrique = briqueChoisie ? stockBriques[briqueChoisie.id]?.pret || 0 : 0;
+
+  // Prestation de location — structurée (article × jours × tarif/jour), au
+  // lieu d'un montant tapé à la main. Porté depuis
+  // termitiere-platform/src/modules/logistique/logic.js (montantLigne).
+  const isLocation = locationMateriel && form.type === "Location";
+  const articleChoisi = referentielMateriel.find((a) => a.id === form.articleId);
+  const montantLocation = (Number(form.articleQuantite) || 0) * (Number(form.jours) || 0) * (articleChoisi?.tarifLocation || 0);
 
   const liste = useMemo(() => {
     let rows = recettes.filter((r) => r.secteurId === config.secteurId).sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -77,6 +88,27 @@ export default function BusinessFacturation() {
       const resVente = await venteBriques(briqueChoisie.id, qte, user);
       setSaving(false);
       if (!resVente.ok) return setError(resVente.error);
+    } else if (isLocation) {
+      if (!articleChoisi || montantLocation <= 0) {
+        setSaving(false);
+        return setError("Choisissez un article avec un tarif de location, une quantité et un nombre de jours");
+      }
+      const res = await addRecette(
+        { secteurId: config.secteurId, montant: montantLocation, date: form.date, origine: `Location — ${articleChoisi.nom} (${form.jours}j)`, client: form.client, description: form.description },
+        user
+      );
+      if (!res.ok) {
+        setSaving(false);
+        return setError(res.error);
+      }
+      // Enregistre la sortie de l'article loué — même geste que la vente de
+      // briques décrémente son stock, ici le matériel part sur le terrain.
+      const resSortie = await addMouvementMateriel(
+        { articleId: articleChoisi.id, type: "sortie", quantite: form.articleQuantite, motif: `Location — ${form.client || "client"}`, date: form.date },
+        user
+      );
+      setSaving(false);
+      if (!resSortie.ok) return setError(resSortie.error);
     } else {
       if (!form.montant) {
         setSaving(false);
@@ -194,6 +226,32 @@ export default function BusinessFacturation() {
               <p className="text-[12.5px] text-ink-soft -mt-1 mb-3">
                 Montant estimé : <span className="font-bold text-ink">{fmtFCFA(Math.min(Number(form.briqueQuantite) || 0, stockDispoBrique) * (briqueChoisie?.tarifVente || 0))}</span>
               </p>
+            </>
+          ) : isLocation ? (
+            <>
+              <Field label="Article loué">
+                <Select value={form.articleId} onChange={(e) => setForm({ ...form, articleId: e.target.value })}>
+                  {referentielMateriel.map((a) => <option key={a.id} value={a.id}>{a.nom} ({fmtFCFA(a.tarifLocation)}/j)</option>)}
+                </Select>
+              </Field>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Quantité">
+                  <TextInput type="number" min="1" value={form.articleQuantite} onChange={(e) => setForm({ ...form, articleQuantite: e.target.value })} />
+                </Field>
+                <Field label="Nombre de jours">
+                  <TextInput type="number" min="1" value={form.jours} onChange={(e) => setForm({ ...form, jours: e.target.value })} />
+                </Field>
+              </div>
+              {articleChoisi?.tarifLocation > 0 ? (
+                <p className="text-[12.5px] text-ink-soft -mt-1 mb-3">
+                  Montant : <span className="font-bold text-ink">{fmtFCFA(montantLocation)}</span> ({form.articleQuantite} × {form.jours}j × {fmtFCFA(articleChoisi.tarifLocation)})
+                </p>
+              ) : (
+                <p className="text-[12px] text-[#b3241b] -mt-1 mb-3">Aucun tarif de location réglé pour cet article — réglez-le depuis Stock magasin.</p>
+              )}
+              <Field label="Date">
+                <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+              </Field>
             </>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

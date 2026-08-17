@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Boxes, ArrowDownCircle, ArrowUpCircle, PackageCheck } from "lucide-react";
+import { Plus, Boxes, ArrowDownCircle, ArrowUpCircle, PackageCheck, AlertTriangle } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
@@ -26,7 +26,7 @@ export default function StockMateriel() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ articleId: referentielMateriel[0]?.id, type: "achat", quantite: "", motif: "", date: "2026-07-27" });
-  const [articleForm, setArticleForm] = useState({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "" });
+  const [articleForm, setArticleForm] = useState({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
 
   const lignes = useMemo(
     () => referentielMateriel.map((a) => ({ ...a, stock: stockArticle(a.id) })),
@@ -35,6 +35,12 @@ export default function StockMateriel() {
   const valeurTotale = lignes.reduce((acc, l) => acc + l.stock * l.coutAchat, 0);
   const enRupture = lignes.filter((l) => l.stock === 0).length;
   const derniersMouvements = mouvementsMateriel.slice(0, 8);
+  // Pertes cumulées (retours cassés/perdus) : ces mouvements n'ont pas d'effet
+  // sur le solde (signe 0, l'article était déjà sorti) mais représentent une
+  // valeur de capital perdue, jusqu'ici invisible dans cet écran.
+  const valeurPertes = mouvementsMateriel
+    .filter((m) => m.type === "retour_casse" || m.type === "retour_perdu")
+    .reduce((acc, m) => acc + m.quantite * (referentielMateriel.find((a) => a.id === m.articleId)?.coutAchat || 0), 0);
 
   async function submit(e) {
     e.preventDefault();
@@ -57,18 +63,19 @@ export default function StockMateriel() {
     setSaving(false);
     if (!res.ok) return setError(res.error);
     setOpenArticle(false);
-    setArticleForm({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "" });
+    setArticleForm({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
   }
 
   return (
     <div>
       <TopBarSimple title="Stock magasin" subtitle={`${config.nom} — matériel disponible et mouvements`} accent={config.color} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Boxes} label="Articles référencés" value={String(lignes.length)} tone={config.color} />
         <StatTile icon={PackageCheck} label="Valeur du stock (estimée)" value={Math.round(valeurTotale / 1000) + "k FCFA"} tone="#30D158" />
         <StatTile icon={ArrowDownCircle} label="Articles en rupture" value={String(enRupture)} tone={enRupture > 0 ? "#FF453A" : "#8E8E93"} />
         <StatTile icon={ArrowUpCircle} label="Mouvements enregistrés" value={String(mouvementsMateriel.length)} tone="#5E5CE6" />
+        <StatTile icon={AlertTriangle} label="Pertes cumulées (casse/perdu)" value={Math.round(valeurPertes / 1000) + "k FCFA"} tone={valeurPertes > 0 ? "#FF453A" : "#8E8E93"} />
       </div>
 
       <div className="flex flex-wrap justify-end gap-2.5 mb-4">
@@ -180,6 +187,9 @@ export default function StockMateriel() {
               <TextInput type="number" value={articleForm.coutAchat} onChange={(e) => setArticleForm({ ...articleForm, coutAchat: e.target.value })} placeholder="15000" />
             </Field>
           </div>
+          <Field label="Tarif de location / jour (FCFA)" hint="Utilisé pour calculer automatiquement le montant d'une prestation en Facturation">
+            <TextInput type="number" value={articleForm.tarifLocation} onChange={(e) => setArticleForm({ ...articleForm, tarifLocation: e.target.value })} placeholder="5000" />
+          </Field>
         </form>
       </Modal>
     </div>

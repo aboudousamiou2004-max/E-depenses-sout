@@ -11,7 +11,7 @@ import { TYPES_MOUVEMENT_ANIMAL } from "../data/stockData";
 
 const nextId = (p) => `${p}_${crypto.randomUUID()}`;
 
-const mapArticle = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, unite: r.unite, coutAchat: Number(r.cout_achat) });
+const mapArticle = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, unite: r.unite, coutAchat: Number(r.cout_achat), tarifLocation: Number(r.tarif_location) || 0 });
 const mapMouvementMateriel = (r) => ({ id: r.id, date: r.date, articleId: r.article_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
 const mapMatiere = (r) => ({ id: r.id, nom: r.nom, unite: r.unite });
 const mapMouvementMatiere = (r) => ({ id: r.id, date: r.date, matiereId: r.matiere_id, type: r.type, quantite: Number(r.quantite), agentNom: r.agent_nom });
@@ -153,7 +153,7 @@ export const useStockStore = create((set, get) => ({
   ajouterArticleMateriel: async (payload) => {
     const { data, error } = await supabase
       .from("referentiel_materiel")
-      .insert({ id: nextId("art"), nom: payload.nom, cat: payload.cat, unite: payload.unite || "unités", cout_achat: Number(payload.coutAchat) || 0 })
+      .insert({ id: nextId("art"), nom: payload.nom, cat: payload.cat, unite: payload.unite || "unités", cout_achat: Number(payload.coutAchat) || 0, tarif_location: Number(payload.tarifLocation) || 0 })
       .select()
       .single();
     if (error) return { ok: false, error: error.message };
