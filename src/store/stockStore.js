@@ -24,7 +24,7 @@ const mapJournalBrique = (r) => ({
   quantite: Number(r.quantite),
   agentNom: r.agent_nom,
 });
-const mapEspece = (r) => ({ id: r.id, nom: r.nom, cat: r.cat });
+const mapEspece = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, initQuantite: Number(r.init_quantite) || 0 });
 const mapMouvementAnimal = (r) => ({ id: r.id, date: r.date, especeId: r.espece_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
 
 export const useStockStore = create((set, get) => ({
@@ -254,6 +254,13 @@ export const useStockStore = create((set, get) => ({
       agent_id: user?.uid || null,
       agent_nom: user?.nom || "Agent",
     });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerStockAnimaux();
+    return { ok: true };
+  },
+
+  supprimerMouvementAnimal: async (id) => {
+    const { error } = await supabase.from("mouvements_animaux").delete().eq("id", id);
     if (error) return { ok: false, error: error.message };
     await get().chargerStockAnimaux();
     return { ok: true };

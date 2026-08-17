@@ -24,6 +24,7 @@ import BusinessDashboard from "./pages/business/BusinessDashboard";
 import BusinessFacturation from "./pages/business/BusinessFacturation";
 import BusinessDepenses from "./pages/business/BusinessDepenses";
 import StockRouter from "./pages/business/StockRouter";
+import SaisieJournaliere from "./pages/business/SaisieJournaliere";
 
 function Protected({ children }) {
   const { user, status } = useAuthStore();
@@ -110,6 +111,7 @@ export default function App() {
           <Route path="facturation" element={<BusinessFacturation />} />
           <Route path="depenses" element={<BusinessDepenses />} />
           <Route path="stock" element={<StockRouter />} />
+          <Route path="saisie" element={<SaisieJournaliere />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/portal" replace />} />

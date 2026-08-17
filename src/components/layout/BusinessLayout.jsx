@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, Menu } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, Menu } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -21,6 +21,9 @@ export default function BusinessLayout({ config }) {
     { to: `${config.path}/facturation`, label: "Facturation", icon: FileText },
     { to: `${config.path}/depenses`, label: "Dépenses", icon: Receipt },
     ...(stockNav ? [{ to: `${config.path}/stock`, label: stockNav.label, icon: stockNav.icon }] : []),
+    // Saisie journalière : spécifique au cheptel MAXI AGRO (report EF Initial,
+    // entrées/sorties du jour, EF Final) — cf. termitiere-platform/src/modules/agro/Saisie.jsx.
+    ...(config.stock === "animaux" ? [{ to: `${config.path}/saisie`, label: "Saisie journalière", icon: ClipboardList }] : []),
   ];
 
   function go(to) {
