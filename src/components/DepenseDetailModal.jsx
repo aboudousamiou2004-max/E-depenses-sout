@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2, Save } from "lucide-react";
+import { Pencil, Trash2, Save, Paperclip, Eye } from "lucide-react";
 import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
 import Field, { TextInput, Select } from "./ui/Field";
 import { fmtFCFA, statutLabel } from "../lib/logic";
+import { lireFichier, ouvrirPiece, formatTaille } from "../lib/fichiers";
 
 function Row({ label, children }) {
   return (
@@ -31,6 +32,7 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
   // réussie, pour ne pas ré-afficher les anciennes valeurs en repassant en
   // mode vue.
   const [enregistree, setEnregistree] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     if (depense) {
@@ -42,12 +44,31 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
         natureFlux: depense.natureFlux || "exploitation",
         sourceFinancement: depense.sourceFinancement || "entreprise",
         description: depense.description || "",
+        beneficiaireNom: depense.beneficiaireNom || "",
+        imprevue: !!depense.imprevue,
+        recurrente: !!depense.recurrente,
+        piece: depense.piece || null,
       });
       setMode("vue");
       setError("");
       setEnregistree(null);
     }
   }, [depense]);
+
+  async function handlePieceChange(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      const piece = await lireFichier(file);
+      setForm((f) => ({ ...f, piece }));
+    } catch (err) {
+      setError(err.message || "Fichier illisible");
+    } finally {
+      setUploading(false);
+    }
+  }
 
   if (!depense || !form) return null;
 
@@ -113,6 +134,21 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
           <Row label="Source de financement"><span className="font-bold text-ink capitalize">{affichee.sourceFinancement}</span></Row>
           <Row label="Statut"><Badge tone={st.tone}>{st.label}</Badge></Row>
           <Row label="Motif"><span className="font-medium text-ink text-right">{affichee.description || "—"}</span></Row>
+          <Row label="Bénéficiaire"><span className="font-medium text-ink text-right">{affichee.beneficiaireNom || "—"}</span></Row>
+          <Row label="Type">
+            <span className="flex gap-1.5">
+              {affichee.imprevue && <Badge tone="amber">⚠ Imprévue</Badge>}
+              {affichee.recurrente && <Badge tone="accent">🔁 Récurrente</Badge>}
+              {!affichee.imprevue && !affichee.recurrente && <span className="text-ink-soft text-[13px]">—</span>}
+            </span>
+          </Row>
+          <Row label="Justificatif">
+            {affichee.piece ? (
+              <button type="button" onClick={() => ouvrirPiece(affichee.piece)} className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0A84FF] hover:underline">
+                <Eye size={14} /> {affichee.piece.nom} <span className="text-ink-soft font-normal">({formatTaille(affichee.piece.taille)})</span>
+              </button>
+            ) : <span className="text-ink-soft text-[13px]">—</span>}
+          </Row>
         </div>
       ) : (
         <form onSubmit={(e) => { e.preventDefault(); enregistrer(); }}>
@@ -151,6 +187,32 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
           </div>
           <Field label="Motif">
             <TextInput value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+          </Field>
+          <Field label="Bénéficiaire" hint="Optionnel">
+            <TextInput value={form.beneficiaireNom} onChange={(e) => setForm({ ...form, beneficiaireNom: e.target.value })} />
+          </Field>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3.5">
+            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft cursor-pointer">
+              <input type="checkbox" checked={form.imprevue} onChange={(e) => setForm({ ...form, imprevue: e.target.checked })} className="w-4 h-4 rounded accent-[#FF9F0A]" />
+              ⚠ Imprévue
+            </label>
+            <label className="flex items-center gap-2 text-[12.5px] font-medium text-ink-soft cursor-pointer">
+              <input type="checkbox" checked={form.recurrente} onChange={(e) => setForm({ ...form, recurrente: e.target.checked })} className="w-4 h-4 rounded accent-[#5E5CE6]" />
+              🔁 Récurrente
+            </label>
+          </div>
+          <Field label="Justificatif" hint="Photo ou PDF, optionnel">
+            {form.piece ? (
+              <div className="flex items-center justify-between rounded-2xl border border-black/10 bg-white px-3.5 py-2.5 text-[13px]">
+                <span className="flex items-center gap-1.5 text-ink"><Paperclip size={14} /> {form.piece.nom} <span className="text-[11px] text-ink-soft">({formatTaille(form.piece.taille)})</span></span>
+                <button type="button" onClick={() => setForm({ ...form, piece: null })} className="text-[11px] text-[#FF453A] hover:underline">Retirer</button>
+              </div>
+            ) : (
+              <label className="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-black/15 bg-black/[0.02] px-3.5 py-3 text-[13px] text-ink-soft cursor-pointer hover:bg-black/[0.04]">
+                <Paperclip size={15} /> {uploading ? "Chargement…" : "Ajouter un justificatif"}
+                <input type="file" accept="image/*,application/pdf" className="hidden" onChange={handlePieceChange} disabled={uploading} />
+              </label>
+            )}
           </Field>
           <p className="text-[12px] text-ink-soft">
             Le statut (« {st.label} ») n'est pas modifiable ici — il suit le circuit d'autorisation.

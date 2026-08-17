@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { supabase, loginToEmail } from "../lib/supabaseClient";
+import { pieceToColumn, pieceFromColumn } from "../lib/fichiers";
 
 // Store principal — anciennement du JS en mémoire persisté en localStorage,
 // aujourd'hui de simples lectures/écritures Supabase. Les noms d'action et la
@@ -38,7 +39,9 @@ const mapDepense = (r) => ({
   natureFlux: r.nature_flux,
   sourceFinancement: r.source_financement,
   beneficiaireNom: r.beneficiaire_nom,
-  piece: r.piece,
+  piece: pieceFromColumn(r.piece),
+  imprevue: !!r.imprevue,
+  recurrente: !!r.recurrente,
   statut: r.statut,
   seuil: Number(r.seuil),
   creeParUid: r.cree_par,
@@ -307,13 +310,61 @@ export const useDataStore = create((set, get) => ({
         nature_flux: payload.natureFlux,
         source_financement: payload.sourceFinancement,
         beneficiaire_nom: payload.beneficiaireNom || "",
-        piece: payload.piece || "",
+        piece: pieceToColumn(payload.piece),
+        imprevue: !!payload.imprevue,
+        recurrente: !!payload.recurrente,
       })
       .select()
       .single();
     if (error) return { ok: false, error: error.message };
     await Promise.all([get().chargerDepenses(), get().chargerNotifications(user?.uid)]);
     return { ok: true, depense: mapDepense(data) };
+  },
+
+  // Reconduit dans le mois courant toutes les dépenses marquées « récurrente »
+  // du mois précédent, en ignorant celles déjà reconduites (même secteur +
+  // catégorie + montant déjà présents ce mois-ci) — pas d'automatisation par
+  // tâche planifiée, action manuelle déclenchée depuis Dépenses.jsx.
+  reconduireDepenses: async (user) => {
+    const now = new Date();
+    const moisPrecedent = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const anneePrec = moisPrecedent.getFullYear();
+    const moisPrec = moisPrecedent.getMonth();
+    const depenses = get().depenses;
+    const aReconduire = depenses.filter((d) => {
+      if (!d.recurrente) return false;
+      const dt = new Date(d.date);
+      return dt.getFullYear() === anneePrec && dt.getMonth() === moisPrec;
+    });
+    const dejaCeMois = depenses.filter((d) => {
+      const dt = new Date(d.date);
+      return dt.getFullYear() === now.getFullYear() && dt.getMonth() === now.getMonth();
+    });
+    const dejaFait = (d) =>
+      dejaCeMois.some((x) => x.secteurId === d.secteurId && x.categorie === d.categorie && x.montant === d.montant && x.recurrente);
+
+    let nb = 0;
+    for (const d of aReconduire) {
+      if (dejaFait(d)) continue;
+      const jour = Math.min(d.date ? new Date(d.date).getDate() : 1, 28);
+      const nouvelleDate = new Date(now.getFullYear(), now.getMonth(), jour).toISOString().slice(0, 10);
+      const res = await get().addDepense(
+        {
+          secteurId: d.secteurId,
+          categorie: d.categorie,
+          montant: d.montant,
+          date: nouvelleDate,
+          description: d.description,
+          natureFlux: d.natureFlux,
+          sourceFinancement: d.sourceFinancement,
+          beneficiaireNom: d.beneficiaireNom,
+          recurrente: true,
+        },
+        user
+      );
+      if (res.ok) nb++;
+    }
+    return { ok: true, nb };
   },
 
   addRecette: async (payload) => {
@@ -342,6 +393,10 @@ export const useDataStore = create((set, get) => ({
         description: payload.description || "",
         nature_flux: payload.natureFlux,
         source_financement: payload.sourceFinancement,
+        beneficiaire_nom: payload.beneficiaireNom || "",
+        piece: pieceToColumn(payload.piece),
+        imprevue: !!payload.imprevue,
+        recurrente: !!payload.recurrente,
       })
       .eq("id", id);
     if (error) return { ok: false, error: error.message };

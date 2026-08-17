@@ -96,16 +96,29 @@ export function croissance(actuel, precedent) {
   return (actuel - precedent) / precedent;
 }
 
+// Seuil fixe du circuit d'autorisation — porté depuis termitiere-platform
+// (SEUIL_APPROBATION_PAU). Au-delà de ce montant, une dépense passe en attente
+// d'approbation même si elle reste dans le budget alloué. Doit rester
+// synchronisé avec `v_seuil_fixe` dans compute_depense_statut() côté serveur
+// (voir supabase/migration_fonctionnalites_depense.sql) — celui-ci reste seul
+// juge côté serveur, cette constante ne sert qu'à l'indication affichée dans
+// le formulaire de saisie.
+export const SEUIL_APPROBATION_FIXE = 20000;
+
 // Reproduit côté client, pour l'indication affichée dans le formulaire de
 // saisie, la même règle que le trigger serveur `compute_depense_statut` :
-// le circuit d'autorisation se déclenche par dépassement du budget alloué
-// au secteur pour le mois, pas par un seuil fixe. Le trigger reste seul
-// juge côté serveur — ceci n'est qu'un indicateur, jamais appliqué tel quel.
-export function evaluationAutorisation(depenses, budgets, secteurId, annee, mois, montantSaisi) {
+// TROIS déclencheurs indépendants, un seul suffit — seuil fixe, dépense
+// imprévue, ou dépassement du budget alloué au secteur pour le mois. Le
+// trigger reste seul juge côté serveur — ceci n'est qu'un indicateur, jamais
+// appliqué tel quel.
+export function evaluationAutorisation(depenses, budgets, secteurId, annee, mois, montantSaisi, imprevue = false) {
   const budget = budgetSecteurMois(budgets, secteurId, annee, mois);
   const dejaDepense = totalMontant(depensesSecteurMois(depenses, secteurId, annee, mois));
-  const declenche = budget === 0 || dejaDepense + (Number(montantSaisi) || 0) > budget;
-  return { declenche, budget, dejaDepense, restant: Math.max(0, budget - dejaDepense) };
+  const montant = Number(montantSaisi) || 0;
+  const depasseBudget = budget === 0 || dejaDepense + montant > budget;
+  const depasseSeuil = montant >= SEUIL_APPROBATION_FIXE;
+  const declenche = depasseBudget || depasseSeuil || !!imprevue;
+  return { declenche, budget, dejaDepense, restant: Math.max(0, budget - dejaDepense), depasseBudget, depasseSeuil, imprevue: !!imprevue };
 }
 
 export function statutLabel(statut) {

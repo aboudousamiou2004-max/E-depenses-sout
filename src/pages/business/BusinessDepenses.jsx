@@ -60,7 +60,7 @@ export default function BusinessDepenses() {
     if (!form.montant) return;
     setSaving(true);
     setError("");
-    const res = await addDepense({ ...form, secteurId: config.secteurId, montant: Number(form.montant), piece: "justificatif.pdf" }, user);
+    const res = await addDepense({ ...form, secteurId: config.secteurId, montant: Number(form.montant) }, user);
     setSaving(false);
     if (!res.ok) return setError(res.error);
     setOpen(false);
