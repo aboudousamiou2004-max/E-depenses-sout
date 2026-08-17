@@ -120,6 +120,16 @@ body {
   50%      { border-color: rgba(255, 255, 255, 0.3); box-shadow: 0 0 22px 4px rgba(255, 255, 255, 0.5); }
 }
 
+/* Signal lumineux (pulsation de halo) utilisé sur des boutons de
+   navigation pour attirer discrètement l'œil — indépendant du survol. */
+.btn-signal-glow {
+  animation: btn-signal-glow 2.2s ease-in-out infinite;
+}
+@keyframes btn-signal-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.35); }
+  50%      { box-shadow: 0 0 0 6px rgba(10, 132, 255, 0); }
+}
+
 /* ---------- glass surfaces ---------- */
 .glass {
   background: rgba(255, 255, 255, 0.62);
