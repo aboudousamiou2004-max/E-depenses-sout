@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  LayoutGrid, Receipt, Wallet, ShieldCheck, LineChart, TrendingUp, ScrollText, LogOut, ArrowLeft, Users, Settings,
+  LayoutGrid, Receipt, Wallet, ShieldCheck, LineChart, TrendingUp, Landmark, Handshake, ScrollText, LogOut, ArrowLeft, Users, Settings,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { ROLES_ACCES_TOTAL } from "../../lib/modules";
@@ -11,8 +11,11 @@ const NAV = [
   { to: "/depense/depenses", label: "Dépenses", icon: Receipt },
   { to: "/depense/recettes", label: "Recettes", icon: Wallet },
   { to: "/depense/autorisations", label: "Autorisations", icon: ShieldCheck },
-  { to: "/depense/analyses", label: "Analyses & rentabilité", icon: LineChart },
+  { to: "/depense/analyses", label: "Analyses", icon: LineChart },
+  { to: "/depense/rentabilite", label: "Rentabilité", icon: TrendingUp },
   { to: "/depense/flux", label: "Flux de trésorerie", icon: TrendingUp },
+  { to: "/depense/banque", label: "Compte bancaire", icon: Landmark },
+  { to: "/depense/partenaires", label: "Partenaires", icon: Handshake },
   { to: "/depense/journal", label: "Journal", icon: ScrollText },
 ];
 

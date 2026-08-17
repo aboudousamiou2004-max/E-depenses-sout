@@ -13,7 +13,10 @@ import Depenses from "./pages/Depenses";
 import Recettes from "./pages/Recettes";
 import Autorisations from "./pages/Autorisations";
 import Analyses from "./pages/Analyses";
+import Rentabilite from "./pages/Rentabilite";
 import Flux from "./pages/Flux";
+import Banque from "./pages/Banque";
+import Partenaires from "./pages/Partenaires";
 import Journal from "./pages/Journal";
 import Parametres from "./pages/Parametres";
 import Utilisateurs from "./pages/admin/Utilisateurs";
@@ -87,7 +90,10 @@ export default function App() {
           <Route path="recettes" element={<Recettes />} />
           <Route path="autorisations" element={<Autorisations />} />
           <Route path="analyses" element={<Analyses />} />
+          <Route path="rentabilite" element={<Rentabilite />} />
           <Route path="flux" element={<Flux />} />
+          <Route path="banque" element={<Banque />} />
+          <Route path="partenaires" element={<Partenaires />} />
           <Route path="journal" element={<Journal />} />
           <Route path="parametres" element={<Parametres />} />
         </Route>

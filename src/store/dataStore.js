@@ -73,6 +73,18 @@ const mapNotification = (r) => ({
   message: r.message,
   lien: r.lien,
 });
+const mapMouvementBanque = (r) => ({
+  id: r.id,
+  date: r.date,
+  type: r.type,
+  libelle: r.libelle,
+  origine: r.origine,
+  personne: r.personne,
+  montant: Number(r.montant),
+  ouverture: !!r.ouverture,
+  creeParUid: r.cree_par,
+});
+const mapPartenaire = (r) => ({ id: r.id, nom: r.nom, type: r.type, contact: r.contact });
 const mapUser = (r) => ({
   uid: r.id,
   login: r.login,
@@ -102,6 +114,8 @@ export const useDataStore = create((set, get) => ({
   notifications: [],
   users: [],
   categories: [],
+  banque: [],
+  partenaires: [],
   loaded: false,
 
   // Charge toutes les données de l'app en une fois — appelé par authStore dès
@@ -109,7 +123,7 @@ export const useDataStore = create((set, get) => ({
   // (chacun ne peut de toute façon voir que les siennes, RLS l'impose déjà,
   // mais filtrer ici évite de dépendre de l'ordre des champs retournés).
   chargerTout: async (userId) => {
-    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories] = await Promise.all([
+    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, banque, partenaires] = await Promise.all([
       supabase.from("secteurs").select("*").order("created_at"),
       supabase.from("budgets").select("*"),
       supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
@@ -120,6 +134,8 @@ export const useDataStore = create((set, get) => ({
         : Promise.resolve({ data: [] }),
       supabase.from("profiles").select("*").order("nom"),
       supabase.from("categories_depense").select("*").order("nom"),
+      supabase.from("banque_mouvements").select("*").order("date"),
+      supabase.from("partenaires").select("*").order("nom"),
     ]);
     set({
       secteurs: (secteurs.data || []).map(mapSecteur),
@@ -130,6 +146,8 @@ export const useDataStore = create((set, get) => ({
       notifications: (notifications.data || []).map(mapNotification),
       users: (users.data || []).map(mapUser),
       categories: (categories.data || []).map(mapCategorie),
+      banque: (banque.data || []).map(mapMouvementBanque),
+      partenaires: (partenaires.data || []).map(mapPartenaire),
       loaded: true,
     });
   },
@@ -137,7 +155,7 @@ export const useDataStore = create((set, get) => ({
   reset: () =>
     set({
       secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [],
-      categories: [], loaded: false,
+      categories: [], banque: [], partenaires: [], loaded: false,
     }),
 
   // Rechargements ciblés après une écriture — évitent de tout re-fetcher.
@@ -443,6 +461,71 @@ export const useDataStore = create((set, get) => ({
       .upsert({ secteur_id: secteurId, annee, mois, montant }, { onConflict: "secteur_id,annee,mois" });
     if (error) return { ok: false, error: error.message };
     await get().chargerBudgets();
+    return { ok: true };
+  },
+
+  chargerBanque: async () => {
+    const { data } = await supabase.from("banque_mouvements").select("*").order("date");
+    set({ banque: (data || []).map(mapMouvementBanque) });
+  },
+  chargerPartenaires: async () => {
+    const { data } = await supabase.from("partenaires").select("*").order("nom");
+    set({ partenaires: (data || []).map(mapPartenaire) });
+  },
+
+  addMouvementBanque: async (payload) => {
+    const { error } = await supabase.from("banque_mouvements").insert({
+      date: payload.date, type: payload.type, libelle: payload.libelle || "",
+      origine: payload.origine || "", personne: payload.personne || "",
+      montant: payload.montant, ouverture: !!payload.ouverture,
+    });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerBanque();
+    return { ok: true };
+  },
+  modifierMouvementBanque: async (id, payload) => {
+    const { error } = await supabase.from("banque_mouvements").update({
+      date: payload.date, type: payload.type, libelle: payload.libelle || "",
+      origine: payload.origine || "", personne: payload.personne || "", montant: payload.montant,
+    }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerBanque();
+    return { ok: true };
+  },
+  supprimerMouvementBanque: async (id) => {
+    const { error } = await supabase.from("banque_mouvements").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerBanque();
+    return { ok: true };
+  },
+  // Solde d'ouverture : une seule ligne `ouverture = true` — upsert par id fixe
+  // pour ne jamais en créer une deuxième par erreur.
+  definirSoldeOuverture: async (id, date, montant) => {
+    const { error } = await supabase.from("banque_mouvements").upsert(
+      { id: id || undefined, date, montant, type: "depot", ouverture: true, libelle: "SOLDE D'OUVERTURE" },
+      { onConflict: "id" }
+    );
+    if (error) return { ok: false, error: error.message };
+    await get().chargerBanque();
+    return { ok: true };
+  },
+
+  addPartenaire: async (payload) => {
+    const { error } = await supabase.from("partenaires").insert({ nom: payload.nom.trim(), type: (payload.type || "").trim(), contact: (payload.contact || "").trim() });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerPartenaires();
+    return { ok: true };
+  },
+  modifierPartenaire: async (id, payload) => {
+    const { error } = await supabase.from("partenaires").update({ nom: payload.nom.trim(), type: (payload.type || "").trim(), contact: (payload.contact || "").trim() }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerPartenaires();
+    return { ok: true };
+  },
+  supprimerPartenaire: async (id) => {
+    const { error } = await supabase.from("partenaires").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerPartenaires();
     return { ok: true };
   },
 
