@@ -9,7 +9,7 @@ import { ROLES_ACCES_TOTAL } from "../../lib/modules";
 const NAV = [
   { to: "/depense", label: "Tableau de bord", icon: LayoutGrid, end: true },
   { to: "/depense/depenses", label: "Dépenses", icon: Receipt },
-  { to: "/depense/recettes", label: "Recettes", icon: Wallet },
+  { to: "/depense/recettes", label: "Recette et Budget", icon: Wallet },
   { to: "/depense/autorisations", label: "Autorisations", icon: ShieldCheck },
   { to: "/depense/analyses", label: "Analyses", icon: LineChart },
   { to: "/depense/rentabilite", label: "Rentabilité", icon: TrendingUp },
