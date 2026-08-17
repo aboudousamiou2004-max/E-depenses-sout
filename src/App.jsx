@@ -28,6 +28,7 @@ import SaisieJournaliere from "./pages/business/SaisieJournaliere";
 import SanteAnimale from "./pages/business/SanteAnimale";
 import Marge from "./pages/business/Marge";
 import DossiersFonciers from "./pages/business/DossiersFonciers";
+import EnfantsPaiements from "./pages/business/EnfantsPaiements";
 
 function Protected({ children }) {
   const { user, status } = useAuthStore();
@@ -118,6 +119,7 @@ export default function App() {
           <Route path="sante" element={<SanteAnimale />} />
           <Route path="marge" element={<Marge />} />
           <Route path="dossiers" element={<DossiersFonciers />} />
+          <Route path="enfants" element={<EnfantsPaiements />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/portal" replace />} />
