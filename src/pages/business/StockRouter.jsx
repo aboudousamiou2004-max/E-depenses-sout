@@ -3,9 +3,12 @@ import { PackageX } from "lucide-react";
 import GlassCard from "../../components/ui/GlassCard";
 import StockMateriel from "./StockMateriel";
 import StockBriques from "./StockBriques";
-import StockAnimaux from "./StockAnimaux";
+import AgroDashboard from "./AgroDashboard";
 
-const STOCK_PAGE = { materiel: StockMateriel, briques: StockBriques, animaux: StockAnimaux };
+// Le « Cheptel » de MAXI AGRO est un volet de LECTURE (indicateurs +
+// graphiques, cf. AgroDashboard) — la saisie du cheptel se fait exclusivement
+// depuis Saisie journalière (report EF Initial, entrées/sorties du jour).
+const STOCK_PAGE = { materiel: StockMateriel, briques: StockBriques, animaux: AgroDashboard };
 
 // Choisit la bonne page de stock selon `config.stock` — la route "stock" est
 // désormais générique (un seul chemin pour tous les modules métiers), donc ce

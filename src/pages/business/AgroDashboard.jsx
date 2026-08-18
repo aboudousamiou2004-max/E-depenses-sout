@@ -249,16 +249,33 @@ export default function AgroDashboard() {
     return { labels, datasets, vide: !datasets.length };
   }, [start, end, scope, cats, especes, especesScope, mouvementsAnimaux]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Détail par espèce du périmètre.
+  // Détail par espèce du périmètre — chaque ligne est cliquable (détail complet en modale).
   const especeRows = useMemo(() => especesScope.map((e) => {
     const mvt = mvtPeriode.filter((m) => m.especeId === e.id);
+    const baseEspece = effectifAuJour(e.id, addDays(start, -1));
+    const naiss = mvt.filter((m) => m.type === "naissance").reduce((s, m) => s + m.quantite, 0);
+    const dec = Math.abs(mvt.filter((m) => m.type === "deces").reduce((s, m) => s + m.quantite, 0));
+    const vendu = Math.abs(mvt.filter((m) => m.type === "vente").reduce((s, m) => s + m.quantite, 0));
+    const achete = mvt.filter((m) => m.type === "achat").reduce((s, m) => s + m.quantite, 0);
+    const perdu = Math.abs(mvt.filter((m) => m.type === "perte").reduce((s, m) => s + m.quantite, 0));
     return {
-      nom: e.nom, cat: e.cat, fin: soldeAnimaux[e.id] || 0,
-      naiss: mvt.filter((m) => m.type === "naissance").reduce((s, m) => s + m.quantite, 0),
-      dec: Math.abs(mvt.filter((m) => m.type === "deces").reduce((s, m) => s + m.quantite, 0)),
+      id: e.id, nom: e.nom, cat: e.cat, fin: soldeAnimaux[e.id] || 0, base: baseEspece,
+      naiss, dec, vendu, achete, perdu,
       malades: [...maladesAnimaux].filter((m) => m.especeId === e.id && m.date <= end).sort((a, b) => (a.date < b.date ? 1 : -1))[0]?.quantite || 0,
+      mortalite: baseEspece ? (dec / baseEspece) * 100 : 0,
     };
-  }), [especesScope, mvtPeriode, soldeAnimaux, maladesAnimaux, end]);
+  }), [especesScope, mvtPeriode, soldeAnimaux, maladesAnimaux, end, start]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [especeDetailId, setEspeceDetailId] = useState(null);
+  const especeDetail = especeRows.find((r) => r.id === especeDetailId) || null;
+  const especeDetailMvt = useMemo(
+    () => mvtPeriode.filter((m) => m.especeId === especeDetailId).sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [mvtPeriode, especeDetailId]
+  );
+  const especeDetailMalades = useMemo(
+    () => maladesAnimaux.filter((m) => m.especeId === especeDetailId && m.date >= start && m.date <= end).sort((a, b) => (a.date < b.date ? 1 : -1)),
+    [maladesAnimaux, especeDetailId, start, end]
+  );
 
   const scopeLabel = scope === TOUTES ? "Toutes les catégories" : scope;
 
@@ -368,38 +385,80 @@ export default function AgroDashboard() {
         </div>
       </GlassCard>
 
-      {/* Détail par espèce */}
+      {/* Détail par espèce — chaque ligne s'ouvre en détail complet (clic) */}
       <GlassCard hover={false} className="p-2 overflow-hidden">
-        <p className="font-bold tracking-tight text-ink px-3 pt-3 mb-2">Détail par espèce — {scopeLabel}</p>
+        <p className="font-bold tracking-tight text-ink px-3 pt-3 mb-1">Détail par espèce — {scopeLabel}</p>
+        <p className="px-3 pb-2 text-[11px] text-ink-soft/60">Cliquez une espèce pour son détail complet sur la période.</p>
         {especeRows.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-ink-soft/60">Aucune espèce.</p>
         ) : (
-          <table className="w-full min-w-[520px] border-collapse">
-            <thead>
-              <tr className="text-left text-[11px] font-bold text-ink-soft/70 uppercase tracking-wide">
-                <th className="px-3 py-2">Espèce</th>
-                {scope === TOUTES && <th className="px-2 py-2">Catégorie</th>}
-                <th className="px-2 py-2 text-center">Effectif</th>
-                <th className="px-2 py-2 text-center">Naiss.</th>
-                <th className="px-2 py-2 text-center">Décès</th>
-                <th className="px-2 py-2 text-center">Malades</th>
-              </tr>
-            </thead>
-            <tbody>
-              {especeRows.map((r) => (
-                <tr key={r.nom} className="text-[13px] hover:bg-white/50 transition-colors">
-                  <td className="px-3 py-1.5 font-semibold text-ink">{r.nom}</td>
-                  {scope === TOUTES && <td className="px-2 py-1.5" style={{ color: catColor(r.cat) }}>{r.cat}</td>}
-                  <td className="px-2 py-1.5 text-center font-bold tabular">{fmtNum(r.fin)}</td>
-                  <td className="px-2 py-1.5 text-center text-[#16a34a] tabular">{r.naiss}</td>
-                  <td className="px-2 py-1.5 text-center text-[#dc2626] tabular">{r.dec}</td>
-                  <td className="px-2 py-1.5 text-center text-[#d97706] tabular">{r.malades}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] border-collapse">
+              <thead>
+                <tr className="text-left text-[11px] font-bold text-ink-soft/70 uppercase tracking-wide">
+                  <th className="px-3 py-2">Espèce</th>
+                  {scope === TOUTES && <th className="px-2 py-2">Catégorie</th>}
+                  <th className="px-2 py-2 text-center">Effectif</th>
+                  <th className="px-2 py-2 text-center">Achats</th>
+                  <th className="px-2 py-2 text-center">Naiss.</th>
+                  <th className="px-2 py-2 text-center">Décès</th>
+                  <th className="px-2 py-2 text-center">Ventes</th>
+                  <th className="px-2 py-2 text-center">Pertes</th>
+                  <th className="px-2 py-2 text-center">Malades</th>
+                  <th className="px-2 py-2 text-center">Mortalité</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {especeRows.map((r) => (
+                  <tr key={r.id} onClick={() => setEspeceDetailId(r.id)} className="text-[13px] hover:bg-white/50 transition-colors cursor-pointer">
+                    <td className="px-3 py-1.5 font-semibold text-ink">{r.nom}</td>
+                    {scope === TOUTES && <td className="px-2 py-1.5" style={{ color: catColor(r.cat) }}>{r.cat}</td>}
+                    <td className="px-2 py-1.5 text-center font-bold tabular">{fmtNum(r.fin)}</td>
+                    <td className="px-2 py-1.5 text-center text-[#2563eb] tabular">{r.achete}</td>
+                    <td className="px-2 py-1.5 text-center text-[#16a34a] tabular">{r.naiss}</td>
+                    <td className="px-2 py-1.5 text-center text-[#dc2626] tabular">{r.dec}</td>
+                    <td className="px-2 py-1.5 text-center text-[#0d9488] tabular">{r.vendu}</td>
+                    <td className="px-2 py-1.5 text-center text-[#991b1b] tabular">{r.perdu}</td>
+                    <td className="px-2 py-1.5 text-center text-[#d97706] tabular">{r.malades}</td>
+                    <td className="px-2 py-1.5 text-center tabular">{r.mortalite.toFixed(1)} %</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </GlassCard>
+
+      {/* Détail complet d'une espèce (clic sur une ligne du tableau ci-dessus) */}
+      <Modal open={!!especeDetail} onClose={() => setEspeceDetailId(null)} title={especeDetail ? `${especeDetail.nom} — ${especeDetail.cat}` : ""} footer={<Button variant="ghost" onClick={() => setEspeceDetailId(null)}>Fermer</Button>}>
+        {especeDetail && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-2">
+              <MiniStat label="Effectif" value={fmtNum(especeDetail.fin)} color="#2563eb" />
+              <MiniStat label="Naissances" value={fmtNum(especeDetail.naiss)} color="#16a34a" />
+              <MiniStat label="Décès" value={fmtNum(especeDetail.dec)} color="#dc2626" />
+              <MiniStat label="Ventes" value={fmtNum(especeDetail.vendu)} color="#0d9488" />
+              <MiniStat label="Malades (actuel)" value={fmtNum(especeDetail.malades)} color="#d97706" />
+              <MiniStat label="Mortalité" value={`${especeDetail.mortalite.toFixed(1)} %`} color="#991b1b" />
+            </div>
+            <div>
+              <p className="mb-1.5 text-[11px] font-bold uppercase text-ink-soft/70">Mouvements sur la période ({especeDetailMvt.length})</p>
+              <DetailTable
+                rows={especeDetailMvt}
+                cols={["Date", "Type", "Qté", "Motif", "Agent"]}
+                render={(m) => [fmtDateShort(m.date), { naissance: "Naissance", achat: "Achat", deces: "Décès", vente: "Vente", perte: "Perte" }[m.type] || m.type, Math.abs(m.quantite), m.motif || "—", m.agentNom || "—"]}
+                empty="Aucun mouvement sur la période."
+              />
+            </div>
+            {especeDetailMalades.length > 0 && (
+              <div>
+                <p className="mb-1.5 text-[11px] font-bold uppercase text-ink-soft/70">Décomptes « malades » saisis sur la période</p>
+                <DetailTable rows={especeDetailMalades} cols={["Date", "Malades"]} render={(m) => [fmtDateShort(m.date), m.quantite]} empty="" />
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
 
       {/* Modales détaillées */}
       <Modal open={modalKey === "naissances"} onClose={() => setModalKey(null)} title={`Naissances — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
@@ -479,6 +538,15 @@ function Indic(props) {
         {sub && <p className="mt-0.5 text-[10.5px] text-ink-soft/60">{sub}{onClick ? " — détails" : ""}</p>}
       </GlassCard>
     </button>
+  );
+}
+
+function MiniStat({ label, value, color }) {
+  return (
+    <div className="rounded-2xl bg-black/[0.03] p-2.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft/70">{label}</p>
+      <p className="text-[15px] font-extrabold" style={{ color }}>{value}</p>
+    </div>
   );
 }
 
