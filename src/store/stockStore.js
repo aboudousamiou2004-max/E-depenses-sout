@@ -43,11 +43,12 @@ export const useStockStore = create((set, get) => ({
   referentielAnimaux: [],
   mouvementsAnimaux: [],
   soldeAnimaux: {},
+  maladesAnimaux: [], // [{ especeId, date, quantite }] — un par (espèce, jour)
 
   prixSacCiment: 0,
 
   chargerTout: async () => {
-    const [refMat, mvtMat, soldeMat, refMatieres, mvtMatieres, soldeMatieres, typesBriques, soldeBriques, journalBriques, refAnimaux, mvtAnimaux, soldeAnimaux, briqueterieConfig] =
+    const [refMat, mvtMat, soldeMat, refMatieres, mvtMatieres, soldeMatieres, typesBriques, soldeBriques, journalBriques, refAnimaux, mvtAnimaux, soldeAnimaux, briqueterieConfig, maladesAnimaux] =
       await Promise.all([
         supabase.from("referentiel_materiel").select("*"),
         supabase.from("mouvements_materiel").select("*").order("created_at", { ascending: false }),
@@ -62,6 +63,7 @@ export const useStockStore = create((set, get) => ({
         supabase.from("mouvements_animaux").select("*").order("created_at", { ascending: false }),
         supabase.from("v_effectif_animaux").select("*"),
         supabase.from("briqueterie_config").select("*").eq("id", "defaut").maybeSingle(),
+        supabase.from("agro_malades").select("*"),
       ]);
 
     const stockBriques = {};
@@ -84,6 +86,7 @@ export const useStockStore = create((set, get) => ({
       mouvementsAnimaux: (mvtAnimaux.data || []).map(mapMouvementAnimal),
       soldeAnimaux: Object.fromEntries((soldeAnimaux.data || []).map((r) => [r.espece_id, Number(r.effectif)])),
       prixSacCiment: Number(briqueterieConfig.data?.prix_sac_ciment) || 0,
+      maladesAnimaux: (maladesAnimaux.data || []).map((r) => ({ especeId: r.espece_id, date: r.date, quantite: Number(r.quantite) || 0 })),
     });
   },
 
@@ -93,7 +96,7 @@ export const useStockStore = create((set, get) => ({
       referentielMatieres: [], mouvementsMatieres: [], soldeMatieres: {},
       typesBriques: [], stockBriques: {}, journalBriques: [],
       referentielAnimaux: [], mouvementsAnimaux: [], soldeAnimaux: {},
-      prixSacCiment: 0,
+      prixSacCiment: 0, maladesAnimaux: [],
     }),
 
   stockArticle: (articleId) => get().soldeMateriel[articleId] || 0,
@@ -282,6 +285,25 @@ export const useStockStore = create((set, get) => ({
     const { error } = await supabase.from("mouvements_animaux").delete().eq("id", id);
     if (error) return { ok: false, error: error.message };
     await get().chargerStockAnimaux();
+    return { ok: true };
+  },
+
+  // Décompte des animaux malades d'une espèce à une date — un enregistrement
+  // par (espèce, jour), comme EF Initial/Final. Sert au calcul des taux de
+  // létalité/morbidité du Dashboard MAXI AGRO.
+  enregistrerMalades: async (especeId, date, quantite) => {
+    const { error } = await supabase.from("agro_malades").upsert(
+      { espece_id: especeId, date, quantite: Math.max(0, parseInt(quantite) || 0), updated_at: new Date().toISOString() },
+      { onConflict: "espece_id,date" }
+    );
+    if (error) return { ok: false, error: error.message };
+    set((s) => {
+      const idx = s.maladesAnimaux.findIndex((m) => m.especeId === especeId && m.date === date);
+      const entry = { especeId, date, quantite: Math.max(0, parseInt(quantite) || 0) };
+      const next = [...s.maladesAnimaux];
+      if (idx >= 0) next[idx] = entry; else next.push(entry);
+      return { maladesAnimaux: next };
+    });
     return { ok: true };
   },
 }));

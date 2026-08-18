@@ -20,15 +20,16 @@ const TYPES_SORTIE = Object.entries(TYPES_MOUVEMENT_ANIMAL).filter(([, t]) => t.
 // Simplifié par rapport à la version termitiere-platform, dont certains
 // aspects ne trouvent pas d'équivalent direct dans le modèle de données de
 // ce projet (journal de mouvements, pas de document « inventaire du jour »
-// verrouillé) : pas de suivi des animaux malades, pas de mutation entre
-// espèces, pas de circuit de réajustement d'audit par la direction, pas de
-// brouillon auto-enregistré. Chaque ligne se sauvegarde immédiatement (comme
-// le reste de ce projet), il n'y a donc pas non plus de bouton
-// « Enregistrer » global à la fin de la journée.
+// verrouillé) : pas de mutation entre espèces, pas de circuit de
+// réajustement d'audit par la direction, pas de brouillon auto-enregistré.
+// Chaque ligne se sauvegarde immédiatement (comme le reste de ce projet), il
+// n'y a donc pas non plus de bouton « Enregistrer » global à la fin de la
+// journée. Le décompte des animaux malades, lui, a été ajouté (colonne
+// Malades) — nécessaire aux taux de létalité/morbidité du Dashboard.
 export default function SaisieJournaliere() {
   const config = useOutletContext();
   const { user } = useAuthStore();
-  const { referentielAnimaux, mouvementsAnimaux, addMouvementAnimal, supprimerMouvementAnimal, ajouterEspece } = useStockStore();
+  const { referentielAnimaux, mouvementsAnimaux, maladesAnimaux, addMouvementAnimal, supprimerMouvementAnimal, ajouterEspece, enregistrerMalades } = useStockStore();
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [mvtModal, setMvtModal] = useState(null); // { espece, dir }
@@ -36,6 +37,7 @@ export default function SaisieJournaliere() {
   const [especeForm, setEspeceForm] = useState({ nom: "", cat: CAT_ANIMAUX[0] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [savingMalades, setSavingMalades] = useState(null);
 
   // EF Initial du jour = effectif initial de l'espèce + tous les mouvements
   // AVANT cette date (report automatique — pas de saisie possible ici).
@@ -44,6 +46,7 @@ export default function SaisieJournaliere() {
     mouvementsAnimaux.filter((m) => m.especeId === especeId && m.date < date).reduce((s, m) => s + m.quantite, 0);
 
   const mouvementsJour = (especeId) => mouvementsAnimaux.filter((m) => m.especeId === especeId && m.date === date);
+  const maladesJour = (especeId) => maladesAnimaux.find((m) => m.especeId === especeId && m.date === date)?.quantite ?? 0;
 
   const lignes = useMemo(() => {
     return referentielAnimaux.map((e) => {
@@ -51,9 +54,15 @@ export default function SaisieJournaliere() {
       const init = efInitial(e.id);
       const totEnt = jour.filter((m) => m.quantite > 0).reduce((s, m) => s + m.quantite, 0);
       const totSor = jour.filter((m) => m.quantite < 0).reduce((s, m) => s + Math.abs(m.quantite), 0);
-      return { espece: e, init, totEnt, totSor, fin: Math.max(0, init + totEnt - totSor), jour };
+      return { espece: e, init, totEnt, totSor, fin: Math.max(0, init + totEnt - totSor), jour, malades: maladesJour(e.id) };
     });
-  }, [referentielAnimaux, mouvementsAnimaux, date]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [referentielAnimaux, mouvementsAnimaux, maladesAnimaux, date]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function changerMalades(especeId, val) {
+    setSavingMalades(especeId);
+    await enregistrerMalades(especeId, date, val);
+    setSavingMalades(null);
+  }
 
   const cats = useMemo(
     () => [...new Set([...CAT_ANIMAUX, ...referentielAnimaux.map((e) => e.cat)])].filter((c) => referentielAnimaux.some((e) => e.cat === c)),
@@ -94,13 +103,14 @@ export default function SaisieJournaliere() {
                 <th className="px-3 py-3 text-center">Entrées</th>
                 <th className="px-3 py-3 text-center">Sorties</th>
                 <th className="px-3 py-3 text-center" title="Calculé automatiquement">EF Final <Lock size={10} className="inline" /></th>
+                <th className="px-3 py-3 text-center" title="Nombre d'animaux malades ce jour — sert au taux de morbidité">Malades</th>
               </tr>
             </thead>
             <tbody>
               {cats.map((cat) => (
                 <Fragment key={cat}>
                   <tr>
-                    <td colSpan={5} className="px-4 py-1.5 text-[10.5px] font-bold uppercase tracking-wide text-white" style={{ background: config.color }}>{cat}</td>
+                    <td colSpan={6} className="px-4 py-1.5 text-[10.5px] font-bold uppercase tracking-wide text-white" style={{ background: config.color }}>{cat}</td>
                   </tr>
                   {lignes.filter((l) => l.espece.cat === cat).map((l) => (
                     <tr key={l.espece.id} className="text-[13.5px] hover:bg-white/50 transition-colors">
@@ -113,12 +123,18 @@ export default function SaisieJournaliere() {
                         <button onClick={() => setMvtModal({ espece: l.espece, dir: "sortie" })} className="min-w-[3rem] rounded-lg border border-black/10 px-2 py-1 font-bold tabular text-[#b3241b] hover:border-[#FF453A]">-{l.totSor}</button>
                       </td>
                       <td className="px-3 py-2.5 text-center tabular font-extrabold text-ink">{l.fin}</td>
+                      <td className="px-3 py-2.5 text-center">
+                        <TextInput type="number" min="0" max={l.fin} defaultValue={l.malades}
+                          className="w-16 mx-auto text-center"
+                          onBlur={(e) => { if (Number(e.target.value) !== l.malades) changerMalades(l.espece.id, e.target.value); }} />
+                        {savingMalades === l.espece.id && <span className="ml-1 text-[10px] text-ink-soft">…</span>}
+                      </td>
                     </tr>
                   ))}
                 </Fragment>
               ))}
               {referentielAnimaux.length === 0 && (
-                <tr><td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune espèce enregistrée.</td></tr>
+                <tr><td colSpan={6} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune espèce enregistrée.</td></tr>
               )}
             </tbody>
           </table>
