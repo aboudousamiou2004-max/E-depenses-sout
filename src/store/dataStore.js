@@ -60,6 +60,11 @@ const mapRecette = (r) => ({
   montant: Number(r.montant),
   date: r.date,
   origine: r.origine,
+  articleId: r.article_id,
+  quantite: r.quantite !== null ? Number(r.quantite) : null,
+  jours: r.jours !== null ? Number(r.jours) : null,
+  client: r.client || "",
+  description: r.description || "",
   creeParUid: r.cree_par,
 });
 const mapJournalRow = (r) => ({
@@ -396,7 +401,11 @@ export const useDataStore = create((set, get) => ({
   addRecette: async (payload) => {
     const { data, error } = await supabase
       .from("recettes")
-      .insert({ secteur_id: payload.secteurId, montant: payload.montant, date: payload.date, origine: payload.origine })
+      .insert({
+        secteur_id: payload.secteurId, montant: payload.montant, date: payload.date, origine: payload.origine,
+        article_id: payload.articleId || null, quantite: payload.quantite ?? null, jours: payload.jours ?? null,
+        client: payload.client || "", description: payload.description || "",
+      })
       .select()
       .single();
     if (error) return { ok: false, error: error.message };

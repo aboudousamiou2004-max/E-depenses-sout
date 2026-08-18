@@ -94,7 +94,11 @@ export default function BusinessFacturation() {
         return setError("Choisissez un article avec un tarif de location, une quantité et un nombre de jours");
       }
       const res = await addRecette(
-        { secteurId: config.secteurId, montant: montantLocation, date: form.date, origine: `Location — ${articleChoisi.nom} (${form.jours}j)`, client: form.client, description: form.description },
+        {
+          secteurId: config.secteurId, montant: montantLocation, date: form.date,
+          origine: `Location — ${articleChoisi.nom} (${form.jours}j)`, client: form.client, description: form.description,
+          articleId: articleChoisi.id, quantite: Number(form.articleQuantite) || 0, jours: Number(form.jours) || 0,
+        },
         user
       );
       if (!res.ok) {
