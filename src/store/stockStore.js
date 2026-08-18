@@ -11,7 +11,7 @@ import { TYPES_MOUVEMENT_ANIMAL } from "../data/stockData";
 
 const nextId = (p) => `${p}_${crypto.randomUUID()}`;
 
-const mapArticle = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, unite: r.unite, coutAchat: Number(r.cout_achat), tarifLocation: Number(r.tarif_location) || 0 });
+const mapArticle = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, unite: r.unite, coutAchat: Number(r.cout_achat), tarifLocation: Number(r.tarif_location) || 0, initQuantite: Number(r.init_quantite) || 0 });
 const mapMouvementMateriel = (r) => ({ id: r.id, date: r.date, articleId: r.article_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
 const mapMatiere = (r) => ({ id: r.id, nom: r.nom, unite: r.unite });
 const mapMouvementMatiere = (r) => ({ id: r.id, date: r.date, matiereId: r.matiere_id, type: r.type, quantite: Number(r.quantite), agentNom: r.agent_nom });

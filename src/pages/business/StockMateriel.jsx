@@ -29,7 +29,10 @@ export default function StockMateriel() {
   const [articleForm, setArticleForm] = useState({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
 
   const lignes = useMemo(
-    () => referentielMateriel.map((a) => ({ ...a, stock: stockArticle(a.id) })),
+    () => referentielMateriel.map((a) => {
+      const sorties = mouvementsMateriel.filter((m) => m.articleId === a.id && m.type === "sortie").reduce((s, m) => s + m.quantite, 0);
+      return { ...a, stock: stockArticle(a.id), sorties };
+    }),
     [referentielMateriel, mouvementsMateriel, stockArticle]
   );
   const valeurTotale = lignes.reduce((acc, l) => acc + l.stock * l.coutAchat, 0);
@@ -86,12 +89,14 @@ export default function StockMateriel() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <GlassCard className="p-2 overflow-hidden lg:col-span-2" hover={false}>
           <div className="max-h-[calc(100vh-380px)] overflow-auto">
-            <table className="w-full min-w-[420px] border-collapse">
+            <table className="w-full min-w-[580px] border-collapse">
               <thead className="sticky top-0 z-10">
                 <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
                   <th className="px-4 py-3">Article</th>
                   <th className="px-4 py-3">Catégorie</th>
-                  <th className="px-4 py-3 text-right">Stock actuel</th>
+                  <th className="px-3 py-3 text-center">Stock initial</th>
+                  <th className="px-3 py-3 text-center">Sorties (cumul)</th>
+                  <th className="px-4 py-3 text-right">Reste</th>
                 </tr>
               </thead>
               <tbody>
@@ -99,6 +104,8 @@ export default function StockMateriel() {
                   <motion.tr key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.02 }} className="text-[13.5px] hover:bg-white/50 transition-colors">
                     <td className="px-4 py-3 font-semibold text-ink">{l.nom}</td>
                     <td className="px-4 py-3 text-ink-soft">{l.cat}</td>
+                    <td className="px-3 py-3 text-center tabular text-ink-soft">{l.initQuantite}</td>
+                    <td className="px-3 py-3 text-center tabular text-[#b3241b]">{l.sorties}</td>
                     <td className="px-4 py-3 text-right">
                       <Badge tone={l.stock === 0 ? "coral" : l.stock < 5 ? "amber" : "mint"}>{l.stock} {l.unite}</Badge>
                     </td>
@@ -148,9 +155,9 @@ export default function StockMateriel() {
               {referentielMateriel.map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
             </Select>
           </Field>
-          <Field label="Type de mouvement">
+          <Field label="Type de mouvement" hint="Les retours se saisissent depuis le volet Retour">
             <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-              {Object.entries(TYPES_MOUVEMENT_MATERIEL).map(([id, t]) => <option key={id} value={id}>{t.label}</option>)}
+              {["achat", "sortie"].map((id) => <option key={id} value={id}>{TYPES_MOUVEMENT_MATERIEL[id].label}</option>)}
             </Select>
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
