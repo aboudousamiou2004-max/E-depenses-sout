@@ -34,6 +34,8 @@ import ProductionBriques from "./pages/business/ProductionBriques";
 import Materiaux from "./pages/business/Materiaux";
 import MaterielBriqueterie from "./pages/business/MaterielBriqueterie";
 import DossiersFonciers from "./pages/business/DossiersFonciers";
+import Projets from "./pages/business/Projets";
+import Taches from "./pages/business/Taches";
 import Enfants from "./pages/business/Enfants";
 import Paiements from "./pages/business/Paiements";
 import CantineRepas from "./pages/business/CantineRepas";
@@ -135,6 +137,8 @@ export default function App() {
           <Route path="materiaux" element={<Materiaux />} />
           <Route path="materiel" element={<MaterielBriqueterie />} />
           <Route path="dossiers" element={<DossiersFonciers />} />
+          <Route path="projets" element={<Projets />} />
+          <Route path="taches" element={<Taches />} />
           <Route path="enfants" element={<Enfants />} />
           <Route path="paiements" element={<Paiements />} />
           <Route path="cantine" element={<CantineRepas />} />

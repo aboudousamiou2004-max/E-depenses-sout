@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3 } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -47,6 +47,15 @@ export default function BusinessLayout({ config }) {
     // Dossiers fonciers : spécifique à E-FONCIER — cf.
     // termitiere-platform/src/modules/foncier/Dossiers.jsx.
     ...(config.id === "foncier" ? [{ to: `${config.path}/dossiers`, label: "Dossiers fonciers", icon: FolderOpen }] : []),
+    // Projets, Tâches : spécifiques à E-G.PRO — porté (simplifié) depuis
+    // termitiere-platform/src/modules/projet/{Projets,Taches}.jsx, à la
+    // demande de l'utilisateur (2026-08-18), scope "Projets + Tâches"
+    // choisi car rattachable aux dépenses (contrairement à Planning,
+    // Documents, Galerie photos, hors scope de cette application).
+    ...(config.id === "egpro" ? [
+      { to: `${config.path}/projets`, label: "Projets", icon: FolderKanban },
+      { to: `${config.path}/taches`, label: "Tâches", icon: ListTodo },
+    ] : []),
     // Enfants, Paiements, Cantine & Repas, Santé & Infirmerie, Analyse &
     // Pilotage : spécifiques à E-GARDERIE — cf. termitiere-platform/src/
     // modules/garderie/{Enfants,Paiements,Cantine,Incidents,Analyses}.jsx.

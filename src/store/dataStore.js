@@ -53,6 +53,8 @@ const mapDepense = (r) => ({
   statut: r.statut,
   seuil: Number(r.seuil),
   creeParUid: r.cree_par,
+  projetId: r.projet_id,
+  tacheId: r.tache_id,
 });
 const mapRecette = (r) => ({
   id: r.id,
@@ -344,6 +346,8 @@ export const useDataStore = create((set, get) => ({
         piece: pieceToColumn(payload.piece),
         imprevue: !!payload.imprevue,
         recurrente: !!payload.recurrente,
+        projet_id: payload.projetId || null,
+        tache_id: payload.tacheId || null,
       })
       .select()
       .single();
