@@ -31,12 +31,8 @@ export default function BusinessLayout({ config }) {
     { to: `${config.path}/besoins`, label: "Besoins", icon: PackagePlus },
     // Historique : disponible dans TOUS les modules métier — dépenses et
     // recettes du secteur, filtrables par période/type, ouvert à qui a déjà
-    // accès au module (mêmes droits que Dépenses). Journal : réservé aux
-    // directeurs et à l'administration (même accès que le journal global,
-    // cf. RLS `journal lisible par les rôles à accès total`), à la demande
-    // de l'utilisateur (2026-08-18).
+    // accès au module (mêmes droits que Dépenses).
     { to: `${config.path}/historique`, label: "Historique", icon: History },
-    ...(ROLES_ADMIN.includes(user?.role) ? [{ to: `${config.path}/journal`, label: "Journal", icon: ScrollText }] : []),
     ...(stockNav ? [{ to: `${config.path}/stock`, label: stockNav.label, icon: stockNav.icon }] : []),
     // Saisie journalière + Santé animale : spécifiques au cheptel MAXI AGRO —
     // cf. termitiere-platform/src/modules/agro/{Saisie,Sante}.jsx.
@@ -82,6 +78,12 @@ export default function BusinessLayout({ config }) {
       { to: `${config.path}/infirmerie`, label: "Santé & Infirmerie", icon: Stethoscope },
       { to: `${config.path}/analyse`, label: "Analyse & Pilotage", icon: BarChart3 },
     ] : []),
+    // Journal : toujours EN DERNIER dans la nav, et récapitule TOUTE
+    // l'activité de l'application (pas seulement ce secteur) — réservé aux
+    // directeurs et à l'administration (même accès que le journal global,
+    // cf. RLS `journal lisible par les rôles à accès total`), à la demande
+    // de l'utilisateur (2026-08-18).
+    ...(ROLES_ADMIN.includes(user?.role) ? [{ to: `${config.path}/journal`, label: "Journal", icon: ScrollText }] : []),
   ];
 
   function go(to) {

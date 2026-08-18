@@ -13,9 +13,9 @@ const ACTION_TONE = {
   "Refus dépense": "coral", Décaissement: "grape", "Budget alloué": "amber", "Budget révisé": "amber",
 };
 
-// Journal — audit trail par module, porté (simplifié) depuis
-// pages/Journal.jsx (vue globale) filtré par secteur (colonne
-// journal.secteur_id, cf. migration_journal_historique.sql). Réservé aux
+// Journal — accessible depuis chaque module (toujours en dernier dans la
+// nav) mais récapitule TOUTE l'activité de l'application, pas seulement ce
+// secteur — même source que pages/Journal.jsx (vue globale). Réservé aux
 // directeurs et à l'administration — même accès que le journal global (RLS
 // `journal lisible par les rôles à accès total`), à la demande de
 // l'utilisateur (2026-08-18).
@@ -26,15 +26,14 @@ export default function BusinessJournal() {
   useEffect(() => { chargerJournal(); }, [chargerJournal]);
 
   const [recherche, setRecherche] = useState("");
-  const duSecteur = useMemo(() => journal.filter((j) => j.secteurId === config.secteurId), [journal, config.secteurId]);
   const lignes = useMemo(() => {
     const q = recherche.trim().toLowerCase();
-    return duSecteur.filter((j) => !q || (j.details || "").toLowerCase().includes(q) || (j.action || "").toLowerCase().includes(q) || (j.userNom || "").toLowerCase().includes(q));
-  }, [duSecteur, recherche]);
+    return journal.filter((j) => !q || (j.details || "").toLowerCase().includes(q) || (j.action || "").toLowerCase().includes(q) || (j.userNom || "").toLowerCase().includes(q) || (j.module || "").toLowerCase().includes(q));
+  }, [journal, recherche]);
 
   return (
     <div>
-      <TopBarSimple title="Journal" subtitle={`${config.nom} — traçabilité complète des opérations (réservé à l'administration)`} icon={ScrollText} accent={config.color} />
+      <TopBarSimple title="Journal" subtitle="Toute l'activité de l'application — traçabilité complète (réservé à l'administration)" icon={ScrollText} accent={config.color} />
 
       <div className="relative mb-4 max-w-sm">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft/50" />
@@ -43,7 +42,7 @@ export default function BusinessJournal() {
 
       <GlassCard className="p-6" hover={false}>
         {lignes.length === 0 ? (
-          <p className="py-10 text-center text-[13px] text-ink-soft italic">Aucune activité{recherche ? " correspondante" : ""} pour ce module.</p>
+          <p className="py-10 text-center text-[13px] text-ink-soft italic">Aucune activité{recherche ? " correspondante" : ""}.</p>
         ) : (
           <div className="relative flex flex-col">
             {lignes.map((j, i) => (
@@ -58,6 +57,7 @@ export default function BusinessJournal() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="text-[13.5px] font-bold text-ink">{j.userNom}</p>
                     <Badge tone={ACTION_TONE[j.action] || "ink"}>{j.action}</Badge>
+                    {j.module && <Badge tone="ink" className="!bg-black/[0.04]">{j.module}</Badge>}
                     <span className="text-[11.5px] text-ink-soft ml-auto">
                       {new Date(j.timestamp).toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                     </span>
