@@ -5,6 +5,8 @@ import { useStockStore } from "./stockStore";
 import { useSanteStore } from "./santeStore";
 import { useFoncierStore } from "./foncierStore";
 import { useGarderieStore } from "./garderieStore";
+import { useSanteGarderieStore } from "./santeGarderieStore";
+import { useCantineStore } from "./cantineStore";
 
 // Même mapping snake_case → camelCase que dataStore.js (mapUser) — dupliqué en
 // petit ici plutôt qu'importé, pour ne pas créer un couplage entre les deux
@@ -46,6 +48,8 @@ export const useAuthStore = create((set, get) => ({
         useSanteStore.getState().reset();
         useFoncierStore.getState().reset();
         useGarderieStore.getState().reset();
+        useSanteGarderieStore.getState().reset();
+        useCantineStore.getState().reset();
       }
     });
   },

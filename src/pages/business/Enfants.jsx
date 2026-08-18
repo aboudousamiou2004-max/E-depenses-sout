@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
-import { Plus, Trash2, Users, AlertTriangle, Baby, CalendarClock } from "lucide-react";
+import { Plus, Trash2, Users, AlertTriangle, Baby, CalendarClock, GraduationCap, ChevronRight } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
@@ -36,7 +36,8 @@ export default function Enfants() {
 
   useEffect(() => { chargerGarderie(); }, [chargerGarderie]);
 
-  const [modal, setModal] = useState(null); // { enfant } | null
+  const [modal, setModal] = useState(null); // { enfant, programme } | null
+  const [choixProgramme, setChoixProgramme] = useState(false);
   const [detail, setDetail] = useState(null);
 
   const soldeEnfantMois = (enfantId, mois) => paiements.filter((p) => p.enfantId === enfantId && p.mois === mois).reduce((s, p) => s + p.montant, 0);
@@ -65,6 +66,11 @@ export default function Enfants() {
     if (detail?.id === e.id) setDetail(null);
   }
 
+  function choisirProgramme(programme) {
+    setChoixProgramme(false);
+    setModal({ enfant: null, programme });
+  }
+
   // Frais d'inscription éventuel, saisi dans la même fiche que l'inscription
   // — enregistré comme recette du secteur (E-GARDERIE n'a pas de volet
   // Prestations : la seule facturation du secteur est ce frais).
@@ -91,7 +97,7 @@ export default function Enfants() {
       </div>
 
       <div className="flex justify-end mb-4">
-        <Button icon={Plus} onClick={() => setModal({ enfant: null })} style={{ background: config.color }}>Inscrire un enfant</Button>
+        <Button icon={Plus} onClick={() => setChoixProgramme(true)} style={{ background: config.color }}>Inscrire un enfant</Button>
       </div>
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
@@ -142,12 +148,34 @@ export default function Enfants() {
         </table>
       </GlassCard>
 
+      {/* Choix du programme — détermine ensuite le groupe d'âge proposé dans
+          la fiche complète (même geste que termitiere-platform). */}
+      <Modal open={choixProgramme} onClose={() => setChoixProgramme(false)} title="Nouvelle inscription" icon={Baby} accent={config.color} moduleLabel={config.nom}>
+        <p className="mb-3 text-[13px] text-ink-soft">Choisissez le programme pour cet enfant :</p>
+        <div className="space-y-2">
+          {PROGRAMMES_ENFANT.map((p) => (
+            <button key={p.id} onClick={() => choisirProgramme(p.id)}
+              className="group flex w-full items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-left transition-colors hover:border-black/20 hover:bg-black/[0.02]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ background: config.color }}>
+                {p.id === "maternelle" ? <GraduationCap size={18} /> : <Baby size={18} />}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-ink">{p.label}</p>
+                <p className="text-[12px] text-ink-soft">{p.desc}</p>
+              </div>
+              <ChevronRight size={16} className="shrink-0 text-ink-soft/50 transition-transform group-hover:translate-x-0.5" />
+            </button>
+          ))}
+        </div>
+      </Modal>
+
       {/* Inscription / modification — fiche complète */}
       {modal && (
         <InscriptionEnfantModal
           key={modal.enfant?.id || "new"}
           open
           enfant={modal.enfant}
+          programmeInitial={modal.programme}
           accent={config.color}
           moduleLabel={config.nom}
           montrerFraisInscription={!modal.enfant}

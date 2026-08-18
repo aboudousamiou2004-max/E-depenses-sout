@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -47,11 +47,15 @@ export default function BusinessLayout({ config }) {
     // Dossiers fonciers : spécifique à E-FONCIER — cf.
     // termitiere-platform/src/modules/foncier/Dossiers.jsx.
     ...(config.id === "foncier" ? [{ to: `${config.path}/dossiers`, label: "Dossiers fonciers", icon: FolderOpen }] : []),
-    // Enfants + Paiements : spécifiques à E-GARDERIE, en deux volets séparés
-    // — cf. termitiere-platform/src/modules/garderie/{Enfants,Paiements}.jsx.
+    // Enfants, Paiements, Cantine & Repas, Santé & Infirmerie, Analyse &
+    // Pilotage : spécifiques à E-GARDERIE — cf. termitiere-platform/src/
+    // modules/garderie/{Enfants,Paiements,Cantine,Incidents,Analyses}.jsx.
     ...(config.id === "garderie" ? [
       { to: `${config.path}/enfants`, label: "Enfants", icon: Baby },
       { to: `${config.path}/paiements`, label: "Paiements", icon: Wallet },
+      { to: `${config.path}/cantine`, label: "Cantine & Repas", icon: Utensils },
+      { to: `${config.path}/infirmerie`, label: "Santé & Infirmerie", icon: Stethoscope },
+      { to: `${config.path}/analyse`, label: "Analyse & Pilotage", icon: BarChart3 },
     ] : []),
   ];
 

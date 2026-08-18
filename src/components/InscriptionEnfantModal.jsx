@@ -34,11 +34,11 @@ function empty() {
 // depuis Enfants & Paiements (gestion de fiche) et depuis Prestations
 // (bouton « Inscrire un enfant », avec le frais d'inscription en plus —
 // voir `montrerFraisInscription`).
-export default function InscriptionEnfantModal({ open, onClose, enfant, accent, moduleLabel, onSaved, montrerFraisInscription }) {
+export default function InscriptionEnfantModal({ open, onClose, enfant, accent, moduleLabel, onSaved, montrerFraisInscription, programmeInitial }) {
   const { ajouterEnfant, modifierEnfant } = useGarderieStore();
   const { user } = useAuthStore();
   const isNew = !enfant;
-  const [data, setData] = useState(() => (enfant ? { ...empty(), ...enfant, tarif: enfant.tarif || "", dureeSemaines: enfant.dureeSemaines || "2", fraisCantine: enfant.fraisCantine || "" } : empty()));
+  const [data, setData] = useState(() => (enfant ? { ...empty(), ...enfant, tarif: enfant.tarif || "", dureeSemaines: enfant.dureeSemaines || "2", fraisCantine: enfant.fraisCantine || "" } : { ...empty(), programme: programmeInitial || "" }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
