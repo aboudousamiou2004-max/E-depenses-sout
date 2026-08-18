@@ -1,15 +1,16 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler,
 } from "chart.js";
 import { Line, Doughnut, Bar } from "react-chartjs-2";
-import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack, Tag, Plus } from "lucide-react";
+import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack, Tag, Plus, LayoutGrid, Syringe, Search } from "lucide-react";
 import GlassCard from "../../components/ui/GlassCard";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
 import Badge from "../../components/ui/Badge";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useStockStore, CAT_ANIMAUX_IDENTIFIES } from "../../store/stockStore";
+import { useSanteStore } from "../../store/santeStore";
 import { useDataStore } from "../../store/dataStore";
 import { CAT_ANIMAUX } from "../../data/stockData";
 
@@ -81,6 +82,7 @@ export default function AgroDashboard() {
   const { referentielAnimaux: especes, mouvementsAnimaux, maladesAnimaux, soldeAnimaux, animauxIndividuels } = useStockStore();
   const { recettes } = useDataStore();
 
+  const [mode, setMode] = useState("dashboard"); // 'dashboard' | 'especes'
   const [preset, setPreset] = useState("mois");
   const [from, setFrom] = useState(todayStr().slice(0, 7) + "-01");
   const [to, setTo] = useState(todayStr());
@@ -292,6 +294,22 @@ export default function AgroDashboard() {
         </div>
       </div>
 
+      <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-black/[0.03] p-1">
+        {[
+          { v: "dashboard", l: "Vue d'ensemble", Icon: LayoutGrid },
+          { v: "especes", l: "Espèces", Icon: Tag },
+        ].map((onglet) => (
+          <button key={onglet.v} onClick={() => setMode(onglet.v)}
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${mode === onglet.v ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"}`}>
+            <onglet.Icon size={14} /> {onglet.l}
+          </button>
+        ))}
+      </div>
+
+      {mode === "especes" && <EspecesIndividuelles especes={especes} animauxIndividuels={animauxIndividuels} />}
+
+      {mode === "dashboard" && (
+      <>
       {/* Période */}
       <div className="flex flex-wrap items-end gap-3">
         <div>
@@ -507,7 +525,169 @@ export default function AgroDashboard() {
         <p className="my-2 text-[11px] italic text-ink-soft/60">Total des recettes du secteur agro (tous types confondus — pas de détail par catégorie dans ce projet).</p>
         <DetailTable rows={ca.liste} cols={["Date", "Origine", "Montant"]} render={(r) => [fmtDateShort(r.date), r.origine, fmtMoney(r.montant)]} empty="Aucune recette certifiée sur la période." />
       </Modal>
+      </>
+      )}
     </div>
+  );
+}
+
+// Volet « Espèces » de Cheptel — dossier individuel de chaque animal
+// identifié (bovins/ovins/caprins, cf. CAT_ANIMAUX_IDENTIFIES) : fiche
+// complète (arrivée, statut, vaccins reçus, sortie) et valeur marchande
+// éditable, à la demande de l'utilisateur (2026-08-18).
+function EspecesIndividuelles({ especes, animauxIndividuels }) {
+  const { fiches, chargerSante } = useSanteStore();
+  const [recherche, setRecherche] = useState("");
+  const [filtreEspece, setFiltreEspece] = useState("");
+  const [detailId, setDetailId] = useState(null);
+
+  useEffect(() => { chargerSante(); }, [chargerSante]);
+
+  const especesIdentifiees = useMemo(() => especes.filter((e) => CAT_ANIMAUX_IDENTIFIES.includes(e.cat)), [especes]);
+  const especeNom = (id) => especes.find((e) => e.id === id)?.nom || id;
+
+  const lignes = useMemo(() => {
+    const q = recherche.trim().toLowerCase();
+    return [...animauxIndividuels]
+      .filter((a) => !filtreEspece || a.especeId === filtreEspece)
+      .filter((a) => !q || a.identifiant.toLowerCase().includes(q) || especeNom(a.especeId).toLowerCase().includes(q))
+      .sort((a, b) => a.identifiant.localeCompare(b.identifiant));
+  }, [animauxIndividuels, filtreEspece, recherche]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const detail = animauxIndividuels.find((a) => a.id === detailId) || null;
+  const statutLabel = { actif: "Actif", vendu: "Vendu", mort: "Mort", perdu: "Perdu" };
+  const statutTone = { actif: "accent", vendu: "mint", mort: "coral", perdu: "amber" };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-end gap-3 my-4">
+        <div className="flex-1 min-w-[180px]">
+          <label className="mb-1 block text-[11px] font-semibold text-ink-soft">Rechercher</label>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft/50" />
+            <TextInput className="pl-8" value={recherche} onChange={(e) => setRecherche(e.target.value)} placeholder="Identifiant ou espèce…" />
+          </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-[11px] font-semibold text-ink-soft">Espèce</label>
+          <Select value={filtreEspece} onChange={(e) => setFiltreEspece(e.target.value)}>
+            <option value="">Toutes</option>
+            {especesIdentifiees.map((e) => <option key={e.id} value={e.id}>{e.nom}</option>)}
+          </Select>
+        </div>
+        <span className="ml-auto text-[11px] text-ink-soft/70">{lignes.length} animal(aux) identifié(s)</span>
+      </div>
+
+      <GlassCard className="p-2 overflow-hidden" hover={false}>
+        {lignes.length === 0 ? (
+          <p className="py-10 text-center text-[13px] text-ink-soft/60">
+            <Tag size={22} className="inline-block mb-1.5 opacity-40" /><br />
+            Aucun animal identifié — ajoutez un identifiant depuis Saisie journalière ou le détail d'une espèce.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] border-collapse">
+              <thead>
+                <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
+                  <th className="px-4 py-3">Identifiant</th>
+                  <th className="px-3 py-3">Espèce</th>
+                  <th className="px-3 py-3 text-center">Sexe</th>
+                  <th className="px-3 py-3 text-center">Statut</th>
+                  <th className="px-3 py-3 text-right">Valeur marchande</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lignes.map((a) => (
+                  <tr key={a.id} onClick={() => setDetailId(a.id)} className="text-[13.5px] hover:bg-white/50 transition-colors cursor-pointer">
+                    <td className="px-4 py-2.5 font-semibold text-ink">{a.identifiant}</td>
+                    <td className="px-3 py-2.5 text-ink-soft">{especeNom(a.especeId)}</td>
+                    <td className="px-3 py-2.5 text-center text-ink-soft">{a.sexe === "male" ? "♂" : a.sexe === "femelle" ? "♀" : "—"}</td>
+                    <td className="px-3 py-2.5 text-center"><Badge tone={statutTone[a.statut]}>{statutLabel[a.statut]}</Badge></td>
+                    <td className="px-3 py-2.5 text-right tabular font-semibold text-ink">{a.valeurMarchande ? fmtMoney(a.valeurMarchande) : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </GlassCard>
+
+      <FicheAnimal key={detail?.id || "none"} animal={detail} especeNom={detail ? especeNom(detail.especeId) : ""} fiches={fiches} onClose={() => setDetailId(null)} />
+    </div>
+  );
+}
+
+// Fiche complète d'un animal identifié : infos, valeur marchande éditable,
+// historique (entrée → vaccins/interventions reçus → sortie éventuelle).
+function FicheAnimal({ animal, especeNom, fiches, onClose }) {
+  const { enregistrerValeurMarchande } = useStockStore();
+  const [valeur, setValeur] = useState(animal?.valeurMarchande || "");
+  const [saving, setSaving] = useState(false);
+  const [savedOk, setSavedOk] = useState(false);
+
+  if (!animal) return null;
+
+  const vaccinsRecus = fiches
+    .filter((f) => f.especeId === animal.especeId && (f.animauxIds || "").split(",").map((s) => s.trim()).includes(animal.identifiant))
+    .sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  const timeline = [
+    { date: animal.dateEntree, label: "Entrée dans l'effectif", tone: "#16a34a" },
+    ...vaccinsRecus.map((f) => ({ date: f.date, label: `${f.type === "vaccination" ? "💉" : f.type === "traitement" ? "💊" : f.type === "deparasitage" ? "🪱" : "🔧"} ${f.produit}`, tone: "#0A84FF" })),
+    ...(animal.statut !== "actif" ? [{ date: animal.dateSortie, label: `Sortie — ${{ vendu: "Vendu", mort: "Mort", perdu: "Perdu" }[animal.statut]}${animal.motifSortie ? ` (${animal.motifSortie})` : ""}`, tone: "#dc2626" }] : []),
+  ].filter((t) => t.date).sort((a, b) => (a.date < b.date ? -1 : 1));
+
+  async function save() {
+    setSaving(true);
+    const res = await enregistrerValeurMarchande(animal.id, valeur);
+    setSaving(false);
+    if (res.ok) { setSavedOk(true); setTimeout(() => setSavedOk(false), 1500); }
+  }
+
+  return (
+    <Modal open={!!animal} onClose={onClose} title={`${animal.identifiant} — ${especeNom}`} footer={<Button variant="ghost" onClick={onClose}>Fermer</Button>}>
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-2">
+          <MiniStat label="Sexe" value={animal.sexe === "male" ? "Mâle" : animal.sexe === "femelle" ? "Femelle" : "—"} color="#374151" />
+          <MiniStat label="Date d'arrivée" value={fmtDateShort(animal.dateEntree)} color="#16a34a" />
+          <MiniStat label="Vaccins/soins reçus" value={String(vaccinsRecus.length)} color="#0A84FF" />
+        </div>
+
+        <div className="rounded-2xl bg-black/[0.03] p-3">
+          <label className="mb-1 block text-[11px] font-semibold text-ink-soft">Valeur marchande (FCFA)</label>
+          <div className="flex items-center gap-2">
+            <TextInput type="number" min="0" value={valeur} onChange={(e) => setValeur(e.target.value)} placeholder="0" className="max-w-[160px]" />
+            <Button size="sm" onClick={save} disabled={saving}>{saving ? "…" : savedOk ? "✓ Enregistré" : "Enregistrer"}</Button>
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-1.5 text-[11px] font-bold uppercase text-ink-soft/70">Historique complet</p>
+          {timeline.length === 0 ? (
+            <p className="py-4 text-center text-[13px] text-ink-soft/60 italic">Aucun évènement enregistré.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {timeline.map((t, i) => (
+                <div key={i} className="flex items-start gap-2 rounded-xl bg-black/[0.03] px-3 py-2 text-[12.5px]">
+                  <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: t.tone }} />
+                  <div>
+                    <span className="font-semibold text-ink">{t.label}</span>
+                    <p className="text-[11px] text-ink-soft/70">{fmtDateShort(t.date)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {animal.notes && (
+          <div>
+            <p className="mb-1 text-[11px] font-bold uppercase text-ink-soft/70">Notes</p>
+            <p className="text-[13px] text-ink-soft italic">{animal.notes}</p>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 

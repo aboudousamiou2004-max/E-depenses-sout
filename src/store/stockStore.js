@@ -31,6 +31,7 @@ const mapMouvementArticleAgro = (r) => ({ id: r.id, date: r.date, articleId: r.a
 const mapAnimalIndividuel = (r) => ({
   id: r.id, especeId: r.espece_id, identifiant: r.identifiant, sexe: r.sexe,
   dateEntree: r.date_entree, statut: r.statut, dateSortie: r.date_sortie, motifSortie: r.motif_sortie, notes: r.notes,
+  valeurMarchande: Number(r.valeur_marchande) || 0,
 });
 // Catégories dont les animaux sont identifiés individuellement (boucle/tag) —
 // jamais la volaille, qui se gère par décompte agrégé en usage réel.
@@ -424,6 +425,14 @@ export const useStockStore = create((set, get) => ({
       .eq("id", id);
     if (error) return { ok: false, error: error.message };
     set((s) => ({ animauxIndividuels: s.animauxIndividuels.map((a) => (a.id === id ? { ...a, statut, dateSortie: date, motifSortie: motif || "" } : a)) }));
+    return { ok: true };
+  },
+
+  enregistrerValeurMarchande: async (id, valeur) => {
+    const v = Math.max(0, Number(valeur) || 0);
+    const { error } = await supabase.from("agro_animaux_individuels").update({ valeur_marchande: v }).eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    set((s) => ({ animauxIndividuels: s.animauxIndividuels.map((a) => (a.id === id ? { ...a, valeurMarchande: v } : a)) }));
     return { ok: true };
   },
 }));
