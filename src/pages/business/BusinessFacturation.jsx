@@ -131,7 +131,7 @@ export default function BusinessFacturation() {
 
   return (
     <div>
-      <TopBarSimple title="Facturation" subtitle={`${config.nom} — prestations et locations facturées`} icon={FileText} accent={config.color} />
+      <TopBarSimple title="Prestations" subtitle={`${config.nom} — prestations et locations facturées`} icon={FileText} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={FileText} label="Total facturé (affiché)" value={fmtCompact(total) + " FCFA"} tone={config.color} />
