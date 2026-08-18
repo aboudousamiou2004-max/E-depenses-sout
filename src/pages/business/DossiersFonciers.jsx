@@ -135,6 +135,7 @@ export default function DossiersFonciers() {
 
       {/* Création / édition du dossier */}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.id ? "Modifier le dossier" : "Nouveau dossier foncier"}
+        icon={FolderOpen} accent={config.color} moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setModal(null)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         {modal && (
           <form onSubmit={submit}>
@@ -165,6 +166,7 @@ export default function DossiersFonciers() {
 
       {/* Détail — frais du dossier */}
       <Modal open={!!detail} onClose={() => setDetailId(null)} title={detail ? `Dossier ${detail.numero} — ${detail.commune}` : ""}
+        icon={FolderOpen} accent={config.color} moduleLabel={config.nom}
         footer={<Button variant="ghost" onClick={() => setDetailId(null)}>Fermer</Button>}>
         {detail && (
           <div className="space-y-4">

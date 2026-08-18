@@ -140,6 +140,9 @@ export default function BusinessDepenses() {
         open={open}
         onClose={() => setOpen(false)}
         title="Enregistrer une dépense"
+        icon={Receipt}
+        accent={config.color}
+        moduleLabel={config.nom}
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>

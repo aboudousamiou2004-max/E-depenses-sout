@@ -136,6 +136,9 @@ export default function StockMateriel() {
         open={open}
         onClose={() => setOpen(false)}
         title="Nouveau mouvement de stock"
+        icon={Boxes}
+        accent={config.color}
+        moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}
       >
         <form onSubmit={submit}>
@@ -168,6 +171,9 @@ export default function StockMateriel() {
         open={openArticle}
         onClose={() => setOpenArticle(false)}
         title="Nouvel article"
+        icon={Boxes}
+        accent={config.color}
+        moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setOpenArticle(false)}>Annuler</Button><Button onClick={submitArticle} disabled={saving}>{saving ? "Création…" : "Créer"}</Button></>}
       >
         <form onSubmit={submitArticle}>

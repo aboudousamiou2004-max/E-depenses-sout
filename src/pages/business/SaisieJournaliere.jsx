@@ -154,6 +154,8 @@ export default function SaisieJournaliere() {
         onClose={() => setMvtModal(null)}
         date={date}
         user={user}
+        accent={config.color}
+        moduleLabel={config.nom}
         addMouvementAnimal={addMouvementAnimal}
         supprimerMouvementAnimal={supprimerMouvementAnimal}
         lignes={mvtModal ? mouvementsJour(mvtModal.espece.id).filter((m) => (mvtModal.dir === "entree" ? m.quantite > 0 : m.quantite < 0)) : []}
@@ -166,6 +168,9 @@ export default function SaisieJournaliere() {
         open={openEspece}
         onClose={() => setOpenEspece(false)}
         title="Nouvelle espèce"
+        icon={ClipboardList}
+        accent={config.color}
+        moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setOpenEspece(false)}>Annuler</Button><Button onClick={submitEspece} disabled={saving}>{saving ? "Création…" : "Créer"}</Button></>}
       >
         <form onSubmit={submitEspece}>
@@ -184,7 +189,7 @@ export default function SaisieJournaliere() {
   );
 }
 
-function MouvementJourModal({ modal, onClose, date, user, addMouvementAnimal, supprimerMouvementAnimal, lignes, animauxIndividuels, ajouterAnimalIndividuel, sortirAnimalIndividuel }) {
+function MouvementJourModal({ modal, onClose, date, user, accent, moduleLabel, addMouvementAnimal, supprimerMouvementAnimal, lignes, animauxIndividuels, ajouterAnimalIndividuel, sortirAnimalIndividuel }) {
   const [type, setType] = useState("");
   const [quantite, setQuantite] = useState("");
   const [motif, setMotif] = useState("");
@@ -217,7 +222,8 @@ function MouvementJourModal({ modal, onClose, date, user, addMouvementAnimal, su
   }
 
   return (
-    <Modal open onClose={onClose} title={`${dir === "entree" ? "⬇️ Entrées" : "⬆️ Sorties"} — ${espece.nom} (${date})`} footer={<Button onClick={onClose}>Terminer</Button>}>
+    <Modal open onClose={onClose} title={`${dir === "entree" ? "⬇️ Entrées" : "⬆️ Sorties"} — ${espece.nom} (${date})`}
+      icon={ClipboardList} accent={accent} moduleLabel={moduleLabel} footer={<Button onClick={onClose}>Terminer</Button>}>
       <div className="space-y-2 mb-4">
         {lignes.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucun mouvement saisi pour cette journée.</p>}
         {lignes.map((l) => (

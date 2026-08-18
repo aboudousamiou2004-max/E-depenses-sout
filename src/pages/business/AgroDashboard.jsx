@@ -308,7 +308,7 @@ export default function AgroDashboard() {
         ))}
       </div>
 
-      {mode === "especes" && <EspecesIndividuelles especes={especes} animauxIndividuels={animauxIndividuels} />}
+      {mode === "especes" && <EspecesIndividuelles especes={especes} animauxIndividuels={animauxIndividuels} config={config} />}
 
       {mode === "dashboard" && (
       <>
@@ -452,7 +452,7 @@ export default function AgroDashboard() {
       </GlassCard>
 
       {/* Détail complet d'une espèce (clic sur une ligne du tableau ci-dessus) */}
-      <Modal open={!!especeDetail} onClose={() => setEspeceDetailId(null)} title={especeDetail ? `${especeDetail.nom} — ${especeDetail.cat}` : ""} footer={<Button variant="ghost" onClick={() => setEspeceDetailId(null)}>Fermer</Button>}>
+      <Modal open={!!especeDetail} onClose={() => setEspeceDetailId(null)} title={especeDetail ? `${especeDetail.nom} — ${especeDetail.cat}` : ""} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setEspeceDetailId(null)}>Fermer</Button>}>
         {especeDetail && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
@@ -486,30 +486,30 @@ export default function AgroDashboard() {
       </Modal>
 
       {/* Modales détaillées */}
-      <Modal open={modalKey === "naissances"} onClose={() => setModalKey(null)} title={`Naissances — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "naissances"} onClose={() => setModalKey(null)} title={`Naissances — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#16a34a]/10 px-3 py-2 text-[13px] text-[#16653c]"><strong>{fmtNum(ind.naiss)}</strong> naissance(s) sur la période — période préc. : {fmtNum(indPrec.naiss)}</p>
         <DetailTable rows={naissancesDetail} cols={["Date", "Espèce", "Nés", "Agent"]} render={(n) => [fmtDateShort(n.date), n.espece, n.qte, n.agent || "—"]} empty="Aucune naissance sur la période." />
       </Modal>
-      <Modal open={modalKey === "deces"} onClose={() => setModalKey(null)} title={`Décès — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "deces"} onClose={() => setModalKey(null)} title={`Décès — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]"><strong>{fmtNum(ind.dec)}</strong> décès sur la période — période préc. : {fmtNum(indPrec.dec)}</p>
         <DetailTable rows={decesDetail} cols={["Date", "Espèce", "Qté", "Motif", "Agent"]} render={(d) => [fmtDateShort(d.date), d.espece, d.qte, d.motif, d.agent || "—"]} empty="Aucun décès sur la période." />
       </Modal>
-      <Modal open={modalKey === "mortalite"} onClose={() => setModalKey(null)} title={`Mortalité — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "mortalite"} onClose={() => setModalKey(null)} title={`Mortalité — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]">Taux : <strong>{ind.mortalite.toFixed(1)} %</strong> — {ind.dec} décès / {fmtNum(ind.base)} têtes (effectif en début de période)</p>
         <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Décès / Effectif début de période) × 100</p>
         <DetailTable rows={decesDetail} cols={["Date", "Espèce", "Qté", "Motif", "Agent"]} render={(d) => [fmtDateShort(d.date), d.espece, d.qte, d.motif, d.agent || "—"]} empty="Aucun décès sur la période." />
       </Modal>
-      <Modal open={modalKey === "letalite"} onClose={() => setModalKey(null)} title={`Létalité — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "letalite"} onClose={() => setModalKey(null)} title={`Létalité — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]">Taux : <strong>{ind.letalite.toFixed(1)} %</strong> — {ind.dec} décès / {ind.casMaladie} cas de maladie (malades + décès)</p>
         <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Décès / Cas de maladie) × 100 — part des animaux tombés malades qui n'ont pas survécu.</p>
         <DetailTable rows={decesDetail} cols={["Date", "Espèce", "Qté", "Motif", "Agent"]} render={(d) => [fmtDateShort(d.date), d.espece, d.qte, d.motif, d.agent || "—"]} empty="Aucun décès sur la période." />
       </Modal>
-      <Modal open={modalKey === "croissance"} onClose={() => setModalKey(null)} title={`Croissance & naissances — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "croissance"} onClose={() => setModalKey(null)} title={`Croissance & naissances — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#16a34a]/10 px-3 py-2 text-[13px] text-[#16653c]">Taux : <strong>{ind.croissance.toFixed(1)} %</strong> — {ind.naiss} naissance(s)</p>
         <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : ((Naissances − Décès) / Effectif début de période) × 100</p>
         <DetailTable rows={naissancesDetail} cols={["Date", "Espèce", "Nés", "Agent"]} render={(n) => [fmtDateShort(n.date), n.espece, n.qte, n.agent || "—"]} empty="Aucune naissance sur la période." />
       </Modal>
-      <Modal open={modalKey === "morbidite"} onClose={() => setModalKey(null)} title={`Morbidité — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "morbidite"} onClose={() => setModalKey(null)} title={`Morbidité — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#d97706]/10 px-3 py-2 text-[13px] text-[#92400e]">Taux : <strong>{ind.morbidite.toFixed(1)} %</strong> — {ind.malades} malade(s) / {fmtNum(ind.effectif)} têtes</p>
         <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Malades / Effectif) × 100 — prévision : tendance + moyenne mobile (7 jours)</p>
         {morbiditePrevision.length > 0 && (
@@ -518,11 +518,11 @@ export default function AgroDashboard() {
           </div>
         )}
       </Modal>
-      <Modal open={modalKey === "ventes"} onClose={() => setModalKey(null)} title={`Ventes (volume) — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "ventes"} onClose={() => setModalKey(null)} title={`Ventes (volume) — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#0d9488]/10 px-3 py-2 text-[13px] text-[#0f766e]">{fmtNum(venduVolume)} unité(s) vendue(s) — période préc. : {fmtNum(indPrec.ventes)}</p>
         <DetailTable rows={ventesDetail} cols={["Date", "Espèce", "Qté", "Motif"]} render={(v) => [fmtDateShort(v.date), v.espece, v.qte, v.motif]} empty="Aucune vente sur la période." />
       </Modal>
-      <Modal open={modalKey === "ca"} onClose={() => setModalKey(null)} title={`Chiffre d'affaires — ${scopeLabel}`} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+      <Modal open={modalKey === "ca"} onClose={() => setModalKey(null)} title={`Chiffre d'affaires — ${scopeLabel}`} icon={Wallet} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
         <p className="rounded-2xl bg-[#7c3aed]/10 px-3 py-2 text-[13px] text-[#5b21b6]">{fmtMoney(ca.courant)} — période préc. : {fmtMoney(ca.precedent)}</p>
         <p className="my-2 text-[11px] italic text-ink-soft/60">Total des recettes du secteur agro (tous types confondus — pas de détail par catégorie dans ce projet).</p>
         <DetailTable rows={ca.liste} cols={["Date", "Origine", "Montant"]} render={(r) => [fmtDateShort(r.date), r.origine, fmtMoney(r.montant)]} empty="Aucune recette certifiée sur la période." />
@@ -537,7 +537,7 @@ export default function AgroDashboard() {
 // identifié (bovins/ovins/caprins, cf. CAT_ANIMAUX_IDENTIFIES) : fiche
 // complète (arrivée, statut, vaccins reçus, sortie) et valeur marchande
 // éditable, à la demande de l'utilisateur (2026-08-18).
-function EspecesIndividuelles({ especes, animauxIndividuels }) {
+function EspecesIndividuelles({ especes, animauxIndividuels, config }) {
   const { fiches, chargerSante } = useSanteStore();
   const [recherche, setRecherche] = useState("");
   const [filtreEspece, setFiltreEspece] = useState("");
@@ -614,14 +614,14 @@ function EspecesIndividuelles({ especes, animauxIndividuels }) {
         )}
       </GlassCard>
 
-      <FicheAnimal key={detail?.id || "none"} animal={detail} especeNom={detail ? especeNom(detail.especeId) : ""} fiches={fiches} onClose={() => setDetailId(null)} />
+      <FicheAnimal key={detail?.id || "none"} animal={detail} especeNom={detail ? especeNom(detail.especeId) : ""} fiches={fiches} config={config} onClose={() => setDetailId(null)} />
     </div>
   );
 }
 
 // Fiche complète d'un animal identifié : infos, valeur marchande éditable,
 // historique (entrée → vaccins/interventions reçus → sortie éventuelle).
-function FicheAnimal({ animal, especeNom, fiches, onClose }) {
+function FicheAnimal({ animal, especeNom, fiches, config, onClose }) {
   const { enregistrerValeurMarchande } = useStockStore();
   const [valeur, setValeur] = useState(animal?.valeurMarchande || "");
   const [saving, setSaving] = useState(false);
@@ -647,7 +647,7 @@ function FicheAnimal({ animal, especeNom, fiches, onClose }) {
   }
 
   return (
-    <Modal open={!!animal} onClose={onClose} title={`${animal.identifiant} — ${especeNom}`} footer={<Button variant="ghost" onClick={onClose}>Fermer</Button>}>
+    <Modal open={!!animal} onClose={onClose} title={`${animal.identifiant} — ${especeNom}`} icon={Tag} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={onClose}>Fermer</Button>}>
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2">
           <MiniStat label="Sexe" value={animal.sexe === "male" ? "Mâle" : animal.sexe === "femelle" ? "Femelle" : "—"} color="#374151" />

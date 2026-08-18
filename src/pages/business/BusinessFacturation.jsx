@@ -188,6 +188,9 @@ export default function BusinessFacturation() {
         open={open}
         onClose={() => setOpen(false)}
         title="Nouvelle facture"
+        icon={FileText}
+        accent={config.color}
+        moduleLabel={config.nom}
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>

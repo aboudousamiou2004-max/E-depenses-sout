@@ -171,6 +171,7 @@ export default function EnfantsPaiements() {
 
       {/* Création / édition enfant */}
       <Modal open={!!modal} onClose={() => setModal(null)} title={modal?.id ? "Modifier la fiche" : "Nouvel enfant"}
+        icon={Baby} accent={config.color} moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setModal(null)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         {modal && (
           <form onSubmit={submit}>
@@ -208,6 +209,7 @@ export default function EnfantsPaiements() {
 
       {/* Détail — historique des paiements */}
       <Modal open={!!detail} onClose={() => setDetailId(null)} title={detail ? `${detail.nom} ${detail.prenom} — Paiements` : ""}
+        icon={Baby} accent={config.color} moduleLabel={config.nom}
         footer={<Button variant="ghost" onClick={() => setDetailId(null)}>Fermer</Button>}>
         {detail && (
           <div className="space-y-4">

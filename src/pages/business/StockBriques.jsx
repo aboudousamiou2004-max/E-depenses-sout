@@ -140,7 +140,7 @@ export default function StockBriques() {
         </GlassCard>
       </div>
 
-      <Modal open={openProd} onClose={() => setOpenProd(false)} title="Nouvelle production" footer={<><Button variant="ghost" onClick={() => setOpenProd(false)}>Annuler</Button><Button onClick={submitProd} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
+      <Modal open={openProd} onClose={() => setOpenProd(false)} title="Nouvelle production" icon={Layers} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenProd(false)}>Annuler</Button><Button onClick={submitProd} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitProd}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Type de brique">
@@ -154,7 +154,7 @@ export default function StockBriques() {
         </form>
       </Modal>
 
-      <Modal open={openTrans} onClose={() => setOpenTrans(false)} title="Transition d'état" footer={<><Button variant="ghost" onClick={() => setOpenTrans(false)}>Annuler</Button><Button onClick={submitTrans} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
+      <Modal open={openTrans} onClose={() => setOpenTrans(false)} title="Transition d'état" icon={Layers} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenTrans(false)}>Annuler</Button><Button onClick={submitTrans} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitTrans}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Type de brique">
@@ -181,7 +181,7 @@ export default function StockBriques() {
         </form>
       </Modal>
 
-      <Modal open={openMatiere} onClose={() => setOpenMatiere(false)} title="Mouvement matière première" footer={<><Button variant="ghost" onClick={() => setOpenMatiere(false)}>Annuler</Button><Button onClick={submitMatiere} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
+      <Modal open={openMatiere} onClose={() => setOpenMatiere(false)} title="Mouvement matière première" icon={Layers} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenMatiere(false)}>Annuler</Button><Button onClick={submitMatiere} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitMatiere}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Matière">

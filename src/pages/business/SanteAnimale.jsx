@@ -60,8 +60,8 @@ export default function SanteAnimale() {
         ))}
       </div>
 
-      {tab === "interventions" && <Interventions fiches={fiches} vaccins={vaccins} especes={referentielAnimaux} animauxIndividuels={animauxIndividuels} user={user} />}
-      {tab === "stock" && <StockVaccins vaccins={vaccins} />}
+      {tab === "interventions" && <Interventions fiches={fiches} vaccins={vaccins} especes={referentielAnimaux} animauxIndividuels={animauxIndividuels} user={user} config={config} />}
+      {tab === "stock" && <StockVaccins vaccins={vaccins} config={config} />}
       {tab === "rdv" && <RendezVous fiches={fiches} />}
       {tab === "bilan" && <Bilan fiches={fiches} vaccins={vaccins} />}
     </div>
@@ -69,7 +69,7 @@ export default function SanteAnimale() {
 }
 
 // ─────────── Interventions ───────────
-function Interventions({ fiches, vaccins, especes, animauxIndividuels, user }) {
+function Interventions({ fiches, vaccins, especes, animauxIndividuels, user, config }) {
   const { ajouterIntervention, supprimerIntervention } = useSanteStore();
   const [filtreType, setFiltreType] = useState("");
   const [open, setOpen] = useState(false);
@@ -168,6 +168,7 @@ function Interventions({ fiches, vaccins, especes, animauxIndividuels, user }) {
       </GlassCard>
 
       <Modal open={open} onClose={() => setOpen(false)} title="Nouvelle intervention sanitaire"
+        icon={HeartPulse} accent={config.color} moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={save} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         {form && (
           <>
@@ -234,7 +235,7 @@ function Interventions({ fiches, vaccins, especes, animauxIndividuels, user }) {
 }
 
 // ─────────── Stock vaccins ───────────
-function StockVaccins({ vaccins }) {
+function StockVaccins({ vaccins, config }) {
   const { enregistrerVaccin, supprimerVaccin } = useSanteStore();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(null);
@@ -317,6 +318,7 @@ function StockVaccins({ vaccins }) {
       </GlassCard>
 
       <Modal open={open} onClose={() => setOpen(false)} title={form?.id ? "Modifier le produit" : "Nouveau produit"}
+        icon={HeartPulse} accent={config.color} moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={save} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         {form && (
           <>

@@ -201,6 +201,9 @@ function MagasinSection({ config, icon: Icon, unitePlaceholder, categories, refe
         open={open}
         onClose={() => setOpen(false)}
         title="Nouveau mouvement"
+        icon={Icon}
+        accent={config.color}
+        moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}
       >
         <form onSubmit={submit}>
@@ -233,6 +236,9 @@ function MagasinSection({ config, icon: Icon, unitePlaceholder, categories, refe
         open={openArticle}
         onClose={() => setOpenArticle(false)}
         title="Nouvel article"
+        icon={Icon}
+        accent={config.color}
+        moduleLabel={config.nom}
         footer={<><Button variant="ghost" onClick={() => setOpenArticle(false)}>Annuler</Button><Button onClick={submitArticle} disabled={saving}>{saving ? "Création…" : "Créer"}</Button></>}
       >
         <form onSubmit={submitArticle}>
