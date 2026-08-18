@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { Plus, Factory, Layers, ArrowRight } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
@@ -11,20 +11,19 @@ import { useStockStore } from "../../store/stockStore";
 import { useAuthStore } from "../../store/authStore";
 import { ETATS_BRIQUE } from "../../data/stockData";
 
-// Stock de briques d'E-BRIQUETERIE — même modèle que le vrai module : chaque
-// type de brique suit 4 états (appâtam → séchage → prêt, ou casse en cours de
-// route), plus un stock de matières premières simple (init + entrées - conso).
-export default function StockBriques() {
+// Production E-BRIQUETERIE — volet dédié (extrait de l'ancien Stock de
+// briques, désormais réparti entre Production, Matériaux et Matériel), à la
+// demande explicite de l'utilisateur (2026-08-18) : enregistre les briques
+// produites (état « appâtam ») et leur transition jusqu'à « prêt à la vente ».
+export default function ProductionBriques() {
   const config = useOutletContext();
   const { user } = useAuthStore();
-  const { typesBriques, stockBriques, journalBriques, ajouterProduction, transitionBrique, referentielMatieres, stockMatiere, addMouvementMatiere, mouvementsMatieres } = useStockStore();
+  const { typesBriques, stockBriques, journalBriques, ajouterProduction, transitionBrique } = useStockStore();
 
   const [openProd, setOpenProd] = useState(false);
   const [prodForm, setProdForm] = useState({ typeId: typesBriques[0]?.id, quantite: "" });
   const [openTrans, setOpenTrans] = useState(false);
   const [transForm, setTransForm] = useState({ typeId: typesBriques[0]?.id, de: "appatam", vers: "sechage", quantite: "" });
-  const [openMatiere, setOpenMatiere] = useState(false);
-  const [matiereForm, setMatiereForm] = useState({ matiereId: referentielMatieres[0]?.id, type: "arrivage", quantite: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -57,21 +56,9 @@ export default function StockBriques() {
     setTransForm((f) => ({ ...f, quantite: "" }));
   }
 
-  async function submitMatiere(e) {
-    e.preventDefault();
-    if (!matiereForm.quantite) return;
-    setSaving(true);
-    setError("");
-    const res = await addMouvementMatiere(matiereForm, user);
-    setSaving(false);
-    if (!res.ok) return setError(res.error);
-    setOpenMatiere(false);
-    setMatiereForm((f) => ({ ...f, quantite: "" }));
-  }
-
   return (
     <div>
-      <TopBarSimple title="Stock de briques" subtitle={`${config.nom} — production, séchage et matières premières`} icon={Layers} accent={config.color} />
+      <TopBarSimple title="Production" subtitle={`${config.nom} — production de briques et séchage jusqu'à la vente`} icon={Factory} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Factory} label="En appâtam" value={String(totalAppatam)} tone="#8E8E93" />
@@ -108,39 +95,22 @@ export default function StockBriques() {
         </table>
       </GlassCard>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <GlassCard className="p-5 lg:col-span-2" hover={false}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold tracking-tight text-ink">Matières premières</h3>
-            <Button variant="ghost" icon={Plus} onClick={() => setOpenMatiere(true)}>Mouvement</Button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {referentielMatieres.map((m) => (
-              <div key={m.id} className="glass rounded-2xl p-4">
-                <p className="text-[12px] text-ink-soft font-semibold">{m.nom}</p>
-                <p className="text-[22px] font-bold tabular text-ink mt-1">{stockMatiere(m.id)} <span className="text-[12px] font-medium text-ink-soft">{m.unite}</span></p>
+      <GlassCard className="p-5" hover={false}>
+        <h3 className="font-bold tracking-tight text-ink mb-3">Journal des transitions</h3>
+        <div className="flex flex-col gap-2 max-h-[280px] overflow-y-auto">
+          {journalBriques.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucun mouvement.</p>}
+          {journalBriques.slice(0, 20).map((j) => {
+            const type = typesBriques.find((t) => t.id === j.typeId);
+            return (
+              <div key={j.id} className="text-[12px] px-1">
+                <span className="font-semibold text-ink">{type?.nom}</span> — {j.action} <span className="font-bold tabular">{j.quantite}</span>
               </div>
-            ))}
-          </div>
-        </GlassCard>
+            );
+          })}
+        </div>
+      </GlassCard>
 
-        <GlassCard className="p-5" hover={false}>
-          <h3 className="font-bold tracking-tight text-ink mb-3">Journal des transitions</h3>
-          <div className="flex flex-col gap-2 max-h-[220px] overflow-y-auto">
-            {journalBriques.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucun mouvement.</p>}
-            {journalBriques.slice(0, 10).map((j) => {
-              const type = typesBriques.find((t) => t.id === j.typeId);
-              return (
-                <div key={j.id} className="text-[12px] px-1">
-                  <span className="font-semibold text-ink">{type?.nom}</span> — {j.action} <span className="font-bold tabular">{j.quantite}</span>
-                </div>
-              );
-            })}
-          </div>
-        </GlassCard>
-      </div>
-
-      <Modal open={openProd} onClose={() => setOpenProd(false)} title="Nouvelle production" icon={Layers} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenProd(false)}>Annuler</Button><Button onClick={submitProd} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
+      <Modal open={openProd} onClose={() => setOpenProd(false)} title="Nouvelle production" icon={Factory} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenProd(false)}>Annuler</Button><Button onClick={submitProd} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitProd}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Type de brique">
@@ -154,7 +124,7 @@ export default function StockBriques() {
         </form>
       </Modal>
 
-      <Modal open={openTrans} onClose={() => setOpenTrans(false)} title="Transition d'état" icon={Layers} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenTrans(false)}>Annuler</Button><Button onClick={submitTrans} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
+      <Modal open={openTrans} onClose={() => setOpenTrans(false)} title="Transition d'état" icon={Factory} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenTrans(false)}>Annuler</Button><Button onClick={submitTrans} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
         <form onSubmit={submitTrans}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Type de brique">
@@ -177,27 +147,7 @@ export default function StockBriques() {
           <Field label="Quantité">
             <TextInput type="number" value={transForm.quantite} onChange={(e) => setTransForm({ ...transForm, quantite: e.target.value })} placeholder="200" />
           </Field>
-          <p className="text-[12px] text-ink-soft">Ex : séchage → prêt une fois les {ETATS_BRIQUE.length > 0 ? "5 jours" : ""} de séchage écoulés.</p>
-        </form>
-      </Modal>
-
-      <Modal open={openMatiere} onClose={() => setOpenMatiere(false)} title="Mouvement matière première" icon={Layers} accent={config.color} moduleLabel={config.nom} footer={<><Button variant="ghost" onClick={() => setOpenMatiere(false)}>Annuler</Button><Button onClick={submitMatiere} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}>
-        <form onSubmit={submitMatiere}>
-          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
-          <Field label="Matière">
-            <Select value={matiereForm.matiereId} onChange={(e) => setMatiereForm({ ...matiereForm, matiereId: e.target.value })}>
-              {referentielMatieres.map((m) => <option key={m.id} value={m.id}>{m.nom}</option>)}
-            </Select>
-          </Field>
-          <Field label="Type">
-            <Select value={matiereForm.type} onChange={(e) => setMatiereForm({ ...matiereForm, type: e.target.value })}>
-              <option value="arrivage">Arrivage</option>
-              <option value="consommation">Consommation</option>
-            </Select>
-          </Field>
-          <Field label="Quantité">
-            <TextInput type="number" value={matiereForm.quantite} onChange={(e) => setMatiereForm({ ...matiereForm, quantite: e.target.value })} placeholder="10" />
-          </Field>
+          <p className="text-[12px] text-ink-soft">Ex : séchage → prêt une fois le séchage terminé.</p>
         </form>
       </Modal>
     </div>

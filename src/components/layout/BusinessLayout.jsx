@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
   materiel: { label: "Stock", icon: Boxes },
-  briques: { label: "Stock", icon: Boxes },
   animaux: { label: "Cheptel", icon: PawPrint },
 };
 
@@ -28,9 +27,14 @@ export default function BusinessLayout({ config }) {
       { to: `${config.path}/sante`, label: "Santé animale", icon: HeartPulse },
       { to: `${config.path}/magasin`, label: "Magasin", icon: Warehouse },
     ] : []),
-    // Marge & Bénéfice : spécifique à la briqueterie — cf.
-    // termitiere-platform/src/modules/evenementiel/Marge.jsx.
-    ...(config.stock === "briques" ? [{ to: `${config.path}/marge`, label: "Marge & Bénéfice", icon: Scale }] : []),
+    // Production, Matériaux, Matériel, Marge & Bénéfice : spécifiques à
+    // E-BRIQUETERIE (remplacent l'ancien volet générique « Stock »).
+    ...(config.stock === "briques" ? [
+      { to: `${config.path}/production`, label: "Production", icon: Factory },
+      { to: `${config.path}/materiaux`, label: "Matériaux", icon: Package },
+      { to: `${config.path}/materiel`, label: "Matériel", icon: Wrench },
+      { to: `${config.path}/marge`, label: "Marge & Bénéfice", icon: Scale },
+    ] : []),
     // Analyses + Retour : spécifiques à MAXI LOGISTIQUE — rentabilité
     // locative (CA par article, taux d'utilisation, pertes) et validation
     // des retours de matériel (bon état / cassé / perdu).

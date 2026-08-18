@@ -45,3 +45,7 @@ export const TYPES_MOUVEMENT_MAGASIN = {
   achat: { label: "Achat", signe: 1 },
   sortie: { label: "Sortie / consommation", signe: -1 },
 };
+
+// Matériel E-BRIQUETERIE — équipement de l'exploitation pouvant sortir en
+// location (presse à briques, brouettes, bétonnière, véhicule de livraison…).
+export const CAT_MATERIEL_BRIQUETERIE = ["MACHINES DE PRODUCTION", "OUTILLAGE", "TRANSPORT", "AUTRES"];

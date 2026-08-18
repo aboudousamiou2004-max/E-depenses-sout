@@ -30,6 +30,9 @@ import Magasin from "./pages/business/Magasin";
 import Marge from "./pages/business/Marge";
 import LogistiqueDashboard from "./pages/business/LogistiqueDashboard";
 import Retour from "./pages/business/Retour";
+import ProductionBriques from "./pages/business/ProductionBriques";
+import Materiaux from "./pages/business/Materiaux";
+import MaterielBriqueterie from "./pages/business/MaterielBriqueterie";
 import DossiersFonciers from "./pages/business/DossiersFonciers";
 import EnfantsPaiements from "./pages/business/EnfantsPaiements";
 
@@ -124,6 +127,9 @@ export default function App() {
           <Route path="marge" element={<Marge />} />
           <Route path="analyses" element={<LogistiqueDashboard />} />
           <Route path="retour" element={<Retour />} />
+          <Route path="production" element={<ProductionBriques />} />
+          <Route path="materiaux" element={<Materiaux />} />
+          <Route path="materiel" element={<MaterielBriqueterie />} />
           <Route path="dossiers" element={<DossiersFonciers />} />
           <Route path="enfants" element={<EnfantsPaiements />} />
         </Route>

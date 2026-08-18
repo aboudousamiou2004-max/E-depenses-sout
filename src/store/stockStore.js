@@ -63,6 +63,12 @@ export const useStockStore = create((set, get) => ({
   referentielAliments: [],
   mouvementsAliments: [],
   soldeAliments: {},
+
+  // Matériel E-BRIQUETERIE — équipement propre à l'exploitation, pouvant
+  // sortir en location (référentiel + mouvements achat/sortie).
+  referentielMaterielBriqueterie: [],
+  mouvementsMaterielBriqueterie: [],
+  soldeMaterielBriqueterie: {},
   animauxIndividuels: [],
 
   prixSacCiment: 0,
@@ -121,6 +127,7 @@ export const useStockStore = create((set, get) => ({
       prixSacCiment: 0, maladesAnimaux: [], animauxIndividuels: [],
       referentielMaterielAgro: [], mouvementsMaterielAgro: [], soldeMaterielAgro: {},
       referentielAliments: [], mouvementsAliments: [], soldeAliments: {},
+      referentielMaterielBriqueterie: [], mouvementsMaterielBriqueterie: [], soldeMaterielBriqueterie: {},
     }),
 
   stockArticle: (articleId) => get().soldeMateriel[articleId] || 0,
@@ -128,6 +135,7 @@ export const useStockStore = create((set, get) => ({
   effectifEspece: (especeId) => get().soldeAnimaux[especeId] || 0,
   stockArticleAgro: (articleId) => get().soldeMaterielAgro[articleId] || 0,
   stockAliment: (articleId) => get().soldeAliments[articleId] || 0,
+  stockArticleBriqueterie: (articleId) => get().soldeMaterielBriqueterie[articleId] || 0,
 
   chargerStockMateriel: async () => {
     const [ref, mvt, solde] = await Promise.all([
@@ -433,6 +441,58 @@ export const useStockStore = create((set, get) => ({
     const { error } = await supabase.from("agro_animaux_individuels").update({ valeur_marchande: v }).eq("id", id);
     if (error) return { ok: false, error: error.message };
     set((s) => ({ animauxIndividuels: s.animauxIndividuels.map((a) => (a.id === id ? { ...a, valeurMarchande: v } : a)) }));
+    return { ok: true };
+  },
+
+  // ─────────── Matériel E-BRIQUETERIE (équipement en location) ───────────
+  chargerMaterielBriqueterie: async () => {
+    const [ref, mvt, solde] = await Promise.all([
+      supabase.from("briqueterie_materiel").select("*"),
+      supabase.from("briqueterie_mouvements_materiel").select("*").order("created_at", { ascending: false }),
+      supabase.from("v_briqueterie_materiel").select("*"),
+    ]);
+    set({
+      referentielMaterielBriqueterie: (ref.data || []).map(mapArticle),
+      mouvementsMaterielBriqueterie: (mvt.data || []).map(mapMouvementMateriel),
+      soldeMaterielBriqueterie: Object.fromEntries((solde.data || []).map((r) => [r.article_id, Number(r.solde)])),
+    });
+  },
+
+  ajouterMaterielBriqueterie: async (payload) => {
+    const { data, error } = await supabase
+      .from("briqueterie_materiel")
+      .insert({
+        id: nextId("mat"), nom: payload.nom, cat: payload.cat, unite: payload.unite || "unités",
+        cout_achat: Number(payload.coutAchat) || 0, tarif_location: Number(payload.tarifLocation) || 0,
+        init_quantite: Math.max(0, parseInt(payload.initQuantite) || 0),
+      })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerMaterielBriqueterie();
+    return { ok: true, article: mapArticle(data) };
+  },
+
+  addMouvementMaterielBriqueterie: async (payload, user) => {
+    const { error } = await supabase.from("briqueterie_mouvements_materiel").insert({
+      date: payload.date, article_id: payload.articleId, type: payload.type,
+      quantite: Math.abs(Number(payload.quantite)), motif: payload.motif || "",
+      agent_id: user?.uid || null, agent_nom: user?.nom || "Agent",
+    });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerMaterielBriqueterie();
+    return { ok: true };
+  },
+
+  ajouterMatiere: async (payload) => {
+    const { data, error } = await supabase
+      .from("referentiel_matieres")
+      .insert({ id: nextId("mp"), nom: payload.nom, unite: payload.unite || "kg", init_quantite: Math.max(0, parseInt(payload.initQuantite) || 0) })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerStockMatieres();
+    set((s) => ({ referentielMatieres: [...s.referentielMatieres, mapMatiere(data)] }));
     return { ok: true };
   },
 }));

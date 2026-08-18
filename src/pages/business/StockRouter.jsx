@@ -2,13 +2,14 @@ import { useOutletContext } from "react-router-dom";
 import { PackageX } from "lucide-react";
 import GlassCard from "../../components/ui/GlassCard";
 import StockMateriel from "./StockMateriel";
-import StockBriques from "./StockBriques";
 import AgroDashboard from "./AgroDashboard";
 
 // Le « Cheptel » de MAXI AGRO est un volet de LECTURE (indicateurs +
 // graphiques, cf. AgroDashboard) — la saisie du cheptel se fait exclusivement
 // depuis Saisie journalière (report EF Initial, entrées/sorties du jour).
-const STOCK_PAGE = { materiel: StockMateriel, briques: StockBriques, animaux: AgroDashboard };
+// E-BRIQUETERIE n'a plus de volet « Stock » générique : Production,
+// Matériaux et Matériel sont des pages dédiées (voir BusinessLayout.jsx).
+const STOCK_PAGE = { materiel: StockMateriel, animaux: AgroDashboard };
 
 // Choisit la bonne page de stock selon `config.stock` — la route "stock" est
 // désormais générique (un seul chemin pour tous les modules métiers), donc ce
