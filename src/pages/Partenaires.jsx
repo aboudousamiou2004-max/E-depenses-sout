@@ -97,6 +97,8 @@ export default function Partenaires() {
         open={!!modal}
         onClose={() => setModal(null)}
         title={modal?.id ? "Modifier le partenaire" : "Nouveau partenaire"}
+        icon={Handshake}
+        accent="#7c3aed"
         footer={<><Button variant="ghost" onClick={() => setModal(null)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}
       >
         {modal && (

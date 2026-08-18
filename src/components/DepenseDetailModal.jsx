@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2, Save, Paperclip, Eye } from "lucide-react";
+import { Pencil, Trash2, Save, Paperclip, Eye, Receipt } from "lucide-react";
 import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
@@ -105,6 +105,9 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
       open={!!depense}
       onClose={onClose}
       title={mode === "edition" ? "Modifier la dépense" : "Détail de la dépense"}
+      icon={Receipt}
+      accent={secteur?.color || "#FF453A"}
+      moduleLabel={secteur?.nom}
       footer={
         peutModifier &&
         (mode === "edition" ? (

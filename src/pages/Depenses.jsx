@@ -220,6 +220,8 @@ export default function Depenses() {
         open={open}
         onClose={() => setOpen(false)}
         title="Enregistrer une dépense"
+        icon={Receipt}
+        accent="#FF453A"
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
@@ -326,6 +328,8 @@ export default function Depenses() {
         open={!!lot}
         onClose={() => setLot(null)}
         title="Ajouter plusieurs dépenses d'un coup"
+        icon={Receipt}
+        accent="#FF453A"
         footer={lot && (() => {
           const completes = lot.filter((r) => r.secteurId && r.categorie && Number(r.montant) > 0 && r.date);
           const totalLot = completes.reduce((s, r) => s + Number(r.montant), 0);

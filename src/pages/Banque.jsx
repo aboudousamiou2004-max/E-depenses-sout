@@ -172,6 +172,8 @@ export default function Banque() {
         open={!!modal}
         onClose={() => setModal(null)}
         title={modal?.id ? "Modifier le mouvement" : "Ajouter un mouvement bancaire"}
+        icon={Landmark}
+        accent="#0A84FF"
         footer={<><Button variant="ghost" onClick={() => setModal(null)}>Annuler</Button><Button onClick={submit} disabled={saving}>{saving ? "Enregistrement…" : "Enregistrer"}</Button></>}
       >
         {modal && (
@@ -214,6 +216,8 @@ export default function Banque() {
         open={!!modalOuverture}
         onClose={() => setModalOuverture(null)}
         title="Solde d'ouverture du compte"
+        icon={Landmark}
+        accent="#0A84FF"
         footer={<><Button variant="ghost" onClick={() => setModalOuverture(null)}>Annuler</Button><Button onClick={submitOuverture} disabled={saving}>Enregistrer</Button></>}
       >
         {modalOuverture && (

@@ -362,6 +362,8 @@ export default function Recettes() {
         open={open}
         onClose={() => setOpen(false)}
         title="Enregistrer une recette"
+        icon={Wallet}
+        accent="#30D158"
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>
@@ -401,6 +403,9 @@ export default function Recettes() {
         open={!!revision}
         onClose={() => setRevision(null)}
         title={revision ? `${revision.alloue > 0 ? "Réviser" : "Allouer"} le budget — ${revision.secteur.nom}` : "Budget"}
+        icon={Wallet}
+        accent={revision?.secteur?.color || "#30D158"}
+        moduleLabel={revision?.secteur?.nom}
       >
         {revision && (() => {
           const estAllocation = revision.alloue === 0;

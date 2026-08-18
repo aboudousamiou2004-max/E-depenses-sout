@@ -141,6 +141,8 @@ function SectionSecteurs({ secteurs, addSecteur, modifierSecteur, supprimerSecte
         open={open}
         onClose={() => setOpen(false)}
         title="Ajouter un secteur"
+        icon={Settings}
+        accent="#8E8E93"
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>

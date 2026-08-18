@@ -171,6 +171,8 @@ export default function Utilisateurs() {
         open={open}
         onClose={() => setOpen(false)}
         title="Ajouter un utilisateur"
+        icon={UserPlus}
+        accent="#0A84FF"
         footer={
           <>
             <Button variant="ghost" onClick={() => setOpen(false)}>Annuler</Button>

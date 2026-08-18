@@ -232,6 +232,8 @@ export default function Dashboard() {
         open={ouvrirAjoutSecteur}
         onClose={() => setOuvrirAjoutSecteur(false)}
         title="Ajouter un secteur d'activité"
+        icon={LayoutGrid}
+        accent="#0A84FF"
         footer={
           <>
             <Button variant="ghost" onClick={() => setOuvrirAjoutSecteur(false)}>Annuler</Button>
