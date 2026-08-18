@@ -36,6 +36,7 @@ import MaterielBriqueterie from "./pages/business/MaterielBriqueterie";
 import DossiersFonciers from "./pages/business/DossiersFonciers";
 import Projets from "./pages/business/Projets";
 import Taches from "./pages/business/Taches";
+import Besoins from "./pages/business/Besoins";
 import Enfants from "./pages/business/Enfants";
 import Paiements from "./pages/business/Paiements";
 import CantineRepas from "./pages/business/CantineRepas";
@@ -126,6 +127,7 @@ export default function App() {
           <Route index element={<BusinessDashboard />} />
           <Route path="facturation" element={<BusinessFacturation />} />
           <Route path="depenses" element={<BusinessDepenses />} />
+          <Route path="besoins" element={<Besoins />} />
           <Route path="stock" element={<StockRouter />} />
           <Route path="saisie" element={<SaisieJournaliere />} />
           <Route path="sante" element={<SanteAnimale />} />

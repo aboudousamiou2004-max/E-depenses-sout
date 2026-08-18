@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -18,9 +18,15 @@ export default function BusinessLayout({ config }) {
   const NAV = [
     { to: config.path, label: "Tableau de bord", icon: LayoutGrid, end: true },
     // Prestations : sans objet pour E-GARDERIE (pas de prestation générique
-    // — l'inscription et le frais qui l'accompagne se font depuis Enfants).
-    ...(config.id !== "garderie" ? [{ to: `${config.path}/facturation`, label: "Prestations", icon: FileText }] : []),
+    // — l'inscription et le frais qui l'accompagne se font depuis Enfants) ni
+    // pour E-G.PRO (la facturation client se fait désormais depuis Projets —
+    // contrat + versements — à la demande de l'utilisateur, 2026-08-18).
+    ...(!["garderie", "egpro"].includes(config.id) ? [{ to: `${config.path}/facturation`, label: "Prestations", icon: FileText }] : []),
     { to: `${config.path}/depenses`, label: "Dépenses", icon: Receipt },
+    // Besoins : disponible dans TOUS les modules métier — demandes reçues par
+    // les directeurs et l'administration, à la demande de l'utilisateur
+    // (2026-08-18). Un besoin validé crée une dépense réelle.
+    { to: `${config.path}/besoins`, label: "Besoins", icon: PackagePlus },
     ...(stockNav ? [{ to: `${config.path}/stock`, label: stockNav.label, icon: stockNav.icon }] : []),
     // Saisie journalière + Santé animale : spécifiques au cheptel MAXI AGRO —
     // cf. termitiere-platform/src/modules/agro/{Saisie,Sante}.jsx.
