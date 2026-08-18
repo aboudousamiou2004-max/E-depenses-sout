@@ -8,6 +8,7 @@ import Modal from "../../components/ui/Modal";
 import Field, { TextInput } from "../../components/ui/Field";
 import Badge from "../../components/ui/Badge";
 import { useStockStore } from "../../store/stockStore";
+import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 
 const RETOUR_TONE = { retour_ok: "mint", retour_casse: "coral", retour_perdu: "amber" };
@@ -29,9 +30,10 @@ export default function Retour() {
   const config = useOutletContext();
   const { user } = useAuthStore();
   const { referentielMateriel, mouvementsMateriel, addMouvementMateriel } = useStockStore();
+  const { addRecette } = useDataStore();
 
   const [modal, setModal] = useState(null); // { article, enAttente }
-  const [form, setForm] = useState({ ok: "", casse: "", perdu: "", motif: "", date: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({ ok: "", casse: "", perdu: "", dedommagement: "", motif: "", date: new Date().toISOString().slice(0, 10) });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,7 +53,7 @@ export default function Retour() {
 
   function ouvrir(article) {
     setModal(article);
-    setForm({ ok: "", casse: "", perdu: "", motif: "", date: new Date().toISOString().slice(0, 10) });
+    setForm({ ok: "", casse: "", perdu: "", dedommagement: "", motif: "", date: new Date().toISOString().slice(0, 10) });
     setError("");
   }
 
@@ -72,6 +74,17 @@ export default function Retour() {
       if (!res.ok) {
         setSaving(false);
         return setError(res.error);
+      }
+    }
+    const dedommagement = Number(form.dedommagement) || 0;
+    if (dedommagement > 0) {
+      const resDedo = await addRecette({
+        secteurId: config.secteurId, montant: dedommagement, date: form.date,
+        origine: `Dédommagement — ${modal.nom} (casse/perte)`, description: form.motif,
+      }, user);
+      if (!resDedo.ok) {
+        setSaving(false);
+        return setError(resDedo.error);
       }
     }
     setSaving(false);
@@ -184,11 +197,16 @@ export default function Retour() {
               </p>
             )}
             {(Number(form.casse) > 0 || Number(form.perdu) > 0) && (
-              <p className="flex items-center gap-1.5 text-[12px] text-[#93400a] bg-[#FF9F0A1a] rounded-xl px-3 py-2 mt-2">
-                <AlertTriangle size={13} /> La casse/perte est comptée comme une perte de capital (visible dans Analyses).
-              </p>
+              <>
+                <p className="flex items-center gap-1.5 text-[12px] text-[#93400a] bg-[#FF9F0A1a] rounded-xl px-3 py-2 mt-2 mb-3">
+                  <AlertTriangle size={13} /> La casse/perte est comptée comme une perte de capital (visible dans Analyses).
+                </p>
+                <Field label="Dédommagement (FCFA)" hint="Somme facturée au client pour compenser les dégâts — enregistrée comme recette du secteur">
+                  <TextInput type="number" min="0" value={form.dedommagement} onChange={(e) => setForm({ ...form, dedommagement: e.target.value })} placeholder="0" />
+                </Field>
+              </>
             )}
-            <Field label="Motif (optionnel)">
+            <Field label="Description (optionnel)">
               <TextInput value={form.motif} onChange={(e) => setForm({ ...form, motif: e.target.value })} placeholder="Ex : retour chantier client X" />
             </Field>
             <Field label="Date">
