@@ -35,3 +35,13 @@ export const TYPES_MOUVEMENT_ANIMAL = {
   deces: { label: "Décès", signe: -1 },
   perte: { label: "Perte / vol", signe: -1 },
 };
+
+// Magasin MAXI AGRO — matériel/machines (parc propre à l'exploitation,
+// distinct du parc locatif de MAXI LOGISTIQUE) et aliments/silo (repris des
+// catégories ALIMENTS/DIVERS de termitiere-platform/src/modules/agro/data.js).
+export const CAT_MATERIEL_AGRO = ["MACHINES & MOTEURS", "OUTILLAGE", "ABRIS & CLÔTURES", "TRANSPORT", "AUTRES"];
+export const CAT_ALIMENTS = ["ALIMENTS", "DIVERS"];
+export const TYPES_MOUVEMENT_MAGASIN = {
+  achat: { label: "Achat", signe: 1 },
+  sortie: { label: "Sortie / consommation", signe: -1 },
+};

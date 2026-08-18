@@ -3,11 +3,13 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler,
 } from "chart.js";
 import { Line, Doughnut, Bar } from "react-chartjs-2";
-import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack } from "lucide-react";
+import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack, Tag, Plus } from "lucide-react";
 import GlassCard from "../../components/ui/GlassCard";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
-import { useStockStore } from "../../store/stockStore";
+import Badge from "../../components/ui/Badge";
+import Field, { TextInput, Select } from "../../components/ui/Field";
+import { useStockStore, CAT_ANIMAUX_IDENTIFIES } from "../../store/stockStore";
 import { useDataStore } from "../../store/dataStore";
 import { CAT_ANIMAUX } from "../../data/stockData";
 
@@ -76,7 +78,7 @@ function previsionSerie(values, horizon = 7) {
 //    n'est calculable que pour le périmètre « Toutes » (affiché « — » sur
 //    une catégorie précise, avec une note).
 export default function AgroDashboard() {
-  const { referentielAnimaux: especes, mouvementsAnimaux, maladesAnimaux, soldeAnimaux } = useStockStore();
+  const { referentielAnimaux: especes, mouvementsAnimaux, maladesAnimaux, soldeAnimaux, animauxIndividuels } = useStockStore();
   const { recettes } = useDataStore();
 
   const [preset, setPreset] = useState("mois");
@@ -456,6 +458,9 @@ export default function AgroDashboard() {
                 <DetailTable rows={especeDetailMalades} cols={["Date", "Malades"]} render={(m) => [fmtDateShort(m.date), m.quantite]} empty="" />
               </div>
             )}
+            {CAT_ANIMAUX_IDENTIFIES.includes(especeDetail.cat) && (
+              <RegistreIndividuel especeId={especeDetail.id} animaux={animauxIndividuels.filter((a) => a.especeId === especeDetail.id)} />
+            )}
           </div>
         )}
       </Modal>
@@ -546,6 +551,116 @@ function MiniStat({ label, value, color }) {
     <div className="rounded-2xl bg-black/[0.03] p-2.5">
       <p className="text-[10px] font-semibold uppercase tracking-wide text-ink-soft/70">{label}</p>
       <p className="text-[15px] font-extrabold" style={{ color }}>{value}</p>
+    </div>
+  );
+}
+
+// Registre individuel — un identifiant (boucle/tag) par animal, pour
+// bovins/ovins/caprins uniquement (cf. CAT_ANIMAUX_IDENTIFIES). Permet de
+// désigner précisément quel animal sort (vente/décès/perte, via Saisie
+// journalière) ou reçoit un vaccin (via Santé animale), plutôt qu'un simple
+// décompte agrégé par espèce.
+function RegistreIndividuel({ especeId, animaux }) {
+  const { ajouterAnimalIndividuel, sortirAnimalIndividuel } = useStockStore();
+  const [openAjout, setOpenAjout] = useState(false);
+  const [form, setForm] = useState({ identifiant: "", sexe: "", dateEntree: todayStr() });
+  const [sortieId, setSortieId] = useState(null);
+  const [sortieForm, setSortieForm] = useState({ statut: "vendu", date: todayStr(), motif: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  const actifs = [...animaux].filter((a) => a.statut === "actif").sort((a, b) => a.identifiant.localeCompare(b.identifiant));
+  const sortis = [...animaux].filter((a) => a.statut !== "actif").sort((a, b) => (a.dateSortie < b.dateSortie ? 1 : -1));
+  const statutLabel = { vendu: "Vendu", mort: "Mort", perdu: "Perdu" };
+  const statutTone = { vendu: "mint", mort: "coral", perdu: "amber" };
+
+  async function ajouter() {
+    if (!form.identifiant.trim()) return;
+    setSaving(true);
+    setError("");
+    const res = await ajouterAnimalIndividuel({ especeId, ...form });
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
+    setForm({ identifiant: "", sexe: "", dateEntree: todayStr() });
+    setOpenAjout(false);
+  }
+
+  async function confirmerSortie() {
+    setSaving(true);
+    await sortirAnimalIndividuel(sortieId, sortieForm.statut, sortieForm.date, sortieForm.motif);
+    setSaving(false);
+    setSortieId(null);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-[11px] font-bold uppercase text-ink-soft/70">Registre individuel — {actifs.length} actif(s)</p>
+        <button onClick={() => setOpenAjout((v) => !v)} className="flex items-center gap-1 text-[11px] font-semibold text-[#0A84FF]"><Plus size={12} /> Ajouter un identifiant</button>
+      </div>
+
+      {openAjout && (
+        <div className="rounded-2xl bg-black/[0.03] p-2.5 mb-2 space-y-2">
+          {error && <p className="text-[11px] text-[#b3241b]">{error}</p>}
+          <div className="grid grid-cols-3 gap-2">
+            <TextInput value={form.identifiant} onChange={(e) => setForm({ ...form, identifiant: e.target.value })} placeholder="Ex : B-014" autoFocus />
+            <Select value={form.sexe} onChange={(e) => setForm({ ...form, sexe: e.target.value })}>
+              <option value="">Sexe ?</option>
+              <option value="male">Mâle</option>
+              <option value="femelle">Femelle</option>
+            </Select>
+            <TextInput type="date" value={form.dateEntree} onChange={(e) => setForm({ ...form, dateEntree: e.target.value })} />
+          </div>
+          <Button size="sm" onClick={ajouter} disabled={saving}>{saving ? "…" : "Enregistrer"}</Button>
+        </div>
+      )}
+
+      {actifs.length === 0 && !openAjout && <p className="text-[12.5px] text-ink-soft/60 italic mb-2">Aucun animal identifié.</p>}
+
+      <div className="flex flex-wrap gap-1.5 mb-2">
+        {actifs.map((a) => (
+          <div key={a.id} className="flex items-center gap-1 rounded-full bg-black/[0.04] pl-2.5 pr-1 py-1 text-[11.5px]">
+            <Tag size={10} className="text-ink-soft/60" />
+            <span className="font-semibold text-ink">{a.identifiant}</span>
+            {a.sexe && <span className="text-ink-soft/60">{a.sexe === "male" ? "♂" : "♀"}</span>}
+            <button onClick={() => { setSortieId(a.id); setSortieForm({ statut: "vendu", date: todayStr(), motif: "" }); }} className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-[#b3241b] hover:bg-[#FF453A]/10">Sortir</button>
+          </div>
+        ))}
+      </div>
+
+      {sortieId && (
+        <div className="rounded-2xl bg-[#FF453A]/5 p-2.5 mb-2 space-y-2">
+          <p className="text-[11px] font-semibold text-ink">Sortie de {actifs.find((a) => a.id === sortieId)?.identifiant}</p>
+          <div className="grid grid-cols-3 gap-2">
+            <Select value={sortieForm.statut} onChange={(e) => setSortieForm({ ...sortieForm, statut: e.target.value })}>
+              <option value="vendu">Vendu</option>
+              <option value="mort">Mort</option>
+              <option value="perdu">Perdu</option>
+            </Select>
+            <TextInput type="date" value={sortieForm.date} onChange={(e) => setSortieForm({ ...sortieForm, date: e.target.value })} />
+            <TextInput value={sortieForm.motif} onChange={(e) => setSortieForm({ ...sortieForm, motif: e.target.value })} placeholder="Motif" />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={confirmerSortie} disabled={saving}>{saving ? "…" : "Confirmer"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setSortieId(null)}>Annuler</Button>
+          </div>
+        </div>
+      )}
+
+      {sortis.length > 0 && (
+        <details className="rounded-2xl bg-black/[0.02] p-2">
+          <summary className="cursor-pointer text-[10.5px] font-bold uppercase text-ink-soft/60">Historique des sorties ({sortis.length})</summary>
+          <div className="mt-1.5 space-y-1">
+            {sortis.map((a) => (
+              <div key={a.id} className="flex items-center gap-2 text-[11.5px]">
+                <span className="font-semibold text-ink">{a.identifiant}</span>
+                <Badge tone={statutTone[a.statut]}>{statutLabel[a.statut]}</Badge>
+                <span className="text-ink-soft/60">{a.dateSortie ? fmtDateShort(a.dateSortie) : ""}{a.motifSortie ? ` — ${a.motifSortie}` : ""}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

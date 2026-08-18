@@ -10,7 +10,7 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useSanteStore } from "../../store/santeStore";
-import { useStockStore } from "../../store/stockStore";
+import { useStockStore, CAT_ANIMAUX_IDENTIFIES } from "../../store/stockStore";
 import { useAuthStore } from "../../store/authStore";
 
 const TYPES = [
@@ -36,7 +36,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function SanteAnimale() {
   const config = useOutletContext();
   const { fiches, vaccins, chargerSante } = useSanteStore();
-  const { referentielAnimaux } = useStockStore();
+  const { referentielAnimaux, animauxIndividuels } = useStockStore();
   const { user } = useAuthStore();
   const [tab, setTab] = useState("interventions");
 
@@ -60,7 +60,7 @@ export default function SanteAnimale() {
         ))}
       </div>
 
-      {tab === "interventions" && <Interventions fiches={fiches} vaccins={vaccins} especes={referentielAnimaux} user={user} />}
+      {tab === "interventions" && <Interventions fiches={fiches} vaccins={vaccins} especes={referentielAnimaux} animauxIndividuels={animauxIndividuels} user={user} />}
       {tab === "stock" && <StockVaccins vaccins={vaccins} />}
       {tab === "rdv" && <RendezVous fiches={fiches} />}
       {tab === "bilan" && <Bilan fiches={fiches} vaccins={vaccins} />}
@@ -69,7 +69,7 @@ export default function SanteAnimale() {
 }
 
 // ─────────── Interventions ───────────
-function Interventions({ fiches, vaccins, especes, user }) {
+function Interventions({ fiches, vaccins, especes, animauxIndividuels, user }) {
   const { ajouterIntervention, supprimerIntervention } = useSanteStore();
   const [filtreType, setFiltreType] = useState("");
   const [open, setOpen] = useState(false);
@@ -189,6 +189,19 @@ function Interventions({ fiches, vaccins, especes, user }) {
             <Field label="Numéros des animaux traités" hint="ex : B-001, B-014, B-027">
               <TextInput value={form.animauxIds} onChange={(e) => setForm((f) => ({ ...f, animauxIds: e.target.value }))} placeholder="B-001, B-014…" />
             </Field>
+            {CAT_ANIMAUX_IDENTIFIES.includes(especes.find((e) => e.id === form.especeId)?.cat) && (
+              <Field label="Piocher dans le registre individuel" hint="Ajoute l'identifiant choisi ci-dessus">
+                <Select value="" onChange={(e) => {
+                  if (!e.target.value) return;
+                  setForm((f) => ({ ...f, animauxIds: [f.animauxIds, e.target.value].filter(Boolean).map((s) => s.trim()).join(", ") }));
+                }}>
+                  <option value="">— Sélectionner un identifiant —</option>
+                  {animauxIndividuels.filter((a) => a.especeId === form.especeId && a.statut === "actif").map((a) => (
+                    <option key={a.id} value={a.identifiant}>{a.identifiant}</option>
+                  ))}
+                </Select>
+              </Field>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Produit du stock" hint="Décrémente le stock automatiquement">
                 <Select value={form.produitStockId} onChange={(e) => setForm((f) => ({ ...f, produitStockId: e.target.value }))}>

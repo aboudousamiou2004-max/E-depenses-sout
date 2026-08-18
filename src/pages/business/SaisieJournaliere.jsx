@@ -6,9 +6,12 @@ import GlassCard from "../../components/ui/GlassCard";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
-import { useStockStore } from "../../store/stockStore";
+import { useStockStore, CAT_ANIMAUX_IDENTIFIES } from "../../store/stockStore";
 import { useAuthStore } from "../../store/authStore";
 import { TYPES_MOUVEMENT_ANIMAL, CAT_ANIMAUX } from "../../data/stockData";
+
+// Sortie (vente/décès/perte) → statut correspondant dans le registre individuel.
+const STATUT_SORTIE = { vente: "vendu", deces: "mort", perte: "perdu" };
 
 const TYPES_ENTREE = Object.entries(TYPES_MOUVEMENT_ANIMAL).filter(([, t]) => t.signe > 0).map(([id]) => id);
 const TYPES_SORTIE = Object.entries(TYPES_MOUVEMENT_ANIMAL).filter(([, t]) => t.signe < 0).map(([id]) => id);
@@ -29,7 +32,11 @@ const TYPES_SORTIE = Object.entries(TYPES_MOUVEMENT_ANIMAL).filter(([, t]) => t.
 export default function SaisieJournaliere() {
   const config = useOutletContext();
   const { user } = useAuthStore();
-  const { referentielAnimaux, mouvementsAnimaux, maladesAnimaux, addMouvementAnimal, supprimerMouvementAnimal, ajouterEspece, enregistrerMalades } = useStockStore();
+  const {
+    referentielAnimaux, mouvementsAnimaux, maladesAnimaux, animauxIndividuels,
+    addMouvementAnimal, supprimerMouvementAnimal, ajouterEspece, enregistrerMalades,
+    ajouterAnimalIndividuel, sortirAnimalIndividuel,
+  } = useStockStore();
 
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [mvtModal, setMvtModal] = useState(null); // { espece, dir }
@@ -150,6 +157,9 @@ export default function SaisieJournaliere() {
         addMouvementAnimal={addMouvementAnimal}
         supprimerMouvementAnimal={supprimerMouvementAnimal}
         lignes={mvtModal ? mouvementsJour(mvtModal.espece.id).filter((m) => (mvtModal.dir === "entree" ? m.quantite > 0 : m.quantite < 0)) : []}
+        animauxIndividuels={mvtModal ? animauxIndividuels.filter((a) => a.especeId === mvtModal.espece.id) : []}
+        ajouterAnimalIndividuel={ajouterAnimalIndividuel}
+        sortirAnimalIndividuel={sortirAnimalIndividuel}
       />
 
       <Modal
@@ -174,24 +184,36 @@ export default function SaisieJournaliere() {
   );
 }
 
-function MouvementJourModal({ modal, onClose, date, user, addMouvementAnimal, supprimerMouvementAnimal, lignes }) {
+function MouvementJourModal({ modal, onClose, date, user, addMouvementAnimal, supprimerMouvementAnimal, lignes, animauxIndividuels, ajouterAnimalIndividuel, sortirAnimalIndividuel }) {
   const [type, setType] = useState("");
   const [quantite, setQuantite] = useState("");
   const [motif, setMotif] = useState("");
+  const [identifiant, setIdentifiant] = useState("");
+  const [individuId, setIndividuId] = useState("");
   const [saving, setSaving] = useState(false);
 
   if (!modal) return null;
   const { espece, dir } = modal;
   const types = dir === "entree" ? TYPES_ENTREE : TYPES_SORTIE;
   const typeActuel = type || types[0];
+  const identifie = CAT_ANIMAUX_IDENTIFIES.includes(espece.cat);
+  const actifs = (animauxIndividuels || []).filter((a) => a.statut === "actif");
 
   async function ajouter() {
     if (!quantite || Number(quantite) <= 0) return;
     setSaving(true);
     await addMouvementAnimal({ especeId: espece.id, type: typeActuel, quantite, motif, date }, user);
+    if (identifie && dir === "entree" && identifiant.trim()) {
+      await ajouterAnimalIndividuel({ especeId: espece.id, identifiant, dateEntree: date });
+    }
+    if (identifie && dir === "sortie" && individuId) {
+      await sortirAnimalIndividuel(individuId, STATUT_SORTIE[typeActuel] || "vendu", date, motif);
+    }
     setSaving(false);
     setQuantite("");
     setMotif("");
+    setIdentifiant("");
+    setIndividuId("");
   }
 
   return (
@@ -225,6 +247,21 @@ function MouvementJourModal({ modal, onClose, date, user, addMouvementAnimal, su
       <div className="mt-2">
         <TextInput value={motif} onChange={(e) => setMotif(e.target.value)} placeholder="Motif (optionnel)" />
       </div>
+      {identifie && dir === "entree" && (types.includes("achat") || types.includes("naissance")) && (
+        <div className="mt-2">
+          <label className="block text-[11px] font-semibold text-ink-soft mb-1">Identifiant de l'animal (optionnel) — l'inscrit au registre individuel</label>
+          <TextInput value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} placeholder="Ex : B-014" />
+        </div>
+      )}
+      {identifie && dir === "sortie" && (
+        <div className="mt-2">
+          <label className="block text-[11px] font-semibold text-ink-soft mb-1">Animal concerné (optionnel) — le marque « {STATUT_SORTIE[typeActuel] || "sorti"} » dans le registre</label>
+          <Select value={individuId} onChange={(e) => setIndividuId(e.target.value)}>
+            <option value="">— Non précisé —</option>
+            {actifs.map((a) => <option key={a.id} value={a.id}>{a.identifiant}</option>)}
+          </Select>
+        </div>
+      )}
     </Modal>
   );
 }

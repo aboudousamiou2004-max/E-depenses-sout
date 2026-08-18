@@ -26,6 +26,15 @@ const mapJournalBrique = (r) => ({
 });
 const mapEspece = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, initQuantite: Number(r.init_quantite) || 0 });
 const mapMouvementAnimal = (r) => ({ id: r.id, date: r.date, especeId: r.espece_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
+const mapArticleAgro = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, unite: r.unite, initQuantite: Number(r.init_quantite) || 0 });
+const mapMouvementArticleAgro = (r) => ({ id: r.id, date: r.date, articleId: r.article_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
+const mapAnimalIndividuel = (r) => ({
+  id: r.id, especeId: r.espece_id, identifiant: r.identifiant, sexe: r.sexe,
+  dateEntree: r.date_entree, statut: r.statut, dateSortie: r.date_sortie, motifSortie: r.motif_sortie, notes: r.notes,
+});
+// Catégories dont les animaux sont identifiés individuellement (boucle/tag) —
+// jamais la volaille, qui se gère par décompte agrégé en usage réel.
+export const CAT_ANIMAUX_IDENTIFIES = ["BOVINS", "OVINS", "CAPRINS"];
 
 export const useStockStore = create((set, get) => ({
   referentielMateriel: [],
@@ -45,10 +54,20 @@ export const useStockStore = create((set, get) => ({
   soldeAnimaux: {},
   maladesAnimaux: [], // [{ especeId, date, quantite }] — un par (espèce, jour)
 
+  // Magasin MAXI AGRO — matériel/machines + aliments (silo), et registre
+  // individuel des animaux identifiés (bovins/ovins/caprins).
+  referentielMaterielAgro: [],
+  mouvementsMaterielAgro: [],
+  soldeMaterielAgro: {},
+  referentielAliments: [],
+  mouvementsAliments: [],
+  soldeAliments: {},
+  animauxIndividuels: [],
+
   prixSacCiment: 0,
 
   chargerTout: async () => {
-    const [refMat, mvtMat, soldeMat, refMatieres, mvtMatieres, soldeMatieres, typesBriques, soldeBriques, journalBriques, refAnimaux, mvtAnimaux, soldeAnimaux, briqueterieConfig, maladesAnimaux] =
+    const [refMat, mvtMat, soldeMat, refMatieres, mvtMatieres, soldeMatieres, typesBriques, soldeBriques, journalBriques, refAnimaux, mvtAnimaux, soldeAnimaux, briqueterieConfig, maladesAnimaux, animauxIndividuels] =
       await Promise.all([
         supabase.from("referentiel_materiel").select("*"),
         supabase.from("mouvements_materiel").select("*").order("created_at", { ascending: false }),
@@ -64,6 +83,7 @@ export const useStockStore = create((set, get) => ({
         supabase.from("v_effectif_animaux").select("*"),
         supabase.from("briqueterie_config").select("*").eq("id", "defaut").maybeSingle(),
         supabase.from("agro_malades").select("*"),
+        supabase.from("agro_animaux_individuels").select("*"),
       ]);
 
     const stockBriques = {};
@@ -87,6 +107,7 @@ export const useStockStore = create((set, get) => ({
       soldeAnimaux: Object.fromEntries((soldeAnimaux.data || []).map((r) => [r.espece_id, Number(r.effectif)])),
       prixSacCiment: Number(briqueterieConfig.data?.prix_sac_ciment) || 0,
       maladesAnimaux: (maladesAnimaux.data || []).map((r) => ({ especeId: r.espece_id, date: r.date, quantite: Number(r.quantite) || 0 })),
+      animauxIndividuels: (animauxIndividuels.data || []).map(mapAnimalIndividuel),
     });
   },
 
@@ -96,12 +117,16 @@ export const useStockStore = create((set, get) => ({
       referentielMatieres: [], mouvementsMatieres: [], soldeMatieres: {},
       typesBriques: [], stockBriques: {}, journalBriques: [],
       referentielAnimaux: [], mouvementsAnimaux: [], soldeAnimaux: {},
-      prixSacCiment: 0, maladesAnimaux: [],
+      prixSacCiment: 0, maladesAnimaux: [], animauxIndividuels: [],
+      referentielMaterielAgro: [], mouvementsMaterielAgro: [], soldeMaterielAgro: {},
+      referentielAliments: [], mouvementsAliments: [], soldeAliments: {},
     }),
 
   stockArticle: (articleId) => get().soldeMateriel[articleId] || 0,
   stockMatiere: (matiereId) => get().soldeMatieres[matiereId] || 0,
   effectifEspece: (especeId) => get().soldeAnimaux[especeId] || 0,
+  stockArticleAgro: (articleId) => get().soldeMaterielAgro[articleId] || 0,
+  stockAliment: (articleId) => get().soldeAliments[articleId] || 0,
 
   chargerStockMateriel: async () => {
     const [ref, mvt, solde] = await Promise.all([
@@ -304,6 +329,101 @@ export const useStockStore = create((set, get) => ({
       if (idx >= 0) next[idx] = entry; else next.push(entry);
       return { maladesAnimaux: next };
     });
+    return { ok: true };
+  },
+
+  // ─────────── Magasin MAXI AGRO : matériel/machines ───────────
+  chargerMagasinAgro: async () => {
+    const [refMat, mvtMat, soldeMat, refAlim, mvtAlim, soldeAlim] = await Promise.all([
+      supabase.from("agro_materiel").select("*"),
+      supabase.from("agro_mouvements_materiel").select("*").order("created_at", { ascending: false }),
+      supabase.from("v_agro_materiel").select("*"),
+      supabase.from("agro_aliments").select("*"),
+      supabase.from("agro_mouvements_aliments").select("*").order("created_at", { ascending: false }),
+      supabase.from("v_agro_aliments").select("*"),
+    ]);
+    set({
+      referentielMaterielAgro: (refMat.data || []).map(mapArticleAgro),
+      mouvementsMaterielAgro: (mvtMat.data || []).map(mapMouvementArticleAgro),
+      soldeMaterielAgro: Object.fromEntries((soldeMat.data || []).map((r) => [r.article_id, Number(r.solde)])),
+      referentielAliments: (refAlim.data || []).map(mapArticleAgro),
+      mouvementsAliments: (mvtAlim.data || []).map(mapMouvementArticleAgro),
+      soldeAliments: Object.fromEntries((soldeAlim.data || []).map((r) => [r.article_id, Number(r.solde)])),
+    });
+  },
+
+  ajouterMaterielAgro: async (payload) => {
+    const { data, error } = await supabase
+      .from("agro_materiel")
+      .insert({ id: nextId("mat"), nom: payload.nom, cat: payload.cat, unite: payload.unite || "unités", init_quantite: Math.max(0, parseInt(payload.initQuantite) || 0) })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerMagasinAgro();
+    return { ok: true, article: mapArticleAgro(data) };
+  },
+
+  addMouvementMaterielAgro: async (payload, user) => {
+    const { error } = await supabase.from("agro_mouvements_materiel").insert({
+      date: payload.date, article_id: payload.articleId, type: payload.type,
+      quantite: Math.abs(Number(payload.quantite)), motif: payload.motif || "",
+      agent_id: user?.uid || null, agent_nom: user?.nom || "Agent",
+    });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerMagasinAgro();
+    return { ok: true };
+  },
+
+  ajouterAliment: async (payload) => {
+    const { data, error } = await supabase
+      .from("agro_aliments")
+      .insert({ id: nextId("alim"), nom: payload.nom, cat: payload.cat, unite: payload.unite || "kg", init_quantite: Math.max(0, parseInt(payload.initQuantite) || 0) })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerMagasinAgro();
+    return { ok: true, article: mapArticleAgro(data) };
+  },
+
+  addMouvementAliment: async (payload, user) => {
+    const { error } = await supabase.from("agro_mouvements_aliments").insert({
+      date: payload.date, article_id: payload.articleId, type: payload.type,
+      quantite: Math.abs(Number(payload.quantite)), motif: payload.motif || "",
+      agent_id: user?.uid || null, agent_nom: user?.nom || "Agent",
+    });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerMagasinAgro();
+    return { ok: true };
+  },
+
+  // ─────────── Registre individuel (bovins/ovins/caprins) ───────────
+  chargerAnimauxIndividuels: async () => {
+    const { data } = await supabase.from("agro_animaux_individuels").select("*");
+    set({ animauxIndividuels: (data || []).map(mapAnimalIndividuel) });
+  },
+
+  ajouterAnimalIndividuel: async (payload) => {
+    const { data, error } = await supabase
+      .from("agro_animaux_individuels")
+      .insert({
+        espece_id: payload.especeId, identifiant: payload.identifiant.trim(),
+        sexe: payload.sexe || null, date_entree: payload.dateEntree || new Date().toISOString().slice(0, 10),
+        notes: payload.notes || "",
+      })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message.includes("duplicate") ? "Cet identifiant existe déjà pour cette espèce" : error.message };
+    set((s) => ({ animauxIndividuels: [...s.animauxIndividuels, mapAnimalIndividuel(data)] }));
+    return { ok: true, animal: mapAnimalIndividuel(data) };
+  },
+
+  // statut : 'vendu' | 'mort' | 'perdu'
+  sortirAnimalIndividuel: async (id, statut, date, motif) => {
+    const { error } = await supabase.from("agro_animaux_individuels")
+      .update({ statut, date_sortie: date, motif_sortie: motif || "" })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    set((s) => ({ animauxIndividuels: s.animauxIndividuels.map((a) => (a.id === id ? { ...a, statut, dateSortie: date, motifSortie: motif || "" } : a)) }));
     return { ok: true };
   },
 }));
