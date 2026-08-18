@@ -9,6 +9,8 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import InscriptionEnfantModal from "../../components/InscriptionEnfantModal";
 import { useGarderieStore } from "../../store/garderieStore";
+import { useDataStore } from "../../store/dataStore";
+import { useAuthStore } from "../../store/authStore";
 import { GROUPES_AGE, PROGRAMMES_ENFANT, programmeDuGroupe } from "../../data/garderieData";
 import { ageLabel, dateFinCourtSejour, joursRestants } from "../../lib/garderieLogic";
 
@@ -28,6 +30,8 @@ const moisCourant = () => new Date().toISOString().slice(0, 7);
 export default function Enfants() {
   const config = useOutletContext();
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const { addRecette } = useDataStore();
   const { enfants, paiements, chargerGarderie, supprimerEnfant } = useGarderieStore();
 
   useEffect(() => { chargerGarderie(); }, [chargerGarderie]);
@@ -59,6 +63,21 @@ export default function Enfants() {
     if (!window.confirm(`Supprimer la fiche de « ${e.nom} ${e.prenom} » et tout son historique de paiement ?`)) return;
     await supprimerEnfant(e.id);
     if (detail?.id === e.id) setDetail(null);
+  }
+
+  // Frais d'inscription éventuel, saisi dans la même fiche que l'inscription
+  // — enregistré comme recette du secteur (E-GARDERIE n'a pas de volet
+  // Prestations : la seule facturation du secteur est ce frais).
+  async function onInscriptionSaved({ enfant, fraisInscription }) {
+    if (fraisInscription > 0 && enfant) {
+      await addRecette(
+        {
+          secteurId: config.secteurId, montant: fraisInscription, date: new Date().toISOString().slice(0, 10),
+          origine: "Frais d'inscription", client: `${enfant.prenom} ${enfant.nom}`, description: "Inscription enfant",
+        },
+        user
+      );
+    }
   }
 
   return (
@@ -131,7 +150,9 @@ export default function Enfants() {
           enfant={modal.enfant}
           accent={config.color}
           moduleLabel={config.nom}
+          montrerFraisInscription={!modal.enfant}
           onClose={() => setModal(null)}
+          onSaved={onInscriptionSaved}
         />
       )}
 

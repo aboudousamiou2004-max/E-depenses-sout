@@ -17,7 +17,9 @@ export default function BusinessLayout({ config }) {
 
   const NAV = [
     { to: config.path, label: "Tableau de bord", icon: LayoutGrid, end: true },
-    { to: `${config.path}/facturation`, label: "Prestations", icon: FileText },
+    // Prestations : sans objet pour E-GARDERIE (pas de prestation générique
+    // — l'inscription et le frais qui l'accompagne se font depuis Enfants).
+    ...(config.id !== "garderie" ? [{ to: `${config.path}/facturation`, label: "Prestations", icon: FileText }] : []),
     { to: `${config.path}/depenses`, label: "Dépenses", icon: Receipt },
     ...(stockNav ? [{ to: `${config.path}/stock`, label: stockNav.label, icon: stockNav.icon }] : []),
     // Saisie journalière + Santé animale : spécifiques au cheptel MAXI AGRO —

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, FileText, UserPlus } from "lucide-react";
+import { Plus, FileText } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
@@ -9,7 +9,6 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import RecetteDetailModal from "../../components/RecetteDetailModal";
-import InscriptionEnfantModal from "../../components/InscriptionEnfantModal";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 import { useStockStore } from "../../store/stockStore";
@@ -25,9 +24,7 @@ export default function BusinessFacturation() {
   const { periode, recherche } = useUIStore();
   const venteDeBriques = config.stock === "briques";
   const locationMateriel = config.stock === "materiel";
-  const estGarderie = config.id === "garderie";
   const [open, setOpen] = useState(false);
-  const [openInscription, setOpenInscription] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [respecterPeriode, setRespecterPeriode] = useState(false);
@@ -132,22 +129,6 @@ export default function BusinessFacturation() {
     setForm((f) => ({ ...f, montant: "", client: "", description: "", briqueQuantite: "" }));
   }
 
-  // Inscription d'un enfant depuis Prestations (E-GARDERIE) : la fiche
-  // complète est saisie via InscriptionEnfantModal (identité, groupe,
-  // parent, santé…) — le frais d'inscription éventuel devient ici la
-  // facture (recette) du secteur, comme n'importe quelle autre prestation.
-  async function onInscriptionSaved({ enfant, fraisInscription }) {
-    if (fraisInscription > 0 && enfant) {
-      await addRecette(
-        {
-          secteurId: config.secteurId, montant: fraisInscription, date: new Date().toISOString().slice(0, 10),
-          origine: "Frais d'inscription", client: `${enfant.prenom} ${enfant.nom}`, description: "Inscription enfant",
-        },
-        user
-      );
-    }
-  }
-
   return (
     <div>
       <TopBarSimple title="Prestations" subtitle={`${config.nom} — prestations et locations facturées`} icon={FileText} accent={config.color} />
@@ -161,14 +142,9 @@ export default function BusinessFacturation() {
           <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#0A84FF]" />
           Limiter à la période sélectionnée
         </label>
-        <div className="w-full sm:w-auto sm:ml-auto flex gap-2.5">
-          {estGarderie && (
-            <Button icon={UserPlus} variant="ghost" onClick={() => setOpenInscription(true)}>Inscrire un enfant</Button>
-          )}
-          <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }}>
-            Nouvelle facture
-          </Button>
-        </div>
+        <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }} className="w-full sm:w-auto sm:ml-auto">
+          Nouvelle facture
+        </Button>
       </div>
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
@@ -314,18 +290,6 @@ export default function BusinessFacturation() {
         supprimerRecette={supprimerRecette}
         onClose={() => setSelection(null)}
       />
-
-      {estGarderie && openInscription && (
-        <InscriptionEnfantModal
-          open
-          enfant={null}
-          accent={config.color}
-          moduleLabel={config.nom}
-          montrerFraisInscription
-          onClose={() => setOpenInscription(false)}
-          onSaved={onInscriptionSaved}
-        />
-      )}
     </div>
   );
 }
