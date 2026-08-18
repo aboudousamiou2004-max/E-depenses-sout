@@ -68,7 +68,7 @@ export default function StockMateriel() {
 
   return (
     <div>
-      <TopBarSimple title="Stock magasin" subtitle={`${config.nom} — matériel disponible et mouvements`} accent={config.color} />
+      <TopBarSimple title="Stock magasin" subtitle={`${config.nom} — matériel disponible et mouvements`} icon={Boxes} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Boxes} label="Articles référencés" value={String(lignes.length)} tone={config.color} />

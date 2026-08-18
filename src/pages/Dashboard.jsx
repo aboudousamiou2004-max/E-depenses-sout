@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Wallet, TrendingUp, AlertTriangle, Clock3, ArrowUpRight, Plus, Building2 } from "lucide-react";
+import { Wallet, TrendingUp, AlertTriangle, Clock3, ArrowUpRight, Plus, Building2, LayoutGrid } from "lucide-react";
 import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { useNavigate } from "react-router-dom";
 import TopBar from "../components/layout/TopBar";
@@ -80,7 +80,7 @@ export default function Dashboard() {
   if (secteurActif) {
     return (
       <div>
-        <TopBar title="Tableau de bord" subtitle={`${secteurActif.nom} — vue financière du secteur`} />
+        <TopBar title="Tableau de bord" subtitle={`${secteurActif.nom} — vue financière du secteur`} icon={LayoutGrid} accent={secteurActif.color} />
         <SecteurOverview
           secteurId={secteurActif.id}
           nom={secteurActif.nom}
@@ -95,7 +95,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <TopBar title="Tableau de bord" subtitle="Vue consolidée — pilotage financier de LA TERMITIÈRE" />
+      <TopBar title="Tableau de bord" subtitle="Vue consolidée — pilotage financier de LA TERMITIÈRE" icon={LayoutGrid} accent="#0A84FF" />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 lg:auto-rows-[172px] gap-4 sm:gap-5">
         <StatTile

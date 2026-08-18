@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { ArrowDownCircle, ArrowUpCircle, Scale } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Scale, TrendingUp } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import StatTile from "../components/ui/StatTile";
@@ -23,7 +23,7 @@ export default function Flux() {
 
   return (
     <div>
-      <TopBar title="Flux de trésorerie" subtitle="Entrées, sorties et solde net par nature de flux" />
+      <TopBar title="Flux de trésorerie" subtitle="Entrées, sorties et solde net par nature de flux" icon={TrendingUp} accent="#0A84FF" />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={ArrowUpCircle} label="Recettes du mois" value={fmtCompact(flux.totalRec) + " FCFA"} tone="#30D158" />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Save, Plus, Trash2, FolderPlus, Building2, ShieldCheck } from "lucide-react";
+import { Save, Plus, Trash2, FolderPlus, Building2, ShieldCheck, Settings } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import Button from "../components/ui/Button";
@@ -23,7 +23,7 @@ export default function Parametres() {
 
   return (
     <div>
-      <TopBar title="Paramètres" subtitle="Configuration du module E-DÉPENSES" />
+      <TopBar title="Paramètres" subtitle="Configuration du module E-DÉPENSES" icon={Settings} accent="#8E8E93" />
       <div className="flex flex-col gap-5">
         <SectionCircuitAutorisation />
         <SectionCategories secteurs={secteurs} categories={categories} addCategorie={addCategorie} supprimerCategorie={supprimerCategorie} />

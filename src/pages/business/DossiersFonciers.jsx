@@ -90,7 +90,7 @@ export default function DossiersFonciers() {
 
   return (
     <div>
-      <TopBarSimple title="Dossiers fonciers" subtitle={`${config.nom} — dossiers, frais engagés, total par dossier`} accent={config.color} />
+      <TopBarSimple title="Dossiers fonciers" subtitle={`${config.nom} — dossiers, frais engagés, total par dossier`} icon={FolderOpen} accent={config.color} />
 
       <div className="grid grid-cols-2 gap-4 mb-5">
         <StatTile icon={FolderOpen} label="Dossiers" value={String(dossiers.length)} tone={config.color} />

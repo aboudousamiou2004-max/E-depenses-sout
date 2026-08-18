@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler,
 } from "chart.js";
 import { Line, Doughnut, Bar } from "react-chartjs-2";
-import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack, Tag, Plus, LayoutGrid, Syringe, Search } from "lucide-react";
+import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack, Tag, Plus, LayoutGrid, Syringe, Search, PawPrint } from "lucide-react";
+import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import Modal from "../../components/ui/Modal";
 import Button from "../../components/ui/Button";
@@ -79,6 +81,7 @@ function previsionSerie(values, horizon = 7) {
 //    n'est calculable que pour le périmètre « Toutes » (affiché « — » sur
 //    une catégorie précise, avec une note).
 export default function AgroDashboard() {
+  const config = useOutletContext();
   const { referentielAnimaux: especes, mouvementsAnimaux, maladesAnimaux, soldeAnimaux, animauxIndividuels } = useStockStore();
   const { recettes } = useDataStore();
 
@@ -285,14 +288,13 @@ export default function AgroDashboard() {
 
   return (
     <div className="space-y-5">
-      <div className="relative flex items-center gap-4 overflow-hidden rounded-3xl p-4 text-white shadow-[0_14px_24px_-12px_rgba(0,0,0,0.45)]"
-        style={{ background: "linear-gradient(135deg, rgba(46,170,63,0.85) 0%, rgba(26,110,39,0.8) 100%)" }}>
-        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/90"><Boxes size={26} color="#2EAA3F" /></div>
-        <div>
-          <h2 className="text-lg font-extrabold drop-shadow">MAXI AGRO</h2>
-          <p className="text-sm text-green-50/90">Élevage · Cheptel · Santé · Facturation</p>
-        </div>
-      </div>
+      <TopBarSimple
+        title="Cheptel"
+        subtitle={`${config.nom} — effectifs, santé et suivi du cheptel par espèce`}
+        icon={PawPrint}
+        accent={config.color}
+        showPeriodeFilter={false}
+      />
 
       <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-black/[0.03] p-1">
         {[

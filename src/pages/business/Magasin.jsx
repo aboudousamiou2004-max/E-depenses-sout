@@ -30,7 +30,7 @@ export default function Magasin() {
 
   return (
     <div>
-      <TopBarSimple title="Magasin" subtitle={`${config.nom} — matériel, machines & aliments (silo)`} accent={config.color} />
+      <TopBarSimple title="Magasin" subtitle={`${config.nom} — matériel, machines & aliments (silo)`} icon={Warehouse} accent={config.color} />
 
       <div className="glass inline-flex items-center gap-1 rounded-2xl p-1.5 mb-4">
         {[

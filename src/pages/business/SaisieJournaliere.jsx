@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Plus, Trash2, Lock } from "lucide-react";
+import { Plus, Trash2, Lock, ClipboardList } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import Button from "../../components/ui/Button";
@@ -90,7 +90,7 @@ export default function SaisieJournaliere() {
 
   return (
     <div>
-      <TopBarSimple title="Saisie journalière" subtitle={`${config.nom} — EF Initial · Entrées · Sorties · EF Final`} accent={config.color} />
+      <TopBarSimple title="Saisie journalière" subtitle={`${config.nom} — EF Initial · Entrées · Sorties · EF Final`} icon={ClipboardList} accent={config.color} />
 
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>

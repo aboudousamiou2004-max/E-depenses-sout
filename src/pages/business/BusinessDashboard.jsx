@@ -1,4 +1,5 @@
 import { useOutletContext, useNavigate } from "react-router-dom";
+import { LayoutGrid } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import SecteurOverview from "../../components/SecteurOverview";
 
@@ -8,7 +9,7 @@ export default function BusinessDashboard() {
 
   return (
     <div>
-      <TopBarSimple title="Tableau de bord" subtitle={`${config.nom} — vue financière du secteur`} accent={config.color} />
+      <TopBarSimple title="Tableau de bord" subtitle={`${config.nom} — vue financière du secteur`} icon={LayoutGrid} accent={config.color} />
       <SecteurOverview
         secteurId={config.secteurId}
         nom={config.nom}

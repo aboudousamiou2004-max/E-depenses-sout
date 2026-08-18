@@ -173,7 +173,7 @@ export default function Recettes() {
 
   return (
     <div>
-      <TopBar title="Recette et Budget" subtitle="Encaissements et budget alloué par secteur d'activité" />
+      <TopBar title="Recette et Budget" subtitle="Encaissements et budget alloué par secteur d'activité" icon={Wallet} accent="#30D158" />
 
       {/* KPI par secteur — revenu du mois en cours */}
       {kpiParSecteur.length > 0 && (

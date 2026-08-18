@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Plus, Phone, Pencil, Trash2 } from "lucide-react";
+import { Plus, Phone, Pencil, Trash2, Handshake } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import Badge from "../components/ui/Badge";
@@ -46,7 +46,7 @@ export default function Partenaires() {
 
   return (
     <div>
-      <TopBar title="Partenaires" subtitle="Contacts externes du secteur — fournisseurs, prestataires, banque…" />
+      <TopBar title="Partenaires" subtitle="Contacts externes du secteur — fournisseurs, prestataires, banque…" icon={Handshake} accent="#7c3aed" />
 
       {peutGerer ? (
         <div className="flex justify-end mb-4">

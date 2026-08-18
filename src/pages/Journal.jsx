@@ -20,7 +20,7 @@ export default function Journal() {
 
   return (
     <div>
-      <TopBar title="Journal" subtitle="Historique des opérations — traçabilité complète (écriture seule)" />
+      <TopBar title="Journal" subtitle="Historique des opérations — traçabilité complète (écriture seule)" icon={ScrollText} accent="#8E8E93" />
 
       <GlassCard className="p-6" hover={false}>
         <h3 className="font-bold tracking-tight text-ink mb-4 flex items-center gap-2">

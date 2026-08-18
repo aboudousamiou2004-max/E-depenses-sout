@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Plus, Trash2, Users, Coins, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Users, Coins, AlertTriangle, Baby } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
@@ -122,7 +122,7 @@ export default function EnfantsPaiements() {
 
   return (
     <div>
-      <TopBarSimple title="Enfants & Paiements" subtitle={`${config.nom} — tarifs, encaissements, impayés`} accent={config.color} />
+      <TopBarSimple title="Enfants & Paiements" subtitle={`${config.nom} — tarifs, encaissements, impayés`} icon={Baby} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
         <StatTile icon={Users} label="Enfants actifs" value={String(actifs.length)} tone={config.color} />

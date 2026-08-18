@@ -99,7 +99,7 @@ export default function Banque() {
 
   return (
     <div>
-      <TopBar title="Compte bancaire" subtitle="Dépôts et retraits — miroir du relevé bancaire de l'entreprise" />
+      <TopBar title="Compte bancaire" subtitle="Dépôts et retraits — miroir du relevé bancaire de l'entreprise" icon={Landmark} accent="#0A84FF" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Landmark} label="Solde actuel" value={fmtFCFA(soldeActuel)} tone="#0A84FF" onClick={peutModifier ? () => setModalOuverture({ date: ouverture?.date || new Date().toISOString().slice(0, 10), montant: soldeInitial }) : undefined} />

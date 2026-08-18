@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Plus, Trash2, Syringe, Boxes, CalendarClock, BarChart3, AlertTriangle, CheckCircle2, Bell, FileDown } from "lucide-react";
+import { Plus, Trash2, Syringe, Boxes, CalendarClock, BarChart3, AlertTriangle, CheckCircle2, Bell, FileDown, HeartPulse } from "lucide-react";
 import * as XLSX from "xlsx";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
@@ -44,7 +44,7 @@ export default function SanteAnimale() {
 
   return (
     <div>
-      <TopBarSimple title="Santé animale" subtitle={`${config.nom} — vaccinations, traitements, suivi sanitaire`} accent={config.color} />
+      <TopBarSimple title="Santé animale" subtitle={`${config.nom} — vaccinations, traitements, suivi sanitaire`} icon={HeartPulse} accent={config.color} />
 
       <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-black/[0.03] p-1 mb-4">
         {[

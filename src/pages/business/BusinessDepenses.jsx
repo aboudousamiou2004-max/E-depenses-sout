@@ -72,7 +72,7 @@ export default function BusinessDepenses() {
 
   return (
     <div>
-      <TopBarSimple title="Dépenses" subtitle={`${config.nom} — saisie des dépenses du secteur`} accent={config.color} />
+      <TopBarSimple title="Dépenses" subtitle={`${config.nom} — saisie des dépenses du secteur`} icon={Receipt} accent={config.color} />
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">

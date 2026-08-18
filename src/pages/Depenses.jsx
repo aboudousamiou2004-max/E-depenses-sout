@@ -134,7 +134,7 @@ export default function Depenses() {
 
   return (
     <div>
-      <TopBar title="Dépenses" subtitle="Saisie et suivi des dépenses par secteur d'activité" />
+      <TopBar title="Dépenses" subtitle="Saisie et suivi des dépenses par secteur d'activité" icon={Receipt} accent="#FF453A" />
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">

@@ -31,7 +31,7 @@ export default function Rentabilite() {
 
   return (
     <div>
-      <TopBar title="Rentabilité" subtitle="Marge (recettes − dépenses) par secteur d'activité" />
+      <TopBar title="Rentabilité" subtitle="Marge (recettes − dépenses) par secteur d'activité" icon={TrendingUp} accent="#30D158" />
 
       <GlassCard className="p-4 sm:p-6" hover={false}>
         <div className="flex flex-col gap-2">

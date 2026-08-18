@@ -101,7 +101,7 @@ export default function Marge() {
 
   return (
     <div>
-      <TopBarSimple title="Marge & Bénéfice" subtitle="Recette − valeur du matériel = bénéfice" accent="#7c3aed" />
+      <TopBarSimple title="Marge & Bénéfice" subtitle="Recette − valeur du matériel = bénéfice" icon={Scale} accent="#7c3aed" />
 
       <GlassCard hover={false} className="p-4 mb-4">
         <div className="flex flex-wrap items-end gap-3">

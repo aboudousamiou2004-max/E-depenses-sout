@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { LineChart } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import { useDataStore } from "../store/dataStore";
@@ -24,7 +25,7 @@ export default function Analyses() {
 
   return (
     <div>
-      <TopBar title="Analyses" subtitle="Répartition des dépenses par secteur d'activité" />
+      <TopBar title="Analyses" subtitle="Répartition des dépenses par secteur d'activité" icon={LineChart} accent="#5E5CE6" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <GlassCard className="lg:col-span-2 p-4 sm:p-6" hover={false}>

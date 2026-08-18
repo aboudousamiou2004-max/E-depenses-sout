@@ -28,7 +28,7 @@ export default function Autorisations() {
 
   return (
     <div>
-      <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses — dès dépassement du budget alloué (PAU ou GE)" />
+      <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses — dès dépassement du budget alloué (PAU ou GE)" icon={ShieldCheck} accent="#FF9F0A" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
         <GlassCard className="p-5">
