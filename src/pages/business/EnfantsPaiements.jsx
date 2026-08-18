@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
-import { Plus, Trash2, Users, Coins, AlertTriangle, Baby } from "lucide-react";
+import { Plus, Trash2, Users, Coins, AlertTriangle, Baby, Utensils, CalendarClock } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
@@ -47,11 +47,28 @@ function ageLabel(dateNaissance) {
   return `${Math.floor(m / 12)} an${Math.floor(m / 12) > 1 ? "s" : ""}`;
 }
 
+// Court séjour : date de fin dérivée (inscription + N semaines) — pas
+// stockée, recalculée à l'affichage, comme termitiere-platform/src/modules/
+// garderie/logic.js (dateFinCourtSejour).
+function dateFinCourtSejour(dateInscription, dureeSemaines) {
+  if (!dateInscription || !dureeSemaines) return null;
+  const d = new Date(dateInscription);
+  d.setDate(d.getDate() + dureeSemaines * 7);
+  return d.toISOString().slice(0, 10);
+}
+function joursRestants(dateFin) {
+  if (!dateFin) return null;
+  return Math.ceil((new Date(dateFin) - new Date(new Date().toISOString().slice(0, 10))) / 86400000);
+}
+
 // Enfants + Paiements E-GARDERIE — porté (simplifié) depuis
 // termitiere-platform/src/modules/garderie/{Enfants.jsx,Paiements.jsx} : le
-// moteur de revenu récurrent de ce secteur — tarif par enfant, historique de
-// paiements, détection des impayés. Cantine/personnel/incidents/présences
-// volontairement écartés (aucune dimension monétaire).
+// moteur de revenu récurrent de ce secteur — tarif par enfant, type
+// d'inscription (mensuel/annuel/court séjour, avec date de fin dérivée pour
+// le court séjour), frais de cantine, historique de paiements, détection
+// des impayés. Programmation des repas / présence par repas volontairement
+// écartées (aucune dimension monétaire sur la plateforme non plus — seule
+// la cantine a un coût, via un frais fixe par enfant).
 export default function EnfantsPaiements() {
   const config = useOutletContext();
   const { user } = useAuthStore();
@@ -63,31 +80,46 @@ export default function EnfantsPaiements() {
   const [detailId, setDetailId] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [paieForm, setPaieForm] = useState({ mois: moisCourant(), montant: "", date: new Date().toISOString().slice(0, 10), modePaiement: "espece" });
+  const [paieForm, setPaieForm] = useState({ mois: moisCourant(), montant: "", montantCantine: "", date: new Date().toISOString().slice(0, 10), modePaiement: "espece" });
 
   const soldeEnfantMois = (enfantId, mois) => paiements.filter((p) => p.enfantId === enfantId && p.mois === mois).reduce((s, p) => s + p.montant, 0);
+  const montantDuTotal = (e) => e.tarif + (e.fraisCantine || 0);
 
   const statutPaiement = (e) => {
     if (e.statut !== "actif" || e.typeAbonnement !== "mensuel") return null;
     const solde = soldeEnfantMois(e.id, moisCourant());
-    if (solde >= e.tarif && e.tarif > 0) return { label: "Payé", tone: "mint" };
+    const du = montantDuTotal(e);
+    if (solde >= du && du > 0) return { label: "Payé", tone: "mint" };
     if (solde > 0) return { label: "Partiel", tone: "amber" };
     return { label: "Impayé", tone: "coral" };
   };
 
   const actifs = enfants.filter((e) => e.statut === "actif");
-  const revenuMois = paiements.filter((p) => p.mois === moisCourant()).reduce((s, p) => s + p.montant, 0);
+  const paiementsMois = paiements.filter((p) => p.mois === moisCourant());
+  const revenuMois = paiementsMois.reduce((s, p) => s + p.montant, 0);
+  const revenuCantineMois = paiementsMois.reduce((s, p) => s + p.montantCantine, 0);
   const impayes = actifs.filter((e) => statutPaiement(e)?.label === "Impayé");
+  const finsProchesCourtSejour = actifs.filter((e) => {
+    if (e.typeAbonnement !== "court_sejour") return false;
+    const jr = joursRestants(dateFinCourtSejour(e.dateInscription, e.dureeSemaines));
+    return jr != null && jr <= 7;
+  });
 
   const detail = enfants.find((e) => e.id === detailId) || null;
   const paiementsDetail = useMemo(() => paiements.filter((p) => p.enfantId === detailId).sort((a, b) => (a.date < b.date ? 1 : -1)), [paiements, detailId]);
 
   function openCreate() {
-    setModal({ data: { nom: "", prenom: "", dateNaissance: "", typeAbonnement: "mensuel", tarif: "" }, id: null });
+    setModal({ data: { nom: "", prenom: "", dateNaissance: "", typeAbonnement: "mensuel", tarif: "", dateInscription: new Date().toISOString().slice(0, 10), dureeSemaines: "2", fraisCantine: "" }, id: null });
     setError("");
   }
   function openEdit(e) {
-    setModal({ data: { nom: e.nom, prenom: e.prenom, dateNaissance: e.dateNaissance || "", typeAbonnement: e.typeAbonnement, tarif: e.tarif, statut: e.statut }, id: e.id });
+    setModal({
+      data: {
+        nom: e.nom, prenom: e.prenom, dateNaissance: e.dateNaissance || "", typeAbonnement: e.typeAbonnement, tarif: e.tarif, statut: e.statut,
+        dateInscription: e.dateInscription || new Date().toISOString().slice(0, 10), dureeSemaines: e.dureeSemaines || "2", fraisCantine: e.fraisCantine || "",
+      },
+      id: e.id,
+    });
     setError("");
   }
 
@@ -113,21 +145,29 @@ export default function EnfantsPaiements() {
     if (detailId === e.id) setDetailId(null);
   }
 
+  function ouvrirDetail(e) {
+    setDetailId(e.id);
+    const du = montantDuTotal(e);
+    setPaieForm((f) => ({ ...f, montant: du > 0 ? String(du) : "", montantCantine: e.fraisCantine > 0 ? String(e.fraisCantine) : "" }));
+  }
+
   async function submitPaiement(e) {
     e.preventDefault();
     if (!paieForm.montant || Number(paieForm.montant) <= 0) return;
     await ajouterPaiement({ ...paieForm, enfantId: detailId });
-    setPaieForm((f) => ({ ...f, montant: "" }));
+    setPaieForm((f) => ({ ...f, montant: "", montantCantine: "" }));
   }
 
   return (
     <div>
       <TopBarSimple title="Enfants & Paiements" subtitle={`${config.nom} — tarifs, encaissements, impayés`} icon={Baby} accent={config.color} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-5">
         <StatTile icon={Users} label="Enfants actifs" value={String(actifs.length)} tone={config.color} />
         <StatTile icon={Coins} label="Revenu du mois" value={Math.round(revenuMois).toLocaleString("fr-FR") + " FCFA"} tone="#30D158" />
+        <StatTile icon={Utensils} label="Dont cantine" value={Math.round(revenuCantineMois).toLocaleString("fr-FR") + " FCFA"} tone="#0d9488" />
         <StatTile icon={AlertTriangle} label="Impayés ce mois" value={String(impayes.length)} tone={impayes.length ? "#FF453A" : "#8E8E93"} />
+        <StatTile icon={CalendarClock} label="Courts séjours à échéance" value={String(finsProchesCourtSejour.length)} tone={finsProchesCourtSejour.length ? "#FF9F0A" : "#8E8E93"} />
       </div>
 
       <div className="flex justify-end mb-4">
@@ -151,12 +191,17 @@ export default function EnfantsPaiements() {
             {enfants.length === 0 && <tr><td colSpan={7} className="text-center py-10 text-[13px] text-ink-soft italic">Aucun enfant enregistré.</td></tr>}
             {enfants.map((e) => {
               const sp = statutPaiement(e);
+              const finCS = e.typeAbonnement === "court_sejour" ? dateFinCourtSejour(e.dateInscription, e.dureeSemaines) : null;
+              const jrCS = finCS ? joursRestants(finCS) : null;
               return (
-                <tr key={e.id} onClick={() => setDetailId(e.id)} className="text-[13px] hover:bg-white/50 transition-colors cursor-pointer">
+                <tr key={e.id} onClick={() => ouvrirDetail(e)} className="text-[13px] hover:bg-white/50 transition-colors cursor-pointer">
                   <td className="px-3 py-2.5 font-semibold text-ink">{e.nom} {e.prenom}</td>
                   <td className="px-3 py-2.5 text-ink-soft">{ageLabel(e.dateNaissance)}</td>
-                  <td className="px-3 py-2.5 text-ink-soft">{TYPES_ABONNEMENT.find((t) => t.id === e.typeAbonnement)?.label}</td>
-                  <td className="px-3 py-2.5 text-right tabular font-semibold">{Math.round(e.tarif).toLocaleString("fr-FR")}</td>
+                  <td className="px-3 py-2.5 text-ink-soft">
+                    {TYPES_ABONNEMENT.find((t) => t.id === e.typeAbonnement)?.label}
+                    {finCS && <span className={`block text-[11px] ${jrCS <= 7 ? "text-[#b3241b] font-semibold" : "text-ink-soft/60"}`}>fin {new Date(finCS).toLocaleDateString("fr-FR")} · {jrCS >= 0 ? `${jrCS} j` : "terminé"}</span>}
+                  </td>
+                  <td className="px-3 py-2.5 text-right tabular font-semibold">{Math.round(e.tarif).toLocaleString("fr-FR")}{e.fraisCantine > 0 && <span className="block text-[11px] font-normal text-ink-soft/60">+{Math.round(e.fraisCantine).toLocaleString("fr-FR")} cantine</span>}</td>
                   <td className="px-3 py-2.5 text-center">{sp ? <Badge tone={sp.tone}>{sp.label}</Badge> : <Badge tone={STATUTS_ENFANT[e.statut]?.tone}>{STATUTS_ENFANT[e.statut]?.label}</Badge>}</td>
                   <td className="px-3 py-2.5 text-center text-ink-soft">{paiements.filter((p) => p.enfantId === e.id).length}</td>
                   <td className="px-3 py-2.5" onClick={(ev) => ev.stopPropagation()}>
@@ -196,6 +241,25 @@ export default function EnfantsPaiements() {
                 </div>
               </Field>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Date d'inscription">
+                <TextInput type="date" value={modal.data.dateInscription} onChange={(e) => setModal((m) => ({ ...m, data: { ...m.data, dateInscription: e.target.value } }))} />
+              </Field>
+              {modal.data.typeAbonnement === "court_sejour" ? (
+                <Field label="Durée (semaines)" hint="Minimum 2 semaines">
+                  <TextInput type="number" min="2" value={modal.data.dureeSemaines} onChange={(e) => setModal((m) => ({ ...m, data: { ...m.data, dureeSemaines: e.target.value } }))} />
+                </Field>
+              ) : (
+                <Field label="Frais de cantine (FCFA/mois)" hint="0 si pas de cantine">
+                  <TextInput type="number" min="0" value={modal.data.fraisCantine} onChange={(e) => setModal((m) => ({ ...m, data: { ...m.data, fraisCantine: e.target.value } }))} placeholder="0" />
+                </Field>
+              )}
+            </div>
+            {modal.data.typeAbonnement === "court_sejour" && (
+              <Field label="Frais de cantine (FCFA/mois)" hint="0 si pas de cantine">
+                <TextInput type="number" min="0" value={modal.data.fraisCantine} onChange={(e) => setModal((m) => ({ ...m, data: { ...m.data, fraisCantine: e.target.value } }))} placeholder="0" />
+              </Field>
+            )}
             {modal.id && (
               <Field label="Statut">
                 <Select value={modal.data.statut} onChange={(e) => setModal((m) => ({ ...m, data: { ...m.data, statut: e.target.value } }))}>
@@ -218,6 +282,15 @@ export default function EnfantsPaiements() {
               <span className="text-[12.5px] text-ink-soft">{TYPES_ABONNEMENT.find((t) => t.id === detail.typeAbonnement)?.label} · tarif {Math.round(detail.tarif).toLocaleString("fr-FR")} FCFA</span>
               <button onClick={() => { setDetailId(null); openEdit(detail); }} className="ml-auto text-[12px] text-[#0A84FF] hover:underline">Modifier fiche</button>
             </div>
+            <div className="flex items-center gap-3 flex-wrap text-[12px] text-ink-soft">
+              <span>Inscrit le {detail.dateInscription ? new Date(detail.dateInscription).toLocaleDateString("fr-FR") : "—"}</span>
+              {detail.fraisCantine > 0 && <span className="flex items-center gap-1"><Utensils size={12} /> Cantine : {Math.round(detail.fraisCantine).toLocaleString("fr-FR")} FCFA/mois</span>}
+              {detail.typeAbonnement === "court_sejour" && detail.dureeSemaines && (() => {
+                const fin = dateFinCourtSejour(detail.dateInscription, detail.dureeSemaines);
+                const jr = joursRestants(fin);
+                return <span className={jr <= 7 ? "text-[#b3241b] font-semibold" : ""}>Fin prévue : {new Date(fin).toLocaleDateString("fr-FR")} ({jr >= 0 ? `${jr} j restants` : "terminé"})</span>;
+              })()}
+            </div>
 
             <div>
               <p className="text-[11px] font-bold uppercase text-ink-soft/70 mb-2">Historique ({paiementsDetail.length})</p>
@@ -226,7 +299,10 @@ export default function EnfantsPaiements() {
                 {paiementsDetail.map((p) => (
                   <div key={p.id} className="flex items-center gap-2 rounded-xl bg-black/[0.03] px-3 py-2 text-[12.5px]">
                     <span className="font-semibold text-ink w-16">{p.mois}</span>
-                    <span className="flex-1 text-ink-soft">{MODES_PAIEMENT.find((m) => m.id === p.modePaiement)?.label}</span>
+                    <span className="flex-1 text-ink-soft">
+                      {MODES_PAIEMENT.find((m) => m.id === p.modePaiement)?.label}
+                      {p.montantCantine > 0 && <span className="text-[11px] text-ink-soft/60"> (dont {Math.round(p.montantCantine).toLocaleString("fr-FR")} cantine)</span>}
+                    </span>
                     <span className="whitespace-nowrap text-ink-soft/70">{new Date(p.date).toLocaleDateString("fr-FR")}</span>
                     <span className="font-bold tabular text-[#1a7d34]">+{Math.round(p.montant).toLocaleString("fr-FR")}</span>
                     <button onClick={() => supprimerPaiement(p.id)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={13} /></button>
@@ -245,8 +321,11 @@ export default function EnfantsPaiements() {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <TextInput type="date" value={paieForm.date} onChange={(e) => setPaieForm((f) => ({ ...f, date: e.target.value }))} />
-                <TextInput type="number" min="0" value={paieForm.montant} onChange={(e) => setPaieForm((f) => ({ ...f, montant: e.target.value }))} placeholder="Montant" />
+                <TextInput type="number" min="0" value={paieForm.montant} onChange={(e) => setPaieForm((f) => ({ ...f, montant: e.target.value }))} placeholder="Montant total" />
               </div>
+              {detail.fraisCantine > 0 && (
+                <TextInput type="number" min="0" value={paieForm.montantCantine} onChange={(e) => setPaieForm((f) => ({ ...f, montantCantine: e.target.value }))} placeholder="Dont cantine (FCFA)" />
+              )}
               <Button type="submit" className="w-full"><Plus size={14} /> Enregistrer</Button>
             </form>
           </div>
