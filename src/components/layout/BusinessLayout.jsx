@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus, History, ScrollText } from "lucide-react";
+
+const ROLES_ADMIN = ["pau", "ge", "super_admin", "directeur"];
 import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
@@ -27,6 +29,14 @@ export default function BusinessLayout({ config }) {
     // les directeurs et l'administration, à la demande de l'utilisateur
     // (2026-08-18). Un besoin validé crée une dépense réelle.
     { to: `${config.path}/besoins`, label: "Besoins", icon: PackagePlus },
+    // Historique : disponible dans TOUS les modules métier — dépenses et
+    // recettes du secteur, filtrables par période/type, ouvert à qui a déjà
+    // accès au module (mêmes droits que Dépenses). Journal : réservé aux
+    // directeurs et à l'administration (même accès que le journal global,
+    // cf. RLS `journal lisible par les rôles à accès total`), à la demande
+    // de l'utilisateur (2026-08-18).
+    { to: `${config.path}/historique`, label: "Historique", icon: History },
+    ...(ROLES_ADMIN.includes(user?.role) ? [{ to: `${config.path}/journal`, label: "Journal", icon: ScrollText }] : []),
     ...(stockNav ? [{ to: `${config.path}/stock`, label: stockNav.label, icon: stockNav.icon }] : []),
     // Saisie journalière + Santé animale : spécifiques au cheptel MAXI AGRO —
     // cf. termitiere-platform/src/modules/agro/{Saisie,Sante}.jsx.

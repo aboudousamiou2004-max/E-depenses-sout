@@ -78,6 +78,7 @@ const mapJournalRow = (r) => ({
   action: r.action,
   details: r.details,
   timestamp: r.timestamp,
+  secteurId: r.secteur_id,
 });
 const mapNotification = (r) => ({
   id: r.id,
