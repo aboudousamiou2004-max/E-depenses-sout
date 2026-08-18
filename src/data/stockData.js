@@ -22,10 +22,11 @@ export const ETATS_BRIQUE = [
   { id: "caillasses", label: "Caillasses (cassées)", color: "#FF453A" },
 ];
 
-// MAXI AGRO — cheptel, repris de src/modules/agro/data.js (catégories OVINS,
-// BOVINS, CAPRINS, POULETS, PINTADES) simplifié : un effectif par espèce plutôt
-// que la distinction adultes/jeunes du vrai module.
-export const CAT_ANIMAUX = ["OVINS", "BOVINS", "CAPRINS", "POULETS", "PINTADES"];
+// MAXI AGRO — cheptel, repris de src/modules/agro/data.js (7 catégories :
+// OVINS, BOVINS, CAPRINS, CANARDS, DINDONS, PINTADES, POULETS), avec détail
+// par espèce (sexe/âge) comme sur la plateforme — voir
+// supabase/migration_especes_detaillees_agro.sql.
+export const CAT_ANIMAUX = ["OVINS", "BOVINS", "CAPRINS", "CANARDS", "DINDONS", "PINTADES", "POULETS"];
 
 export const TYPES_MOUVEMENT_ANIMAL = {
   achat: { label: "Achat", signe: 1 },

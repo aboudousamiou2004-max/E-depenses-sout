@@ -24,7 +24,7 @@ const PRESETS = [
   { v: "custom", label: "Plage personnalisée…" },
 ];
 const TOUTES = "__TOUTES__";
-const CAT_COLORS = { OVINS: "#0d9488", BOVINS: "#7c3aed", CAPRINS: "#ea580c", POULETS: "#ca8a04", PINTADES: "#0284c7" };
+const CAT_COLORS = { OVINS: "#0d9488", BOVINS: "#7c3aed", CAPRINS: "#ea580c", POULETS: "#ca8a04", PINTADES: "#0284c7", CANARDS: "#0891b2", DINDONS: "#dc2626" };
 const SERIE_COLORS = ["#2563eb", "#dc2626", "#16a34a", "#d97706", "#7c3aed", "#0d9488", "#db2777", "#4338ca"];
 const catColor = (c) => CAT_COLORS[c] || "#64748b";
 const serieColor = (i) => SERIE_COLORS[i % SERIE_COLORS.length];
