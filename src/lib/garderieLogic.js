@@ -1,4 +1,4 @@
-// Logique E-GARDERIE partagée entre EnfantsPaiements.jsx et
+// Logique E-GARDERIE partagée entre Enfants.jsx, Paiements.jsx et
 // InscriptionEnfantModal.jsx — reprise de termitiere-platform/src/modules/
 // garderie/logic.js (âge, tarif suggéré, date de fin du court séjour).
 

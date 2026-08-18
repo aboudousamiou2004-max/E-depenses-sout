@@ -34,7 +34,8 @@ import ProductionBriques from "./pages/business/ProductionBriques";
 import Materiaux from "./pages/business/Materiaux";
 import MaterielBriqueterie from "./pages/business/MaterielBriqueterie";
 import DossiersFonciers from "./pages/business/DossiersFonciers";
-import EnfantsPaiements from "./pages/business/EnfantsPaiements";
+import Enfants from "./pages/business/Enfants";
+import Paiements from "./pages/business/Paiements";
 
 function Protected({ children }) {
   const { user, status } = useAuthStore();
@@ -131,7 +132,8 @@ export default function App() {
           <Route path="materiaux" element={<Materiaux />} />
           <Route path="materiel" element={<MaterielBriqueterie />} />
           <Route path="dossiers" element={<DossiersFonciers />} />
-          <Route path="enfants" element={<EnfantsPaiements />} />
+          <Route path="enfants" element={<Enfants />} />
+          <Route path="paiements" element={<Paiements />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/portal" replace />} />
