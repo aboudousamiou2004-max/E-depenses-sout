@@ -32,14 +32,18 @@ export default function Magasin() {
     <div>
       <TopBarSimple title="Magasin" subtitle={`${config.nom} — matériel, machines & aliments (silo)`} accent={config.color} />
 
-      <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-black/[0.03] p-1 mb-4">
+      <div className="glass inline-flex items-center gap-1 rounded-2xl p-1.5 mb-4">
         {[
           { v: "materiel", l: "Matériel & Machines", Icon: Wrench },
           { v: "aliments", l: "Aliments (Silo)", Icon: Wheat },
         ].map((onglet) => (
           <button key={onglet.v} onClick={() => setTab(onglet.v)}
-            className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${tab === onglet.v ? "bg-white text-ink shadow-sm" : "text-ink-soft hover:text-ink"}`}>
-            <onglet.Icon size={14} /> {onglet.l}
+            className={`relative rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors ${tab === onglet.v ? "text-white" : "text-ink-soft hover:text-ink"}`}>
+            {tab === onglet.v && (
+              <motion.div layoutId="magasin-tab-active" className="absolute inset-0 rounded-xl" style={{ background: config.color }}
+                transition={{ type: "spring", stiffness: 500, damping: 32 }} />
+            )}
+            <span className="relative z-10 flex items-center gap-1.5"><onglet.Icon size={14} /> {onglet.l}</span>
           </button>
         ))}
       </div>
