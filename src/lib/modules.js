@@ -30,7 +30,7 @@ const PRESETS = {
   logistique: { icon: Truck, description: "Transport & location de matériel", typesFacturation: ["Prestation", "Location"], stock: "materiel" },
   briqueterie: { icon: Factory, description: "Production & vente de briques", typesFacturation: ["Vente de briques"], stock: "briques" },
   foncier: { icon: MapPinned, description: "Gestion foncière", typesFacturation: ["Prestation", "Location"] },
-  garderie: { icon: Baby, description: "Garderie LA TERMITIÈRE", typesFacturation: ["Prestation", "Frais d'inscription"] },
+  garderie: { icon: Baby, description: "Garderie LA TERMITIÈRE", typesFacturation: ["Frais d'inscription"] },
   egpro: { icon: Briefcase, description: "Gestion des projets de l'entreprise", typesFacturation: ["Prestation", "Facturation de projet"] },
 };
 
