@@ -2,18 +2,37 @@ import { create } from "zustand";
 import { supabase } from "../lib/supabaseClient";
 
 // Enfants + Paiements E-GARDERIE — moteur de revenu récurrent (tarif par
-// enfant, historique de paiements, détection des impayés), avec suivi
-// d'inscription (mensuel/annuel/court séjour) et frais de cantine.
+// enfant, historique de paiements, détection des impayés), avec fiche
+// d'inscription complète (identité, groupe/programme, parent/tuteur,
+// santé) et frais de cantine.
 
 const mapEnfant = (r) => ({
-  id: r.id, nom: r.nom, prenom: r.prenom, dateNaissance: r.date_naissance,
+  id: r.id, nom: r.nom, prenom: r.prenom, dateNaissance: r.date_naissance, ageSaisi: r.age_saisi || "",
+  sexe: r.sexe || "F", programme: r.programme || "", groupe: r.groupe || "",
   typeAbonnement: r.type_abonnement, tarif: Number(r.tarif) || 0, statut: r.statut,
   dateInscription: r.date_inscription, dureeSemaines: r.duree_semaines != null ? Number(r.duree_semaines) : null,
   fraisCantine: Number(r.frais_cantine) || 0,
+  allergies: r.allergies || "", infoMedicale: r.info_medicale || "",
+  parentNom: r.parent_nom || "", parentContact: r.parent_contact || "", parentContact2: r.parent_contact2 || "",
+  parentProfession: r.parent_profession || "", adresse: r.adresse || "", notes: r.notes || "",
 });
 const mapPaiement = (r) => ({
   id: r.id, enfantId: r.enfant_id, mois: r.mois, montant: Number(r.montant) || 0, date: r.date,
   modePaiement: r.mode_paiement, montantCantine: Number(r.montant_cantine) || 0,
+});
+
+// Payload commun insert/update — un seul endroit à mettre à jour si un
+// champ de la fiche d'inscription change.
+const enfantColumns = (form) => ({
+  nom: form.nom.trim(), prenom: form.prenom.trim(), date_naissance: form.dateNaissance || null, age_saisi: form.ageSaisi || "",
+  sexe: form.sexe || "F", programme: form.programme || null, groupe: form.groupe || null,
+  type_abonnement: form.typeAbonnement, tarif: Number(form.tarif) || 0,
+  date_inscription: form.dateInscription || new Date().toISOString().slice(0, 10),
+  duree_semaines: form.typeAbonnement === "court_sejour" ? Math.max(2, parseInt(form.dureeSemaines) || 2) : null,
+  frais_cantine: Number(form.fraisCantine) || 0,
+  allergies: form.allergies || "", info_medicale: form.infoMedicale || "",
+  parent_nom: form.parentNom || "", parent_contact: form.parentContact || "", parent_contact2: form.parentContact2 || "",
+  parent_profession: form.parentProfession || "", adresse: form.adresse || "", notes: form.notes || "",
 });
 
 export const useGarderieStore = create((set, get) => ({
@@ -31,26 +50,18 @@ export const useGarderieStore = create((set, get) => ({
   reset: () => set({ enfants: [], paiements: [] }),
 
   ajouterEnfant: async (form, user) => {
-    const { error } = await supabase.from("garderie_enfants").insert({
-      nom: form.nom.trim(), prenom: form.prenom.trim(), date_naissance: form.dateNaissance || null,
-      type_abonnement: form.typeAbonnement, tarif: Number(form.tarif) || 0, statut: "actif", cree_par: user?.uid || null,
-      date_inscription: form.dateInscription || new Date().toISOString().slice(0, 10),
-      duree_semaines: form.typeAbonnement === "court_sejour" ? Math.max(2, parseInt(form.dureeSemaines) || 2) : null,
-      frais_cantine: Number(form.fraisCantine) || 0,
-    });
+    const { data, error } = await supabase
+      .from("garderie_enfants")
+      .insert({ ...enfantColumns(form), statut: "actif", cree_par: user?.uid || null })
+      .select()
+      .single();
     if (error) return { ok: false, error: error.message };
     await get().chargerGarderie();
-    return { ok: true };
+    return { ok: true, enfant: mapEnfant(data) };
   },
 
   modifierEnfant: async (id, form) => {
-    const { error } = await supabase.from("garderie_enfants").update({
-      nom: form.nom.trim(), prenom: form.prenom.trim(), date_naissance: form.dateNaissance || null,
-      type_abonnement: form.typeAbonnement, tarif: Number(form.tarif) || 0, statut: form.statut,
-      date_inscription: form.dateInscription || new Date().toISOString().slice(0, 10),
-      duree_semaines: form.typeAbonnement === "court_sejour" ? Math.max(2, parseInt(form.dureeSemaines) || 2) : null,
-      frais_cantine: Number(form.fraisCantine) || 0,
-    }).eq("id", id);
+    const { error } = await supabase.from("garderie_enfants").update({ ...enfantColumns(form), statut: form.statut }).eq("id", id);
     if (error) return { ok: false, error: error.message };
     await get().chargerGarderie();
     return { ok: true };
