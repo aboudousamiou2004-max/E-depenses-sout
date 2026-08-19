@@ -2,9 +2,10 @@ import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus, History, ScrollText } from "lucide-react";
+import { useAuthStore } from "../../store/authStore";
+import MobileBottomNav from "./MobileBottomNav";
 
 const ROLES_ADMIN = ["pau", "ge", "super_admin", "directeur"];
-import { useAuthStore } from "../../store/authStore";
 
 const STOCK_NAV = {
   materiel: { label: "Stock", icon: Boxes },
@@ -190,10 +191,12 @@ export default function BusinessLayout({ config }) {
       </aside>
 
       <main className="flex-1 min-w-0 p-4 pt-[76px] lg:pt-4 lg:pl-0">
-        <div className="h-full overflow-y-auto pr-1 pb-8">
+        <div className="h-full overflow-y-auto pr-1 pb-24 lg:pb-8">
           <Outlet context={config} />
         </div>
       </main>
+
+      <MobileBottomNav config={config} nav={NAV} onOpenMenu={() => setMenuOuvert(true)} />
     </div>
   );
 }
