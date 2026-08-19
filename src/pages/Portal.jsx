@@ -1,13 +1,14 @@
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LogOut, ChevronRight, Users } from "lucide-react";
+import { LogOut, ChevronRight, Users, Home } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useDataStore } from "../store/dataStore";
 import { modulesAccessibles, MODULE_DEPENSE, ROLES_ACCES_TOTAL } from "../lib/modules";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtCompact } from "../lib/logic";
 import GlassCard from "../components/ui/GlassCard";
 import NotificationBell from "../components/layout/NotificationBell";
+import MobileTabBar from "../components/layout/MobileTabBar";
 
 const now = { annee: 2026, mois: 6 };
 
@@ -18,6 +19,14 @@ export default function Portal() {
 
   const accessibles = useMemo(() => modulesAccessibles(user, secteurs), [user, secteurs]);
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
+  // Barre mobile du Portail — pas de « Plus » ici (pas de sidebar caché à
+  // ouvrir), juste les raccourcis utiles depuis l'accueil, à la demande de
+  // l'utilisateur (2026-08-19) : visible partout, pas seulement en secteur.
+  const navMobile = [
+    { to: "/portal", label: "Accueil", icon: Home, end: true },
+    { to: MODULE_DEPENSE.path, label: "E-DÉPENSES", icon: MODULE_DEPENSE.icon },
+    ...(peutGererUtilisateurs ? [{ to: "/utilisateurs", label: "Utilisateurs", icon: Users }] : []),
+  ];
   const heure = new Date().getHours();
   const salutation = heure < 12 ? "Bonjour" : heure < 18 ? "Bon après-midi" : "Bonsoir";
   const dateBrute = new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
@@ -75,7 +84,7 @@ export default function Portal() {
         </nav>
       </div>
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6 sm:pt-10 pb-28 lg:pb-10">
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -143,6 +152,8 @@ export default function Portal() {
           </div>
         )}
       </div>
+
+      <MobileTabBar items={navMobile} accent="#7A1128" pillId="mobile-nav-pill-portal" />
     </div>
   );
 }

@@ -1,7 +1,18 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
-import { Menu } from "lucide-react";
+import { Menu, LayoutGrid, Receipt, ShieldCheck, Grid2x2 } from "lucide-react";
 import Sidebar from "./Sidebar";
+import MobileTabBar from "./MobileTabBar";
+
+// Volets essentiels au suivi quotidien d'E-DÉPENSES pour la barre mobile —
+// même principe que BusinessLayout.jsx (Tableau de bord + 2 volets clés +
+// « Plus » pour le reste), à la demande explicite de l'utilisateur
+// (2026-08-19) : la barre doit être visible partout, pas seulement dans un secteur.
+const NAV_MOBILE = [
+  { to: "/depense", label: "Tableau de bord", icon: LayoutGrid, end: true },
+  { to: "/depense/depenses", label: "Dépenses", icon: Receipt },
+  { to: "/depense/autorisations", label: "Autorisations", icon: ShieldCheck },
+];
 
 export default function AppLayout() {
   const [menuOuvert, setMenuOuvert] = useState(false);
@@ -26,10 +37,12 @@ export default function AppLayout() {
       <Sidebar open={menuOuvert} onClose={() => setMenuOuvert(false)} />
 
       <main className="flex-1 min-w-0 p-4 pt-[76px] lg:pt-4 lg:pl-0">
-        <div className="h-full overflow-y-auto pr-1 pb-8">
+        <div className="h-full overflow-y-auto pr-1 pb-24 lg:pb-8">
           <Outlet />
         </div>
       </main>
+
+      <MobileTabBar items={NAV_MOBILE} accent="#0A84FF" pillId="mobile-nav-pill-depense" menu={{ label: "Plus", icon: Grid2x2, onClick: () => setMenuOuvert(true) }} />
     </div>
   );
 }
