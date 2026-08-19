@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus, History, ScrollText } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, ChevronLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus, History, ScrollText } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import MobileBottomNav from "./MobileBottomNav";
 
@@ -99,6 +99,13 @@ export default function BusinessLayout({ config }) {
       </div>
 
       <header className="lg:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 px-4 py-3 glass-strong m-3 rounded-2xl">
+        <button
+          onClick={() => navigate(-1)}
+          title="Retour"
+          className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-ink-soft hover:bg-black/5 transition-colors"
+        >
+          <ChevronLeft size={20} strokeWidth={2.2} />
+        </button>
         <button
           onClick={() => setMenuOuvert(true)}
           className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-ink-soft hover:bg-black/5 transition-colors"

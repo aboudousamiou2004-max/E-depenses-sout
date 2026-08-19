@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Outlet } from "react-router-dom";
-import { Menu, LayoutGrid, Receipt, ShieldCheck, Grid2x2 } from "lucide-react";
+import { Outlet, useNavigate } from "react-router-dom";
+import { Menu, ChevronLeft, LayoutGrid, Receipt, ShieldCheck, Grid2x2 } from "lucide-react";
 import Sidebar from "./Sidebar";
 import MobileTabBar from "./MobileTabBar";
 
@@ -16,6 +16,7 @@ const NAV_MOBILE = [
 
 export default function AppLayout() {
   const [menuOuvert, setMenuOuvert] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen flex">
@@ -24,6 +25,13 @@ export default function AppLayout() {
       </div>
 
       <header className="lg:hidden fixed top-0 inset-x-0 z-30 flex items-center gap-3 px-4 py-3 glass-strong m-3 rounded-2xl">
+        <button
+          onClick={() => navigate(-1)}
+          title="Retour"
+          className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-ink-soft hover:bg-black/5 transition-colors"
+        >
+          <ChevronLeft size={20} strokeWidth={2.2} />
+        </button>
         <button
           onClick={() => setMenuOuvert(true)}
           className="w-9 h-9 shrink-0 rounded-xl flex items-center justify-center text-ink-soft hover:bg-black/5 transition-colors"
