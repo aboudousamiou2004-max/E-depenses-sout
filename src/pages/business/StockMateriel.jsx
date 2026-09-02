@@ -1,21 +1,41 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Boxes, ArrowDownCircle, ArrowUpCircle, PackageCheck, AlertTriangle } from "lucide-react";
+import { Plus, Boxes, ArrowDownCircle, ArrowUpCircle, PackageCheck, AlertTriangle, Lock } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
-import Badge from "../../components/ui/Badge";
 import { useStockStore } from "../../store/stockStore";
 import { useAuthStore } from "../../store/authStore";
 import { TYPES_MOUVEMENT_MATERIEL, CAT_MATERIEL } from "../../data/stockData";
 
-// Stock magasin de MAXI LOGISTIQUE — même principe que le vrai module
-// (référentiel d'articles + mouvements d'entrée/sortie/retour), simplifié en
-// un solde cumulé par article plutôt qu'en inventaires journaliers.
+const CAT_COLORS = {
+  "TENTES & STRUCTURES": "#0A84FF",
+  "TABLES": "#30D158",
+  "CHAISES": "#FF9F0A",
+  "SONORISATION": "#BF5AF2",
+  "ÉCLAIRAGE": "#FFD60A",
+  "DÉCORATION": "#FF375F",
+  "VAISSELLE & SERVICE": "#5E5CE6",
+  "AUTRES": "#8E8E93",
+};
+
+function MvtCell({ total, tone, onClick, sub }) {
+  const colors = { green: "text-[#1a7d34]", amber: "text-[#93400a]", sky: "text-[#036799]" };
+  return (
+    <td className="px-2 py-1.5 text-center">
+      <button type="button" onClick={onClick}
+        className="mx-auto flex min-w-[4rem] flex-col items-center rounded-xl border border-black/[0.06] px-2 py-1 hover:border-[#0A84FF] hover:bg-[#0A84FF]/5 transition-colors">
+        <span className={`font-bold ${colors[tone]}`}>{total}</span>
+        {sub && <span className="text-[9px] text-ink-soft/60">{sub}</span>}
+      </button>
+    </td>
+  );
+}
+
 export default function StockMateriel() {
   const config = useOutletContext();
   const { user } = useAuthStore();
@@ -23,24 +43,29 @@ export default function StockMateriel() {
 
   const [open, setOpen] = useState(false);
   const [openArticle, setOpenArticle] = useState(false);
+  const [detail, setDetail] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ articleId: referentielMateriel[0]?.id, type: "achat", quantite: "", motif: "", date: "2026-07-27" });
   const [articleForm, setArticleForm] = useState({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
 
+  const cats = useMemo(
+    () => CAT_MATERIEL.filter((c) => referentielMateriel.some((a) => a.cat === c)),
+    [referentielMateriel]
+  );
+
   const lignes = useMemo(
     () => referentielMateriel.map((a) => {
-      const sorties = mouvementsMateriel.filter((m) => m.articleId === a.id && m.type === "sortie").reduce((s, m) => s + m.quantite, 0);
-      return { ...a, stock: stockArticle(a.id), sorties };
+      const mvts = mouvementsMateriel.filter((m) => m.articleId === a.id);
+      const achats = mvts.filter((m) => m.type === "achat").reduce((s, m) => s + m.quantite, 0);
+      const sorties = mvts.filter((m) => m.type === "sortie").reduce((s, m) => s + m.quantite, 0);
+      const retours = mvts.filter((m) => m.type.startsWith("retour_")).reduce((s, m) => s + m.quantite, 0);
+      return { ...a, stock: stockArticle(a.id), achats, sorties, retours, mvts };
     }),
     [referentielMateriel, mouvementsMateriel, stockArticle]
   );
   const valeurTotale = lignes.reduce((acc, l) => acc + l.stock * l.coutAchat, 0);
   const enRupture = lignes.filter((l) => l.stock === 0).length;
-  const derniersMouvements = mouvementsMateriel.slice(0, 8);
-  // Pertes cumulées (retours cassés/perdus) : ces mouvements n'ont pas d'effet
-  // sur le solde (signe 0, l'article était déjà sorti) mais représentent une
-  // valeur de capital perdue, jusqu'ici invisible dans cet écran.
   const valeurPertes = mouvementsMateriel
     .filter((m) => m.type === "retour_casse" || m.type === "retour_perdu")
     .reduce((acc, m) => acc + m.quantite * (referentielMateriel.find((a) => a.id === m.articleId)?.coutAchat || 0), 0);
@@ -69,6 +94,12 @@ export default function StockMateriel() {
     setArticleForm({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
   }
 
+  function ouvrirDetail(ligne, type) {
+    setDetail({ nom: ligne.nom, type, mvts: ligne.mvts.filter((m) => type === "retour" ? m.type.startsWith("retour_") : m.type === type) });
+  }
+
+  const DETAIL_TITRES = { achat: "Achats", sortie: "Sorties", retour: "Retours" };
+
   return (
     <div>
       <TopBarSimple title="Stock magasin" subtitle={`${config.nom} — matériel disponible et mouvements`} icon={Boxes} accent={config.color} />
@@ -86,58 +117,43 @@ export default function StockMateriel() {
         <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }}>Nouveau mouvement</Button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <GlassCard className="p-2 overflow-hidden lg:col-span-2" hover={false}>
-          <div className="max-h-[calc(100vh-380px)] overflow-auto">
-            <table className="w-full min-w-[580px] border-collapse">
-              <thead className="sticky top-0 z-10">
-                <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
-                  <th className="px-4 py-3">Article</th>
-                  <th className="px-4 py-3">Catégorie</th>
-                  <th className="px-3 py-3 text-center">Stock initial</th>
-                  <th className="px-3 py-3 text-center">Sorties (cumul)</th>
-                  <th className="px-4 py-3 text-right">Reste</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lignes.map((l, i) => (
-                  <motion.tr key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.02 }} className="text-[13.5px] hover:bg-white/50 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-ink">{l.nom}</td>
-                    <td className="px-4 py-3 text-ink-soft">{l.cat}</td>
-                    <td className="px-3 py-3 text-center tabular text-ink-soft">{l.initQuantite}</td>
-                    <td className="px-3 py-3 text-center tabular text-[#b3241b]">{l.sorties}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Badge tone={l.stock === 0 ? "coral" : l.stock < 5 ? "amber" : "mint"}>{l.stock} {l.unite}</Badge>
-                    </td>
-                  </motion.tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </GlassCard>
-
-        <GlassCard className="p-5" hover={false}>
-          <h3 className="font-bold tracking-tight text-ink mb-3">Derniers mouvements</h3>
-          <div className="flex flex-col gap-2.5">
-            {derniersMouvements.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucun mouvement.</p>}
-            {derniersMouvements.map((m) => {
-              const article = referentielMateriel.find((a) => a.id === m.articleId);
-              const info = TYPES_MOUVEMENT_MATERIEL[m.type];
-              return (
-                <div key={m.id} className="text-[12.5px] px-1">
-                  <div className="flex items-center justify-between">
-                    <span className="font-semibold text-ink truncate">{article?.nom}</span>
-                    <span className={`font-bold tabular ${info.signe > 0 ? "text-[#1a7d34]" : info.signe < 0 ? "text-[#b3241b]" : "text-ink-soft"}`}>
-                      {info.signe > 0 ? "+" : info.signe < 0 ? "-" : ""}{m.quantite}
-                    </span>
-                  </div>
-                  <p className="text-ink-soft text-[11.5px]">{info.label} · {new Date(m.date).toLocaleDateString("fr-FR")}</p>
-                </div>
-              );
-            })}
-          </div>
-        </GlassCard>
-      </div>
+      <GlassCard className="p-2 overflow-hidden" hover={false}>
+        <div className="max-h-[calc(100vh-22rem)] overflow-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-white/80 backdrop-blur-md text-[11px] uppercase text-ink-soft">
+              <tr>
+                <th className="sticky left-0 z-20 bg-white/80 backdrop-blur-md px-3 py-2 text-left">Matériel</th>
+                <th className="px-2 py-2 text-center">Stock initial <Lock size={10} className="inline -mt-0.5" /></th>
+                <th className="px-2 py-2 text-center">Achats</th>
+                <th className="px-2 py-2 text-center">Sorties</th>
+                <th className="px-2 py-2 text-center">Retours</th>
+                <th className="px-2 py-2 text-center">Stock final <Lock size={10} className="inline -mt-0.5" /></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/[0.04]">
+              {cats.map((cat) => (
+                <Fragment key={cat}>
+                  <tr>
+                    <td colSpan={6} className="sticky left-0 px-3 py-1.5 text-xs font-bold uppercase text-white" style={{ background: CAT_COLORS[cat] || "#8E8E93" }}>{cat}</td>
+                  </tr>
+                  {lignes.filter((l) => l.cat === cat).map((l, i) => (
+                    <motion.tr key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.02 }} className="group">
+                      <td className="sticky left-0 z-10 bg-white px-3 py-1.5 font-semibold text-ink group-hover:bg-black/[0.02]">
+                        {l.nom} <span className="text-[10px] text-ink-soft/60">({l.unite})</span>
+                      </td>
+                      <td className="px-2 py-1.5 text-center tabular text-ink-soft">{l.initQuantite}</td>
+                      <MvtCell total={l.achats} tone="green" onClick={() => ouvrirDetail(l, "achat")} />
+                      <MvtCell total={l.sorties} tone="amber" onClick={() => ouvrirDetail(l, "sortie")} />
+                      <MvtCell total={l.retours} tone="sky" sub="via Retour" onClick={() => ouvrirDetail(l, "retour")} />
+                      <td className="px-2 py-1.5 text-center font-bold" style={{ color: l.stock === 0 ? "#FF453A" : config.color }}>{l.stock}</td>
+                    </motion.tr>
+                  ))}
+                </Fragment>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </GlassCard>
 
       <Modal
         open={open}
@@ -204,6 +220,35 @@ export default function StockMateriel() {
             <TextInput type="number" value={articleForm.tarifLocation} onChange={(e) => setArticleForm({ ...articleForm, tarifLocation: e.target.value })} placeholder="5000" />
           </Field>
         </form>
+      </Modal>
+
+      <Modal
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title={detail ? `${DETAIL_TITRES[detail.type]} — ${detail.nom}` : ""}
+        icon={Boxes}
+        accent={config.color}
+        moduleLabel={config.nom}
+        footer={<Button variant="ghost" onClick={() => setDetail(null)}>Fermer</Button>}
+      >
+        {detail?.type === "retour" && (
+          <p className="mb-3 rounded-xl bg-[#0A84FF]/10 px-3 py-2 text-[12px] text-[#0a5cb3]">
+            Les retours s'enregistrent depuis le volet <strong>Retour</strong>, ils apparaissent ici en lecture seule.
+          </p>
+        )}
+        {!detail?.mvts?.length ? (
+          <p className="py-6 text-center text-[13px] text-ink-soft/60">Aucun mouvement de ce type.</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {detail.mvts.map((m) => (
+              <div key={m.id} className="flex items-center justify-between rounded-xl bg-black/[0.03] px-3 py-2 text-[12.5px]">
+                <span className="text-ink-soft">{new Date(m.date).toLocaleDateString("fr-FR")}</span>
+                <span className="font-bold text-ink">{m.quantite}</span>
+                <span className="text-ink-soft truncate max-w-[45%]">{m.motif || "—"}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Pencil, Trash2, Save, Paperclip, Eye, Receipt } from "lucide-react";
+import { Pencil, Trash2, Save, Paperclip, Eye, Receipt, Check, X } from "lucide-react";
 import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
@@ -20,11 +20,12 @@ function Row({ label, children }) {
 // suppression — réutilisée par Depenses.jsx, BusinessDepenses.jsx, et par le
 // détail ouvert en cliquant sur un KPI (TransactionsListModal). Édition et
 // suppression restent réservées aux approbateurs (RLS + `peutModifier`).
-export default function DepenseDetailModal({ depense, secteurs, categories, peutModifier, modifierDepense, supprimerDepense, onClose, onDeleted }) {
+export default function DepenseDetailModal({ depense, secteurs, categories, users = [], peutModifier, modifierDepense, supprimerDepense, changerStatutDepense, currentUser, onClose, onDeleted }) {
   const [mode, setMode] = useState("vue");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [validating, setValidating] = useState(false);
   const [error, setError] = useState("");
   // `depense` est un instantané pris au clic sur la ligne — le rechargement
   // du store après une modification ne le met pas à jour automatiquement.
@@ -74,7 +75,9 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
 
   const affichee = enregistree || depense;
   const secteur = secteurs.find((s) => s.id === affichee.secteurId);
+  const demandeur = users.find((u) => u.uid === affichee.creeParUid);
   const st = statutLabel(affichee.statut);
+  const peutValider = affichee.statut === "en_attente" && typeof changerStatutDepense === "function" && peutModifier;
   const categoriesDuSecteur = [
     ...new Set([...categories.filter((c) => c.secteurId === form.secteurId).map((c) => c.nom), form.categorie].filter(Boolean)),
   ];
@@ -100,6 +103,15 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
     onClose();
   }
 
+  async function valider(statut) {
+    setValidating(true);
+    setError("");
+    const res = await changerStatutDepense(depense.id, statut, currentUser);
+    setValidating(false);
+    if (!res.ok) return setError(res.error);
+    setEnregistree({ ...affichee, statut });
+  }
+
   return (
     <Modal
       open={!!depense}
@@ -117,6 +129,16 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
           </>
         ) : (
           <>
+            {peutValider && (
+              <>
+                <Button variant="danger" icon={X} onClick={() => valider("refusee")} disabled={validating} className="mr-auto">
+                  {validating ? "…" : "Refuser"}
+                </Button>
+                <Button variant="success" icon={Check} onClick={() => valider("approuvee")} disabled={validating}>
+                  {validating ? "…" : "Valider"}
+                </Button>
+              </>
+            )}
             <Button variant="ghost" icon={Trash2} onClick={supprimer} disabled={deleting} className="text-[#FF453A]">
               {deleting ? "Suppression…" : "Supprimer"}
             </Button>
@@ -136,6 +158,12 @@ export default function DepenseDetailModal({ depense, secteurs, categories, peut
           <Row label="Nature du flux"><span className="font-bold text-ink capitalize">{affichee.natureFlux}</span></Row>
           <Row label="Source de financement"><span className="font-bold text-ink capitalize">{affichee.sourceFinancement}</span></Row>
           <Row label="Statut"><Badge tone={st.tone}>{st.label}</Badge></Row>
+          <Row label="Demandé par">
+            <span className="font-semibold text-ink text-right">
+              {demandeur ? demandeur.nom : "—"}
+              {demandeur?.poste && <span className="block text-[11.5px] font-normal text-ink-soft">{demandeur.poste}</span>}
+            </span>
+          </Row>
           <Row label="Motif"><span className="font-medium text-ink text-right">{affichee.description || "—"}</span></Row>
           <Row label="Bénéficiaire"><span className="font-medium text-ink text-right">{affichee.beneficiaireNom || "—"}</span></Row>
           <Row label="Type">

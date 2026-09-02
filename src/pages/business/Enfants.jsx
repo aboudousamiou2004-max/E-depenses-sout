@@ -8,6 +8,7 @@ import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import InscriptionEnfantModal from "../../components/InscriptionEnfantModal";
+import InscriptionJournalierModal from "../../components/InscriptionJournalierModal";
 import { useGarderieStore } from "../../store/garderieStore";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
@@ -32,12 +33,13 @@ export default function Enfants() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { addRecette } = useDataStore();
-  const { enfants, paiements, chargerGarderie, supprimerEnfant } = useGarderieStore();
+  const { enfants, paiements, journaliers, chargerGarderie, supprimerEnfant, supprimerJournalier } = useGarderieStore();
 
   useEffect(() => { chargerGarderie(); }, [chargerGarderie]);
 
   const [modal, setModal] = useState(null); // { enfant, programme } | null
   const [choixProgramme, setChoixProgramme] = useState(false);
+  const [journalierModal, setJournalierModal] = useState(false);
   const [detail, setDetail] = useState(null);
 
   const soldeEnfantMois = (enfantId, mois) => paiements.filter((p) => p.enfantId === enfantId && p.mois === mois).reduce((s, p) => s + p.montant, 0);
@@ -68,7 +70,25 @@ export default function Enfants() {
 
   function choisirProgramme(programme) {
     setChoixProgramme(false);
+    if (programme === "journalier") { setJournalierModal(true); return; }
     setModal({ enfant: null, programme });
+  }
+
+  async function onJournalierSaved({ journalier, montantPaye }) {
+    if (montantPaye > 0 && journalier) {
+      await addRecette(
+        {
+          secteurId: config.secteurId, montant: montantPaye, date: journalier.date,
+          origine: "Frais d'inscription", client: `${journalier.prenom} ${journalier.nom}`, description: "Accueil journalier",
+        },
+        user
+      );
+    }
+  }
+
+  async function supprimerJournalierRow(j) {
+    if (!window.confirm(`Supprimer l'accueil journalier de « ${j.nom} ${j.prenom} » du ${new Date(j.date).toLocaleDateString("fr-FR")} ?`)) return;
+    await supprimerJournalier(j.id);
   }
 
   // Frais d'inscription éventuel, saisi dans la même fiche que l'inscription
@@ -157,7 +177,7 @@ export default function Enfants() {
             <button key={p.id} onClick={() => choisirProgramme(p.id)}
               className="group flex w-full items-center gap-3 rounded-2xl border border-black/10 px-4 py-3 text-left transition-colors hover:border-black/20 hover:bg-black/[0.02]">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white" style={{ background: config.color }}>
-                {p.id === "maternelle" ? <GraduationCap size={18} /> : <Baby size={18} />}
+                {p.id === "maternelle" ? <GraduationCap size={18} /> : p.id === "journalier" ? <CalendarClock size={18} /> : <Baby size={18} />}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-bold text-ink">{p.label}</p>
@@ -182,6 +202,44 @@ export default function Enfants() {
           onClose={() => setModal(null)}
           onSaved={onInscriptionSaved}
         />
+      )}
+
+      <InscriptionJournalierModal
+        open={journalierModal}
+        onClose={() => setJournalierModal(false)}
+        accent={config.color}
+        moduleLabel={config.nom}
+        onSaved={onJournalierSaved}
+      />
+
+      {journaliers.length > 0 && (
+        <GlassCard className="p-2 overflow-hidden mt-5" hover={false}>
+          <p className="font-bold tracking-tight text-ink px-3 pt-3 mb-2 flex items-center gap-2">
+            <CalendarClock size={16} className="text-ink-soft" /> Accueils journaliers récents
+          </p>
+          <table className="w-full min-w-[560px] border-collapse">
+            <thead>
+              <tr className="text-left text-[11px] font-bold text-ink-soft/70 uppercase tracking-wide">
+                <th className="px-3 py-2">Enfant</th>
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2 text-center">Jours</th>
+                <th className="px-3 py-2 text-right">Payé</th>
+                <th className="px-3 py-2"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {journaliers.slice(0, 10).map((j) => (
+                <tr key={j.id} className="text-[13px] hover:bg-black/[0.02] transition-colors">
+                  <td className="px-3 py-2 font-semibold text-ink">{j.nom} {j.prenom}</td>
+                  <td className="px-3 py-2 text-ink-soft">{new Date(j.date).toLocaleDateString("fr-FR")}</td>
+                  <td className="px-3 py-2 text-center tabular text-ink-soft">{j.nombreJours}</td>
+                  <td className="px-3 py-2 text-right tabular font-bold text-[#1a7d34]">{j.montantPaye > 0 ? `+${j.montantPaye.toLocaleString("fr-FR")}` : "—"}</td>
+                  <td className="px-3 py-2 text-right"><button onClick={() => supprimerJournalierRow(j)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </GlassCard>
       )}
 
       {/* Fiche détail — sans les paiements, désormais dans leur propre volet */}

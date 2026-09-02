@@ -18,7 +18,7 @@ import { ROLES_ACCES_TOTAL } from "../../lib/modules";
 
 export default function BusinessDepenses() {
   const config = useOutletContext();
-  const { secteurs, depenses, categories, budgets, addDepense, modifierDepense, supprimerDepense } = useDataStore();
+  const { secteurs, depenses, categories, budgets, users, addDepense, modifierDepense, supprimerDepense, changerStatutDepense } = useDataStore();
   const { user } = useAuthStore();
   const { periode, recherche } = useUIStore();
   const [open, setOpen] = useState(false);
@@ -201,9 +201,12 @@ export default function BusinessDepenses() {
         depense={selection}
         secteurs={secteurs}
         categories={categories}
+        users={users}
         peutModifier={peutModifier}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
+        changerStatutDepense={changerStatutDepense}
+        currentUser={user}
         onClose={() => setSelection(null)}
       />
     </div>

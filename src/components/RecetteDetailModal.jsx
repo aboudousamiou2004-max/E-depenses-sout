@@ -93,7 +93,10 @@ export default function RecetteDetailModal({ recette, secteurs, peutModifier, mo
         <div className="flex flex-col gap-2">
           <Row label="Secteur"><span className="font-bold" style={{ color: secteur?.color }}>{secteur?.nom}</span></Row>
           <Row label="Source"><Badge tone={ORIGINE_TONE[affichee.origine] || "ink"}>{affichee.origine}</Badge></Row>
-          <Row label="Date"><span className="font-bold text-ink">{new Date(affichee.date).toLocaleDateString("fr-FR")}</span></Row>
+          <Row label="Date de sortie"><span className="font-bold text-ink">{new Date(affichee.date).toLocaleDateString("fr-FR")}</span></Row>
+          {affichee.dateRetour && (
+            <Row label="Date de retour"><span className="font-bold text-ink">{new Date(affichee.dateRetour).toLocaleDateString("fr-FR")}</span></Row>
+          )}
           <Row label="Montant"><span className="font-bold text-[#1a7d34]">+{fmtFCFA(affichee.montant)}</span></Row>
         </div>
       ) : (

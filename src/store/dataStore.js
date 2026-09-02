@@ -66,6 +66,7 @@ const mapRecette = (r) => ({
   articleId: r.article_id,
   quantite: r.quantite !== null ? Number(r.quantite) : null,
   jours: r.jours !== null ? Number(r.jours) : null,
+  dateRetour: r.date_retour,
   client: r.client || "",
   description: r.description || "",
   creeParUid: r.cree_par,
@@ -411,6 +412,7 @@ export const useDataStore = create((set, get) => ({
       .insert({
         secteur_id: payload.secteurId, montant: payload.montant, date: payload.date, origine: payload.origine,
         article_id: payload.articleId || null, quantite: payload.quantite ?? null, jours: payload.jours ?? null,
+        date_retour: payload.dateRetour || null,
         client: payload.client || "", description: payload.description || "",
       })
       .select()

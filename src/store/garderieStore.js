@@ -20,6 +20,12 @@ const mapPaiement = (r) => ({
   id: r.id, enfantId: r.enfant_id, mois: r.mois, montant: Number(r.montant) || 0, date: r.date,
   modePaiement: r.mode_paiement, montantCantine: Number(r.montant_cantine) || 0,
 });
+const mapJournalier = (r) => ({
+  id: r.id, date: r.date, nom: r.nom, prenom: r.prenom, ageApprox: r.age_approx || "",
+  parentNom: r.parent_nom || "", parentContact: r.parent_contact || "",
+  nombreJours: Number(r.nombre_jours) || 1, apporteRepas: r.apporte_repas === true,
+  notes: r.notes || "", montantPaye: Number(r.montant_paye) || 0, modePaiement: r.mode_paiement || "espece",
+});
 
 // Payload commun insert/update — un seul endroit à mettre à jour si un
 // champ de la fiche d'inscription change.
@@ -38,16 +44,46 @@ const enfantColumns = (form) => ({
 export const useGarderieStore = create((set, get) => ({
   enfants: [],
   paiements: [],
+  journaliers: [],
 
   chargerGarderie: async () => {
-    const [enfants, paiements] = await Promise.all([
+    const [enfants, paiements, journaliers] = await Promise.all([
       supabase.from("garderie_enfants").select("*").order("nom"),
       supabase.from("garderie_paiements").select("*").order("date", { ascending: false }),
+      supabase.from("garderie_journaliers").select("*").order("date", { ascending: false }),
     ]);
-    set({ enfants: (enfants.data || []).map(mapEnfant), paiements: (paiements.data || []).map(mapPaiement) });
+    set({
+      enfants: (enfants.data || []).map(mapEnfant),
+      paiements: (paiements.data || []).map(mapPaiement),
+      journaliers: (journaliers.data || []).map(mapJournalier),
+    });
   },
 
-  reset: () => set({ enfants: [], paiements: [] }),
+  reset: () => set({ enfants: [], paiements: [], journaliers: [] }),
+
+  ajouterJournalier: async (form, user) => {
+    const { data, error } = await supabase
+      .from("garderie_journaliers")
+      .insert({
+        date: form.date, nom: form.nom.trim(), prenom: form.prenom.trim(), age_approx: form.ageApprox || "",
+        parent_nom: form.parentNom || "", parent_contact: form.parentContact || "",
+        nombre_jours: Number(form.nombreJours) || 1, apporte_repas: form.apporteRepas === true,
+        notes: form.notes || "", montant_paye: Number(form.montantPaye) || 0, mode_paiement: form.modePaiement || "espece",
+        cree_par: user?.uid || null,
+      })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerGarderie();
+    return { ok: true, journalier: mapJournalier(data) };
+  },
+
+  supprimerJournalier: async (id) => {
+    const { error } = await supabase.from("garderie_journaliers").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerGarderie();
+    return { ok: true };
+  },
 
   ajouterEnfant: async (form, user) => {
     const { data, error } = await supabase

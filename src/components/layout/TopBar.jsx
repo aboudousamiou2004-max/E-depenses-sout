@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 import { useDataStore } from "../../store/dataStore";
 import { useUIStore } from "../../store/uiStore";
+import { modulesMetier } from "../../lib/modules";
 import NotificationBell from "./NotificationBell";
 import PeriodeFilter from "./PeriodeFilter";
 
@@ -30,6 +31,9 @@ export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF"
   const { secteurs } = useDataStore();
   const { secteurFiltre, setSecteurFiltre, recherche, setRecherche } = useUIStore();
   const gradient = `linear-gradient(135deg, ${accent}d9 0%, ${darkenHex(accent, 0.58)}cc 100%)`;
+  // Ne proposer dans ce filtre que les secteurs réellement utilisés (mêmes
+  // règles que la navigation : actifs, hors BTP piloté par le circuit PAU).
+  const secteursFiltrables = modulesMetier(secteurs);
 
   return (
     <div className="mb-5">
@@ -67,7 +71,7 @@ export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF"
             className="glass rounded-2xl px-3.5 py-2.5 text-sm font-semibold text-ink outline-none cursor-pointer flex-1 sm:flex-none min-w-0"
           >
             <option value="tous">Tous les secteurs</option>
-            {secteurs.map((s) => (
+            {secteursFiltrables.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.nom}
               </option>

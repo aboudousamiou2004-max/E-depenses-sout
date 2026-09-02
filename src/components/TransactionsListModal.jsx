@@ -13,7 +13,7 @@ import { ROLES_ACCES_TOTAL } from "../lib/modules";
 // ligne pour ouvrir son détail complet (voir/modifier/supprimer), exactement
 // comme depuis les pages Dépenses/Recettes.
 export default function TransactionsListModal({ type, title, items, onClose }) {
-  const { secteurs, categories, modifierDepense, supprimerDepense, modifierRecette, supprimerRecette } = useDataStore();
+  const { secteurs, categories, users, modifierDepense, supprimerDepense, changerStatutDepense, modifierRecette, supprimerRecette } = useDataStore();
   const { user } = useAuthStore();
   const [selection, setSelection] = useState(null);
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
@@ -56,9 +56,12 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
           depense={selection}
           secteurs={secteurs}
           categories={categories}
+          users={users}
           peutModifier={peutModifier}
           modifierDepense={modifierDepense}
           supprimerDepense={supprimerDepense}
+          changerStatutDepense={changerStatutDepense}
+          currentUser={user}
           onClose={() => setSelection(null)}
         />
       ) : (

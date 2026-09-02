@@ -15,6 +15,7 @@ export const GROUPES_AGE = [
 export const PROGRAMMES_ENFANT = [
   { id: "garderie", label: "Garderie", desc: "0 – 2 ans" },
   { id: "maternelle", label: "Maternelle", desc: "3 – 6 ans" },
+  { id: "journalier", label: "Journalier", desc: "Accueil ponctuel, payé au jour" },
 ];
 
 export const GROUPES_PAR_PROGRAMME = {

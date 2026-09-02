@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Save, Plus, Trash2, FolderPlus, Building2, ShieldCheck, Settings } from "lucide-react";
+import { Save, Plus, Trash2, FolderPlus, Building2, ShieldCheck, Settings, AlertTriangle } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import Button from "../components/ui/Button";
@@ -8,6 +8,8 @@ import Field, { TextInput, Select } from "../components/ui/Field";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore } from "../store/authStore";
 import { ROLES_ACCES_TOTAL } from "../lib/modules";
+import { reinitialiserBaseDeDonnees, TABLES_A_REINITIALISER } from "../lib/resetApplication";
+import { supabase } from "../lib/supabaseClient";
 
 export default function Parametres() {
   const { user } = useAuthStore();
@@ -28,8 +30,181 @@ export default function Parametres() {
         <SectionCircuitAutorisation />
         <SectionCategories secteurs={secteurs} categories={categories} addCategorie={addCategorie} supprimerCategorie={supprimerCategorie} />
         <SectionSecteurs secteurs={secteurs} addSecteur={addSecteur} modifierSecteur={modifierSecteur} supprimerSecteur={supprimerSecteur} />
+        {user?.role === "super_admin" && <SectionZoneDanger user={user} />}
       </div>
     </div>
+  );
+}
+
+const PHRASE_CONFIRMATION = "SUPPRIMER TOUT";
+
+// Réinitialisation complète des DONNÉES de l'application — strictement
+// réservée au super-administrateur. Double confirmation volontairement lourde
+// (phrase à recopier + mot de passe re-saisi) : action IRRÉVERSIBLE.
+function SectionZoneDanger({ user }) {
+  const { login, logout } = useAuthStore();
+  const [open, setOpen] = useState(false);
+  const [etape, setEtape] = useState("phrase"); // "phrase" | "motdepasse" | "suppression" | "termine"
+  const [phrase, setPhrase] = useState("");
+  const [motDePasse, setMotDePasse] = useState("");
+  const [erreur, setErreur] = useState("");
+  const [verification, setVerification] = useState(false);
+  const [progression, setProgression] = useState(null);
+
+  function fermer() {
+    if (etape === "suppression") return; // pas d'annulation en cours de suppression
+    setOpen(false);
+    setEtape("phrase");
+    setPhrase("");
+    setMotDePasse("");
+    setErreur("");
+    setProgression(null);
+  }
+
+  async function confirmerMotDePasse() {
+    setErreur("");
+    if (!motDePasse) return setErreur("Saisissez votre mot de passe.");
+    setVerification(true);
+    try {
+      const res = await login(user.login, motDePasse);
+      if (!res.ok) return setErreur(res.error || "Mot de passe incorrect.");
+      setEtape("suppression");
+      const resultats = await reinitialiserBaseDeDonnees({
+        keepUserId: user.uid,
+        onProgress: (info) => setProgression(info),
+      });
+      const totalSupprime = resultats.reduce((s, r) => s + r.removed, 0);
+      const echecs = resultats.filter((r) => !r.ok);
+      await supabase.from("journal").insert({
+        user_id: user.uid,
+        user_nom: user.nom,
+        role: user.role,
+        module: "parametres",
+        action: "RESET_BASE_DE_DONNEES",
+        details: `Réinitialisation de la base (${totalSupprime} enregistrements supprimés sur ${resultats.length} tables${echecs.length ? `, ${echecs.length} table(s) en échec` : ""})`,
+      });
+      setEtape("termine");
+    } catch (e) {
+      setErreur(e?.message || "Une erreur est survenue pendant la réinitialisation.");
+      setEtape("motdepasse");
+    } finally {
+      setVerification(false);
+    }
+  }
+
+  async function terminerEtRecharger() {
+    await logout();
+    window.location.reload();
+  }
+
+  return (
+    <>
+      <GlassCard className="p-6" hover={false} style={{ border: "1px solid rgba(255,69,58,0.3)" }}>
+        <div className="flex items-start gap-3">
+          <AlertTriangle size={20} className="mt-0.5 shrink-0 text-[#FF453A]" />
+          <div>
+            <h3 className="font-bold tracking-tight text-[#b3241b]">⚠️ Zone de danger — réinitialiser la base de données</h3>
+            <p className="mt-1 text-[12.5px] text-[#b3241b]">
+              Supprime définitivement les données de tous les secteurs et modules ({TABLES_A_REINITIALISER.length} tables :
+              dépenses, recettes, stocks, budgets, journal…). Les secteurs eux-mêmes et les autres comptes
+              utilisateurs sont conservés (seuls leurs mouvements/données sont vidés). Cette action est irréversible.
+            </p>
+            <Button variant="danger" className="mt-3" icon={Trash2} onClick={() => setOpen(true)}>
+              Réinitialiser la base de données
+            </Button>
+          </div>
+        </div>
+      </GlassCard>
+
+      <Modal
+        open={open}
+        onClose={fermer}
+        title="Réinitialisation de la base de données"
+        icon={AlertTriangle}
+        accent="#FF453A"
+        footer={
+          etape === "phrase" ? (
+            <>
+              <Button variant="ghost" onClick={fermer}>Annuler</Button>
+              <Button variant="danger" disabled={phrase !== PHRASE_CONFIRMATION} onClick={() => setEtape("motdepasse")}>
+                Continuer
+              </Button>
+            </>
+          ) : etape === "motdepasse" ? (
+            <>
+              <Button variant="ghost" onClick={fermer}>Annuler</Button>
+              <Button variant="danger" disabled={verification} onClick={confirmerMotDePasse}>
+                {verification ? "Vérification…" : "Confirmer la réinitialisation"}
+              </Button>
+            </>
+          ) : etape === "termine" ? (
+            <Button variant="danger" onClick={terminerEtRecharger}>Fermer et recharger l'application</Button>
+          ) : null
+        }
+      >
+        {etape === "phrase" && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] font-semibold text-[#b3241b]">
+              Cette action supprime définitivement toutes les données de tous les secteurs et modules. Irréversible.
+            </p>
+            <p className="text-[13px] text-ink-soft">Pour continuer, recopiez exactement la phrase suivante :</p>
+            <p className="rounded-xl bg-black/[0.04] px-3 py-2 text-center font-mono text-[13px] font-bold tracking-wide text-ink">
+              {PHRASE_CONFIRMATION}
+            </p>
+            <TextInput
+              type="text"
+              value={phrase}
+              onChange={(e) => setPhrase(e.target.value)}
+              placeholder="Recopiez la phrase ci-dessus"
+              autoFocus
+            />
+          </div>
+        )}
+
+        {etape === "motdepasse" && (
+          <div className="flex flex-col gap-3">
+            <p className="text-[13px] text-ink-soft">Dernière étape : ressaisissez votre mot de passe pour confirmer.</p>
+            <TextInput
+              type="password"
+              value={motDePasse}
+              onChange={(e) => setMotDePasse(e.target.value)}
+              placeholder="Votre mot de passe"
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && confirmerMotDePasse()}
+            />
+            {erreur && <p className="text-[12.5px] font-semibold text-[#FF453A]">{erreur}</p>}
+          </div>
+        )}
+
+        {etape === "suppression" && (
+          <div className="flex flex-col gap-3 py-4 text-center">
+            <p className="text-[13px] font-semibold text-ink">Réinitialisation en cours — ne fermez pas cette fenêtre…</p>
+            {progression && (
+              <>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-black/[0.06]">
+                  <div
+                    className="h-full bg-[#FF453A] transition-all"
+                    style={{ width: `${Math.round((progression.index / progression.total) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-[11.5px] text-ink-soft">
+                  {progression.index} / {progression.total} tables traitées — {progression.table}
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
+        {etape === "termine" && (
+          <div className="flex flex-col gap-2 py-2 text-center">
+            <p className="text-[13px] font-semibold text-[#1a7d34]">Réinitialisation terminée ✓</p>
+            <p className="text-[13px] text-ink-soft">L'application va se déconnecter et recharger sur un état vierge.</p>
+          </div>
+        )}
+
+        {erreur && etape === "phrase" && <p className="mt-2 text-[12.5px] font-semibold text-[#FF453A]">{erreur}</p>}
+      </Modal>
+    </>
   );
 }
 

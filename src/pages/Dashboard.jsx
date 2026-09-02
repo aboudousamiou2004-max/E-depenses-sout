@@ -40,6 +40,11 @@ export default function Dashboard() {
     if (!res.ok) return alert(res.error);
     setOuvrirAjoutSecteur(false);
     setFormSecteur({ nom: "", label: "", color: COULEURS_SUGGEREES[0] });
+    // On amène directement vers l'allocation du budget du mois pour ce
+    // nouveau secteur — sinon il faut le retrouver soi-même dans la longue
+    // liste de « Recette et Budget » (il apparaît en dernier, par date de
+    // création).
+    navigate("/depense/recettes", { state: { ouvrirBudgetPour: res.secteur.id } });
   }
 
   const secteurActif = secteurFiltre !== "tous" ? secteurs.find((s) => s.id === secteurFiltre) : null;

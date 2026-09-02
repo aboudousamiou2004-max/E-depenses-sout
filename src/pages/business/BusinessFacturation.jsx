@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, FileText } from "lucide-react";
+import { Plus, FileText, Trash2 } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
@@ -37,23 +37,32 @@ export default function BusinessFacturation() {
     description: "",
     montant: "",
     date: "2026-07-27",
+    dateSortie: "2026-07-27",
+    dateRetour: "2026-07-27",
     briqueTypeId: typesBriques[0]?.id,
     briqueQuantite: "",
-    articleId: referentielMateriel[0]?.id,
-    articleQuantite: 1,
-    jours: 1,
+    lignes: [{ articleId: referentielMateriel[0]?.id, qte: 1, jours: 1 }],
   });
 
   const isVenteBriques = venteDeBriques && form.type === "Vente de briques";
   const briqueChoisie = typesBriques.find((t) => t.id === form.briqueTypeId);
   const stockDispoBrique = briqueChoisie ? stockBriques[briqueChoisie.id]?.pret || 0 : 0;
 
-  // Prestation de location — structurée (article × jours × tarif/jour), au
-  // lieu d'un montant tapé à la main. Porté depuis
-  // termitiere-platform/src/modules/logistique/logic.js (montantLigne).
-  const isLocation = locationMateriel && form.type === "Location";
-  const articleChoisi = referentielMateriel.find((a) => a.id === form.articleId);
-  const montantLocation = (Number(form.articleQuantite) || 0) * (Number(form.jours) || 0) * (articleChoisi?.tarifLocation || 0);
+  const isLocationOuPrestation = locationMateriel && (form.type === "Location" || form.type === "Prestation");
+
+  function articleDe(id) { return referentielMateriel.find((a) => a.id === id); }
+  function ligneMontant(l) { return (Number(l.qte) || 0) * (Number(l.jours) || 0) * (articleDe(l.articleId)?.tarifLocation || 0); }
+  const totalLignes = form.lignes.reduce((s, l) => s + ligneMontant(l), 0);
+
+  function ajouterLigne() {
+    setForm((f) => ({ ...f, lignes: [...f.lignes, { articleId: referentielMateriel[0]?.id, qte: 1, jours: 1 }] }));
+  }
+  function retirerLigne(i) {
+    setForm((f) => ({ ...f, lignes: f.lignes.filter((_, k) => k !== i) }));
+  }
+  function modifierLigne(i, patch) {
+    setForm((f) => ({ ...f, lignes: f.lignes.map((l, k) => (k === i ? { ...l, ...patch } : l)) }));
+  }
 
   const liste = useMemo(() => {
     let rows = recettes.filter((r) => r.secteurId === config.secteurId).sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -88,31 +97,36 @@ export default function BusinessFacturation() {
       const resVente = await venteBriques(briqueChoisie.id, qte, user);
       setSaving(false);
       if (!resVente.ok) return setError(resVente.error);
-    } else if (isLocation) {
-      if (!articleChoisi || montantLocation <= 0) {
+    } else if (isLocationOuPrestation) {
+      const lignesValides = form.lignes.filter((l) => articleDe(l.articleId) && ligneMontant(l) > 0);
+      if (!lignesValides.length) {
         setSaving(false);
-        return setError("Choisissez un article avec un tarif de location, une quantité et un nombre de jours");
+        return setError("Ajoutez au moins une ligne avec un article, une quantité, un nombre de jours et un tarif réglé");
       }
-      const res = await addRecette(
-        {
-          secteurId: config.secteurId, montant: montantLocation, date: form.date,
-          origine: `Location — ${articleChoisi.nom} (${form.jours}j)`, client: form.client, description: form.description,
-          articleId: articleChoisi.id, quantite: Number(form.articleQuantite) || 0, jours: Number(form.jours) || 0,
-        },
-        user
-      );
-      if (!res.ok) {
-        setSaving(false);
-        return setError(res.error);
+      for (const l of lignesValides) {
+        const article = articleDe(l.articleId);
+        const res = await addRecette(
+          {
+            secteurId: config.secteurId, montant: ligneMontant(l), date: form.dateSortie, dateRetour: form.dateRetour,
+            origine: `${form.type} — ${article.nom} (${l.jours}j)`, client: form.client, description: form.description,
+            articleId: l.articleId, quantite: Number(l.qte) || 0, jours: Number(l.jours) || 0,
+          },
+          user
+        );
+        if (!res.ok) {
+          setSaving(false);
+          return setError(res.error);
+        }
+        const resSortie = await addMouvementMateriel(
+          { articleId: l.articleId, type: "sortie", quantite: l.qte, motif: `${form.type} — ${form.client || "client"}`, date: form.dateSortie },
+          user
+        );
+        if (!resSortie.ok) {
+          setSaving(false);
+          return setError(resSortie.error);
+        }
       }
-      // Enregistre la sortie de l'article loué — même geste que la vente de
-      // briques décrémente son stock, ici le matériel part sur le terrain.
-      const resSortie = await addMouvementMateriel(
-        { articleId: articleChoisi.id, type: "sortie", quantite: form.articleQuantite, motif: `Location — ${form.client || "client"}`, date: form.date },
-        user
-      );
       setSaving(false);
-      if (!resSortie.ok) return setError(resSortie.error);
     } else {
       if (!form.montant) {
         setSaving(false);
@@ -126,7 +140,10 @@ export default function BusinessFacturation() {
       if (!res.ok) return setError(res.error);
     }
     setOpen(false);
-    setForm((f) => ({ ...f, montant: "", client: "", description: "", briqueQuantite: "" }));
+    setForm((f) => ({
+      ...f, montant: "", client: "", description: "", briqueQuantite: "",
+      lignes: [{ articleId: referentielMateriel[0]?.id, qte: 1, jours: 1 }],
+    }));
   }
 
   return (
@@ -234,31 +251,58 @@ export default function BusinessFacturation() {
                 Montant estimé : <span className="font-bold text-ink">{fmtFCFA(Math.min(Number(form.briqueQuantite) || 0, stockDispoBrique) * (briqueChoisie?.tarifVente || 0))}</span>
               </p>
             </>
-          ) : isLocation ? (
+          ) : isLocationOuPrestation ? (
             <>
-              <Field label="Article loué">
-                <Select value={form.articleId} onChange={(e) => setForm({ ...form, articleId: e.target.value })}>
-                  {referentielMateriel.map((a) => <option key={a.id} value={a.id}>{a.nom} ({fmtFCFA(a.tarifLocation)}/j)</option>)}
-                </Select>
-              </Field>
+              <p className="mb-1.5 text-[12.5px] font-semibold text-ink-soft">
+                {form.type === "Prestation" ? "Matériel mis à disposition" : "Articles loués"}
+              </p>
+              {form.lignes.map((l, i) => {
+                const article = articleDe(l.articleId);
+                return (
+                  <div key={i} className="rounded-2xl border border-black/[0.06] p-3 mb-2.5">
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-end">
+                      <Field label="Article">
+                        <Select value={l.articleId} onChange={(e) => modifierLigne(i, { articleId: e.target.value })}>
+                          {referentielMateriel.map((a) => <option key={a.id} value={a.id}>{a.nom} ({fmtFCFA(a.tarifLocation)}/j)</option>)}
+                        </Select>
+                      </Field>
+                      {form.lignes.length > 1 && (
+                        <button type="button" onClick={() => retirerLigne(i)} className="w-10 h-10 mb-3.5 rounded-xl flex items-center justify-center text-ink-soft hover:bg-[#FF453A]/10 hover:text-[#FF453A] transition-colors">
+                          <Trash2 size={15} strokeWidth={2.2} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Quantité">
+                        <TextInput type="number" min="1" value={l.qte} onChange={(e) => modifierLigne(i, { qte: e.target.value })} />
+                      </Field>
+                      <Field label="Nombre de jours">
+                        <TextInput type="number" min="1" value={l.jours} onChange={(e) => modifierLigne(i, { jours: e.target.value })} />
+                      </Field>
+                    </div>
+                    {article?.tarifLocation > 0 ? (
+                      <p className="text-[12.5px] text-ink-soft -mt-1">
+                        Montant : <span className="font-bold text-ink">{fmtFCFA(ligneMontant(l))}</span> ({l.qte} × {l.jours}j × {fmtFCFA(article.tarifLocation)})
+                      </p>
+                    ) : (
+                      <p className="text-[12px] text-[#b3241b] -mt-1">Aucun tarif de location réglé pour cet article — réglez-le depuis Stock magasin.</p>
+                    )}
+                  </div>
+                );
+              })}
+              <Button type="button" variant="ghost" icon={Plus} onClick={ajouterLigne} className="mb-3">Ajouter une ligne</Button>
+              <p className="text-right text-[15px] font-extrabold text-ink mb-3">Total : {fmtFCFA(totalLignes)}</p>
+              <p className="text-[11.5px] text-ink-soft/70 -mt-1 mb-3">
+                Ces quantités seront automatiquement sorties du stock magasin à l'enregistrement.
+              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Quantité">
-                  <TextInput type="number" min="1" value={form.articleQuantite} onChange={(e) => setForm({ ...form, articleQuantite: e.target.value })} />
+                <Field label="Date de sortie">
+                  <TextInput type="date" value={form.dateSortie} onChange={(e) => setForm({ ...form, dateSortie: e.target.value })} />
                 </Field>
-                <Field label="Nombre de jours">
-                  <TextInput type="number" min="1" value={form.jours} onChange={(e) => setForm({ ...form, jours: e.target.value })} />
+                <Field label="Date de retour prévue">
+                  <TextInput type="date" value={form.dateRetour} onChange={(e) => setForm({ ...form, dateRetour: e.target.value })} />
                 </Field>
               </div>
-              {articleChoisi?.tarifLocation > 0 ? (
-                <p className="text-[12.5px] text-ink-soft -mt-1 mb-3">
-                  Montant : <span className="font-bold text-ink">{fmtFCFA(montantLocation)}</span> ({form.articleQuantite} × {form.jours}j × {fmtFCFA(articleChoisi.tarifLocation)})
-                </p>
-              ) : (
-                <p className="text-[12px] text-[#b3241b] -mt-1 mb-3">Aucun tarif de location réglé pour cet article — réglez-le depuis Stock magasin.</p>
-              )}
-              <Field label="Date">
-                <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-              </Field>
             </>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

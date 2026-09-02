@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, Wallet, TrendingUp, AlertTriangle, History, Send, CheckCircle2, Trash2 } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
@@ -31,6 +32,8 @@ export default function Recettes() {
   const { secteurs, recettes, budgets, depenses, users, addRecette, modifierRecette, supprimerRecette, allouerOuReviserBudget, validerReceptionBudget, supprimerBudget } = useDataStore();
   const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +72,20 @@ export default function Recettes() {
     setRevMotif("");
     setRevError("");
   }
+
+  // Arrivée depuis « Ajouter un secteur » (tableau de bord) : ouvre directement
+  // l'allocation du budget du mois pour le secteur qu'on vient de créer, sans
+  // avoir à le chercher soi-même dans la liste. On nettoie l'état de
+  // navigation aussitôt pour ne pas rouvrir la modale sur un retour arrière.
+  useEffect(() => {
+    const cible = location.state?.ouvrirBudgetPour;
+    if (!cible) return;
+    const bs = budgetParSecteur.find((b) => b.secteur.id === cible);
+    if (bs) {
+      ouvrirRevision(bs);
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, budgetParSecteur]);
 
   async function confirmerRevision() {
     if (!revision) return;

@@ -20,7 +20,7 @@ import { ROLES_ACCES_TOTAL } from "../lib/modules";
 const ligneVide = () => ({ secteurId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), natureFlux: "exploitation", sourceFinancement: "entreprise", description: "", imprevue: false });
 
 export default function Depenses() {
-  const { secteurs, depenses, categories, budgets, addDepense, modifierDepense, supprimerDepense, reconduireDepenses } = useDataStore();
+  const { secteurs, depenses, categories, budgets, users, addDepense, modifierDepense, supprimerDepense, changerStatutDepense, reconduireDepenses } = useDataStore();
   const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
   const [open, setOpen] = useState(false);
@@ -388,9 +388,12 @@ export default function Depenses() {
         depense={selection}
         secteurs={secteurs}
         categories={categories}
+        users={users}
         peutModifier={peutModifier}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
+        changerStatutDepense={changerStatutDepense}
+        currentUser={user}
         onClose={() => setSelection(null)}
       />
     </div>

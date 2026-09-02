@@ -18,7 +18,7 @@ import { ROLES_ACCES_TOTAL } from "../lib/modules";
 // (quand un secteur précis est sélectionné dans le filtre) et par le tableau de
 // bord des modules métier, pour ne jamais dupliquer ce calcul à deux endroits.
 export default function SecteurOverview({ secteurId, nom, color, labelRecettes = "Dernières recettes", onVoirDepenses, onVoirRecettes }) {
-  const { secteurs, budgets, depenses, recettes, categories, modifierDepense, supprimerDepense, modifierRecette, supprimerRecette } = useDataStore();
+  const { secteurs, budgets, depenses, recettes, categories, users, modifierDepense, supprimerDepense, changerStatutDepense, modifierRecette, supprimerRecette } = useDataStore();
   const { periode } = useUIStore();
   const { user } = useAuthStore();
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
@@ -173,9 +173,12 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
         depense={depenseSelectionnee}
         secteurs={secteurs}
         categories={categories}
+        users={users}
         peutModifier={peutModifier}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
+        changerStatutDepense={changerStatutDepense}
+        currentUser={user}
         onClose={() => setDepenseSelectionnee(null)}
       />
       <RecetteDetailModal
