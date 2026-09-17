@@ -45,7 +45,7 @@ export default function Login() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-ink">E-DÉPENSES</h1>
           <p className="text-[13.5px] text-ink-soft font-medium mt-1">
-            Système de pilotage financier — LA TERMITIÈRE
+            Système de pilotage financier : LA TERMITIÈRE
           </p>
         </div>
 

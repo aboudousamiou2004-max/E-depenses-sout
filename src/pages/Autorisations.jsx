@@ -28,7 +28,7 @@ export default function Autorisations() {
 
   return (
     <div>
-      <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses — dès dépassement du budget alloué (PAU ou GE)" icon={ShieldCheck} accent="#FF9F0A" />
+      <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses : dès dépassement du budget alloué (PAU ou GE)" icon={ShieldCheck} accent="#FF9F0A" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
         <GlassCard className="p-5">
@@ -36,7 +36,7 @@ export default function Autorisations() {
           <p className="text-3xl font-bold tracking-tight tabular text-[#9a5f00] mt-1.5">{enAttente.length}</p>
         </GlassCard>
         <GlassCard className="p-5">
-          <p className="text-[12.5px] font-semibold text-ink-soft">Approuvées — à décaisser</p>
+          <p className="text-[12.5px] font-semibold text-ink-soft">Approuvées : à décaisser</p>
           <p className="text-3xl font-bold tracking-tight tabular text-[#0a5cb3] mt-1.5">{approuvees.length}</p>
         </GlassCard>
         <GlassCard className="p-5">
@@ -65,7 +65,7 @@ export default function Autorisations() {
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s?.color }} />
                     <div className="min-w-0">
-                      <p className="text-[13.5px] font-semibold text-ink truncate">{d.categorie} — {s?.nom}</p>
+                      <p className="text-[13.5px] font-semibold text-ink truncate">{d.categorie} : {s?.nom}</p>
                       <p className="text-[11.5px] text-ink-soft truncate">{d.beneficiaireNom} · {new Date(d.date).toLocaleDateString("fr-FR")}</p>
                       <p className="text-[11.5px] text-ink-soft italic truncate mt-0.5">Motif : {d.description?.trim() || "non renseigné"}</p>
                     </div>
@@ -88,7 +88,7 @@ export default function Autorisations() {
 
       <GlassCard className="p-6 mb-5" hover={false}>
         <h3 className="font-bold tracking-tight text-ink mb-4 flex items-center gap-2">
-          <Banknote size={18} className="text-[#0A84FF]" /> Approuvées — décaissement
+          <Banknote size={18} className="text-[#0A84FF]" /> Approuvées : décaissement
         </h3>
         <div className="flex flex-col gap-2.5">
           {approuvees.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucune dépense approuvée en attente de décaissement.</p>}
@@ -98,7 +98,7 @@ export default function Autorisations() {
               <div key={d.id} className="flex items-center justify-between gap-4 px-4 py-3.5 rounded-2xl bg-white/50">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: s?.color }} />
-                  <p className="text-[13.5px] font-semibold text-ink truncate">{d.categorie} — {s?.nom}</p>
+                  <p className="text-[13.5px] font-semibold text-ink truncate">{d.categorie} : {s?.nom}</p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-bold tabular text-ink">{fmtFCFA(d.montant)}</span>

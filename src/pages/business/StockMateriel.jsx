@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Boxes, ArrowDownCircle, ArrowUpCircle, PackageCheck, AlertTriangle, Lock } from "lucide-react";
+import { Plus, Boxes, ArrowDownCircle, ArrowUpCircle, PackageCheck, AlertTriangle, Lock, Pencil } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import StatTile from "../../components/ui/StatTile";
@@ -13,14 +13,14 @@ import { useAuthStore } from "../../store/authStore";
 import { TYPES_MOUVEMENT_MATERIEL, CAT_MATERIEL } from "../../data/stockData";
 
 const CAT_COLORS = {
-  "TENTES & STRUCTURES": "#0A84FF",
-  "TABLES": "#30D158",
-  "CHAISES": "#FF9F0A",
-  "SONORISATION": "#BF5AF2",
-  "ÉCLAIRAGE": "#FFD60A",
-  "DÉCORATION": "#FF375F",
-  "VAISSELLE & SERVICE": "#5E5CE6",
-  "AUTRES": "#8E8E93",
+  "TENTES & STRUCTURES": "#DC2626",
+  "TABLES": "#059669",
+  "CHAISES": "#D97706",
+  "SONORISATION": "#7C3AED",
+  "ÉCLAIRAGE": "#CA8A04",
+  "DÉCORATION": "#DB2777",
+  "VAISSELLE & SERVICE": "#0891B2",
+  "AUTRES": "#52525B",
 };
 
 function MvtCell({ total, tone, onClick, sub }) {
@@ -39,10 +39,16 @@ function MvtCell({ total, tone, onClick, sub }) {
 export default function StockMateriel() {
   const config = useOutletContext();
   const { user } = useAuthStore();
-  const { referentielMateriel, mouvementsMateriel, stockArticle, addMouvementMateriel, ajouterArticleMateriel } = useStockStore();
+  // Valeur financière du stock cachée aux agents (à la demande explicite de
+  // l'utilisateur, 2026-09-17) : donnée sensible, pas leur rôle de la voir.
+  const peutVoirValeurStock = user?.role !== "agent";
+  const { referentielMateriel: tousArticles, mouvementsMateriel: tousMouvements, stockArticle, addMouvementMateriel, ajouterArticleMateriel, modifierArticleMateriel } = useStockStore();
+  const referentielMateriel = useMemo(() => tousArticles.filter((a) => a.secteurId === config.secteurId), [tousArticles, config.secteurId]);
+  const mouvementsMateriel = useMemo(() => tousMouvements.filter((m) => m.secteurId === config.secteurId), [tousMouvements, config.secteurId]);
 
   const [open, setOpen] = useState(false);
   const [openArticle, setOpenArticle] = useState(false);
+  const [articleEnEdition, setArticleEnEdition] = useState(null); // null = création, sinon l'article en cours de modification
   const [detail, setDetail] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -75,7 +81,7 @@ export default function StockMateriel() {
     if (!form.quantite || !form.articleId) return;
     setSaving(true);
     setError("");
-    const res = await addMouvementMateriel(form, user);
+    const res = await addMouvementMateriel({ ...form, secteurId: config.secteurId }, user);
     setSaving(false);
     if (!res.ok) return setError(res.error);
     setOpen(false);
@@ -87,11 +93,28 @@ export default function StockMateriel() {
     if (!articleForm.nom) return;
     setSaving(true);
     setError("");
-    const res = await ajouterArticleMateriel(articleForm);
+    const res = articleEnEdition
+      ? await modifierArticleMateriel(articleEnEdition.id, articleForm)
+      : await ajouterArticleMateriel({ ...articleForm, secteurId: config.secteurId });
     setSaving(false);
     if (!res.ok) return setError(res.error);
     setOpenArticle(false);
+    setArticleEnEdition(null);
     setArticleForm({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
+  }
+
+  function ouvrirNouvelArticle(catPreremplie) {
+    setArticleEnEdition(null);
+    setArticleForm({ nom: "", cat: catPreremplie || CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
+    setError("");
+    setOpenArticle(true);
+  }
+
+  function ouvrirModificationArticle(article) {
+    setArticleEnEdition(article);
+    setArticleForm({ nom: article.nom, cat: article.cat, unite: article.unite, coutAchat: String(article.coutAchat || ""), tarifLocation: String(article.tarifLocation || "") });
+    setError("");
+    setOpenArticle(true);
   }
 
   function ouvrirDetail(ligne, type) {
@@ -102,18 +125,20 @@ export default function StockMateriel() {
 
   return (
     <div>
-      <TopBarSimple title="Stock magasin" subtitle={`${config.nom} — matériel disponible et mouvements`} icon={Boxes} accent={config.color} />
+      <TopBarSimple title="Stock magasin" subtitle={`${config.nom} : matériel disponible et mouvements`} icon={Boxes} accent={config.color} />
 
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 mb-5">
+      <div className={`grid grid-cols-2 gap-4 sm:gap-5 mb-5 ${peutVoirValeurStock ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
         <StatTile icon={Boxes} label="Articles référencés" value={String(lignes.length)} tone={config.color} />
-        <StatTile icon={PackageCheck} label="Valeur du stock (estimée)" value={Math.round(valeurTotale / 1000) + "k FCFA"} tone="#30D158" />
+        {peutVoirValeurStock && (
+          <StatTile icon={PackageCheck} label="Valeur du stock (estimée)" value={Math.round(valeurTotale / 1000) + "k FCFA"} tone="#30D158" />
+        )}
         <StatTile icon={ArrowDownCircle} label="Articles en rupture" value={String(enRupture)} tone={enRupture > 0 ? "#FF453A" : "#8E8E93"} />
         <StatTile icon={ArrowUpCircle} label="Mouvements enregistrés" value={String(mouvementsMateriel.length)} tone="#5E5CE6" />
         <StatTile icon={AlertTriangle} label="Pertes cumulées (casse/perdu)" value={Math.round(valeurPertes / 1000) + "k FCFA"} tone={valeurPertes > 0 ? "#FF453A" : "#8E8E93"} />
       </div>
 
       <div className="flex flex-wrap justify-end gap-2.5 mb-4">
-        <Button variant="ghost" icon={Plus} onClick={() => setOpenArticle(true)}>Nouvel article</Button>
+        <Button variant="ghost" icon={Plus} onClick={() => ouvrirNouvelArticle()}>Nouvel article</Button>
         <Button icon={Plus} onClick={() => setOpen(true)} style={{ background: config.color }}>Nouveau mouvement</Button>
       </div>
 
@@ -128,13 +153,27 @@ export default function StockMateriel() {
                 <th className="px-2 py-2 text-center">Sorties</th>
                 <th className="px-2 py-2 text-center">Retours</th>
                 <th className="px-2 py-2 text-center">Stock final <Lock size={10} className="inline -mt-0.5" /></th>
+                <th className="px-2 py-2 text-center">Location / j</th>
+                <th className="px-2 py-2 text-center"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-black/[0.04]">
               {cats.map((cat) => (
                 <Fragment key={cat}>
                   <tr>
-                    <td colSpan={6} className="sticky left-0 px-3 py-1.5 text-xs font-bold uppercase text-white" style={{ background: CAT_COLORS[cat] || "#8E8E93" }}>{cat}</td>
+                    <td colSpan={8} className="sticky left-0 px-3 py-1.5 text-xs font-bold uppercase text-white" style={{ background: CAT_COLORS[cat] || "#8E8E93" }}>
+                      <div className="flex items-center justify-between">
+                        <span>{cat}</span>
+                        <button
+                          type="button"
+                          onClick={() => ouvrirNouvelArticle(cat)}
+                          title={`Ajouter un article dans ${cat}`}
+                          className="flex items-center gap-1 rounded-lg bg-white/20 hover:bg-white/30 px-2 py-0.5 text-[10.5px] font-bold normal-case transition-colors"
+                        >
+                          <Plus size={11} strokeWidth={2.6} /> Article
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                   {lignes.filter((l) => l.cat === cat).map((l, i) => (
                     <motion.tr key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.02 }} className="group">
@@ -146,6 +185,17 @@ export default function StockMateriel() {
                       <MvtCell total={l.sorties} tone="amber" onClick={() => ouvrirDetail(l, "sortie")} />
                       <MvtCell total={l.retours} tone="sky" sub="via Retour" onClick={() => ouvrirDetail(l, "retour")} />
                       <td className="px-2 py-1.5 text-center font-bold" style={{ color: l.stock === 0 ? "#FF453A" : config.color }}>{l.stock}</td>
+                      <td className="px-2 py-1.5 text-center tabular text-ink-soft">{l.tarifLocation ? `${l.tarifLocation.toLocaleString("fr-FR")} F` : "—"}</td>
+                      <td className="px-2 py-1.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => ouvrirModificationArticle(l)}
+                          title="Modifier cet article"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-ink-soft/60 hover:bg-black/5 hover:text-ink transition-colors"
+                        >
+                          <Pencil size={13} strokeWidth={2.2} />
+                        </button>
+                      </td>
                     </motion.tr>
                   ))}
                 </Fragment>
@@ -192,14 +242,15 @@ export default function StockMateriel() {
 
       <Modal
         open={openArticle}
-        onClose={() => setOpenArticle(false)}
-        title="Nouvel article"
-        icon={Boxes}
+        onClose={() => { setOpenArticle(false); setArticleEnEdition(null); }}
+        title={articleEnEdition ? "Modifier l'article" : "Nouvel article"}
+        icon={articleEnEdition ? Pencil : Boxes}
         accent={config.color}
         moduleLabel={config.nom}
-        footer={<><Button variant="ghost" onClick={() => setOpenArticle(false)}>Annuler</Button><Button onClick={submitArticle} disabled={saving}>{saving ? "Création…" : "Créer"}</Button></>}
+        footer={<><Button variant="ghost" onClick={() => { setOpenArticle(false); setArticleEnEdition(null); }}>Annuler</Button><Button onClick={submitArticle} disabled={saving}>{saving ? "Enregistrement…" : articleEnEdition ? "Enregistrer" : "Créer"}</Button></>}
       >
         <form onSubmit={submitArticle}>
+          {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Nom de l'article">
             <TextInput value={articleForm.nom} onChange={(e) => setArticleForm({ ...articleForm, nom: e.target.value })} placeholder="Ex : Groupe électrogène" />
           </Field>
@@ -225,7 +276,7 @@ export default function StockMateriel() {
       <Modal
         open={!!detail}
         onClose={() => setDetail(null)}
-        title={detail ? `${DETAIL_TITRES[detail.type]} — ${detail.nom}` : ""}
+        title={detail ? `${DETAIL_TITRES[detail.type]} : ${detail.nom}` : ""}
         icon={Boxes}
         accent={config.color}
         moduleLabel={config.nom}

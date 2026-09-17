@@ -10,6 +10,9 @@ import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useEgproStore } from "../../store/egproStore";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutModifier, peutSupprimer } from "../../lib/modules";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 const STATUTS = {
   a_faire: { label: "À faire", tone: "ink" }, en_cours: { label: "En cours", tone: "amber" },
@@ -39,6 +42,8 @@ export default function Taches() {
   const { user } = useAuthStore();
   const { projets, taches, chargerEgpro, ajouterTache, modifierTache, supprimerTache, avancerTache } = useEgproStore();
   const { depenses, chargerDepenses, addDepense } = useDataStore();
+  const modifierOk = peutModifier(user?.role);
+  const supprimerOk = peutSupprimer(user?.role);
 
   useEffect(() => { chargerEgpro(); chargerDepenses(); }, [chargerEgpro, chargerDepenses]);
 
@@ -50,6 +55,7 @@ export default function Taches() {
   const [error, setError] = useState("");
   const [versForm, setVersForm] = useState({ montant: "", date: new Date().toISOString().slice(0, 10) });
   const [versSaving, setVersSaving] = useState(false);
+  const [confirmCible, setConfirmCible] = useState(null);
 
   const verseParTache = useMemo(() => {
     const map = {};
@@ -88,10 +94,12 @@ export default function Taches() {
     setModal(null);
   }
 
-  async function supprimer(t) {
-    if (!window.confirm(`Supprimer la tâche « ${t.titre} » ?`)) return;
-    await supprimerTache(t.id);
-    if (detailId === t.id) setDetailId(null);
+  async function confirmerSuppression(motif) {
+    const t = confirmCible;
+    await enregistrerMotifSuppression({ user, table: "egpro_taches", label: t.titre, motif, secteurId: config.secteurId });
+    const res = await supprimerTache(t.id);
+    if (res.ok && detailId === t.id) setDetailId(null);
+    return res;
   }
 
   async function submitVersement(e) {
@@ -100,7 +108,7 @@ export default function Taches() {
     setVersSaving(true);
     await addDepense({
       secteurId: config.secteurId, categorie: "Sous-traitance", montant: Number(versForm.montant), date: versForm.date,
-      description: `Versement — ${detail.titre}`, natureFlux: "exploitation", sourceFinancement: "entreprise",
+      description: `Versement : ${detail.titre}`, natureFlux: "exploitation", sourceFinancement: "entreprise",
       beneficiaireNom: detail.prestataireNom || "", projetId: detail.projetId, tacheId: detail.id,
     }, user);
     setVersSaving(false);
@@ -109,7 +117,7 @@ export default function Taches() {
 
   return (
     <div>
-      <TopBarSimple title="Tâches" subtitle={`${config.nom} — suivi des tâches et versements aux prestataires`} icon={ListTodo} accent={config.color} />
+      <TopBarSimple title="Tâches" subtitle={`${config.nom} : suivi des tâches et versements aux prestataires`} icon={ListTodo} accent={config.color} />
 
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Select className="!w-auto" value={filtreProjet} onChange={(e) => setFiltreProjet(e.target.value)}>
@@ -139,7 +147,7 @@ export default function Taches() {
                   <Badge tone={PRIORITES[t.priorite]?.tone}>{PRIORITES[t.priorite]?.label}</Badge>
                   {enRetard && <Badge tone="coral">En retard</Badge>}
                 </div>
-                <button onClick={(e) => { e.stopPropagation(); supprimer(t); }} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>
+                {supprimerOk && <button onClick={(e) => { e.stopPropagation(); setConfirmCible(t); }} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}
               </div>
               <p className="mt-2 font-bold tracking-tight text-ink">{t.titre}</p>
               <p className="mt-1 text-[11.5px] text-ink-soft">{nomProjet(t.projetId)}{t.phase && ` · ${t.phase}`}</p>
@@ -210,7 +218,7 @@ export default function Taches() {
         )}
       </Modal>
 
-      {/* Détail — versements */}
+      {/* Détail : versements */}
       <Modal open={!!detail} onClose={() => setDetailId(null)} title={detail ? detail.titre : ""}
         icon={ListTodo} accent={config.color} moduleLabel={config.nom}
         footer={<Button variant="ghost" onClick={() => setDetailId(null)}>Fermer</Button>}>
@@ -226,11 +234,11 @@ export default function Taches() {
                 <Badge tone={STATUTS[detail.statut]?.tone}>{STATUTS[detail.statut]?.label}</Badge>
                 <Badge tone={PRIORITES[detail.priorite]?.tone}>{PRIORITES[detail.priorite]?.label}</Badge>
                 <span className="text-[12.5px] text-ink-soft">{nomProjet(detail.projetId)}</span>
-                <button onClick={() => { setDetailId(null); openEdit(detail); }} className="ml-auto text-[12px] text-[#0A84FF] hover:underline">Modifier</button>
+                {modifierOk && <button onClick={() => { setDetailId(null); openEdit(detail); }} className="ml-auto text-[12px] text-[#0A84FF] hover:underline">Modifier</button>}
               </div>
               {detail.note && <p className="text-[13px] text-ink-soft whitespace-pre-wrap">{detail.note}</p>}
               {(detail.prestataireNom || detail.prestataireMetier) && (
-                <p className="text-[12.5px] text-ink-soft">Prestataire : <span className="font-semibold text-ink">{detail.prestataireNom || "—"}</span>{detail.prestataireMetier && ` — ${detail.prestataireMetier}`}{detail.prestataireTelephone && ` · ${detail.prestataireTelephone}`}</p>
+                <p className="text-[12.5px] text-ink-soft">Prestataire : <span className="font-semibold text-ink">{detail.prestataireNom || "—"}</span>{detail.prestataireMetier && ` : ${detail.prestataireMetier}`}{detail.prestataireTelephone && ` · ${detail.prestataireTelephone}`}</p>
               )}
 
               <div className="rounded-2xl bg-black/[0.03] p-3">
@@ -263,6 +271,14 @@ export default function Taches() {
           );
         })()}
       </Modal>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre="Supprimer cette tâche ?"
+        description={confirmCible ? `Vous allez supprimer la tâche « ${confirmCible.titre} ».` : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
     </div>
   );
 }

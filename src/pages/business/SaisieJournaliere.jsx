@@ -8,7 +8,10 @@ import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useStockStore, CAT_ANIMAUX_IDENTIFIES } from "../../store/stockStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutSupprimer } from "../../lib/modules";
 import { TYPES_MOUVEMENT_ANIMAL, CAT_ANIMAUX } from "../../data/stockData";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 // Sortie (vente/décès/perte) → statut correspondant dans le registre individuel.
 const STATUT_SORTIE = { vente: "vendu", deces: "mort", perte: "perdu" };
@@ -90,7 +93,7 @@ export default function SaisieJournaliere() {
 
   return (
     <div>
-      <TopBarSimple title="Saisie journalière" subtitle={`${config.nom} — EF Initial · Entrées · Sorties · EF Final`} icon={ClipboardList} accent={config.color} />
+      <TopBarSimple title="Saisie journalière" subtitle={`${config.nom} : EF Initial · Entrées · Sorties · EF Final`} icon={ClipboardList} accent={config.color} />
 
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div>
@@ -110,7 +113,7 @@ export default function SaisieJournaliere() {
                 <th className="px-3 py-3 text-center">Entrées</th>
                 <th className="px-3 py-3 text-center">Sorties</th>
                 <th className="px-3 py-3 text-center" title="Calculé automatiquement">EF Final <Lock size={10} className="inline" /></th>
-                <th className="px-3 py-3 text-center" title="Nombre d'animaux malades ce jour — sert au taux de morbidité">Malades</th>
+                <th className="px-3 py-3 text-center" title="Nombre d'animaux malades ce jour : sert au taux de morbidité">Malades</th>
               </tr>
             </thead>
             <tbody>
@@ -158,6 +161,7 @@ export default function SaisieJournaliere() {
         moduleLabel={config.nom}
         addMouvementAnimal={addMouvementAnimal}
         supprimerMouvementAnimal={supprimerMouvementAnimal}
+        secteurId={config.secteurId}
         lignes={mvtModal ? mouvementsJour(mvtModal.espece.id).filter((m) => (mvtModal.dir === "entree" ? m.quantite > 0 : m.quantite < 0)) : []}
         animauxIndividuels={mvtModal ? animauxIndividuels.filter((a) => a.especeId === mvtModal.espece.id) : []}
         ajouterAnimalIndividuel={ajouterAnimalIndividuel}
@@ -189,13 +193,21 @@ export default function SaisieJournaliere() {
   );
 }
 
-function MouvementJourModal({ modal, onClose, date, user, accent, moduleLabel, addMouvementAnimal, supprimerMouvementAnimal, lignes, animauxIndividuels, ajouterAnimalIndividuel, sortirAnimalIndividuel }) {
+function MouvementJourModal({ modal, onClose, date, user, accent, moduleLabel, addMouvementAnimal, supprimerMouvementAnimal, secteurId, lignes, animauxIndividuels, ajouterAnimalIndividuel, sortirAnimalIndividuel }) {
   const [type, setType] = useState("");
   const [quantite, setQuantite] = useState("");
   const [motif, setMotif] = useState("");
   const [identifiant, setIdentifiant] = useState("");
   const [individuId, setIndividuId] = useState("");
   const [saving, setSaving] = useState(false);
+  const [confirmCible, setConfirmCible] = useState(null);
+  const supprimerOk = peutSupprimer(user?.role);
+
+  async function confirmerSuppression(motifSuppression) {
+    const l = confirmCible;
+    await enregistrerMotifSuppression({ user, table: "mouvements_animaux", label: `${TYPES_MOUVEMENT_ANIMAL[l.type]?.label || l.type} : ${Math.abs(l.quantite)}`, motif: motifSuppression, secteurId });
+    return supprimerMouvementAnimal(l.id);
+  }
 
   if (!modal) return null;
   const { espece, dir } = modal;
@@ -222,7 +234,7 @@ function MouvementJourModal({ modal, onClose, date, user, accent, moduleLabel, a
   }
 
   return (
-    <Modal open onClose={onClose} title={`${dir === "entree" ? "⬇️ Entrées" : "⬆️ Sorties"} — ${espece.nom} (${date})`}
+    <Modal open onClose={onClose} title={`${dir === "entree" ? "⬇️ Entrées" : "⬆️ Sorties"} : ${espece.nom} (${date})`}
       icon={ClipboardList} accent={accent} moduleLabel={moduleLabel} footer={<Button onClick={onClose}>Terminer</Button>}>
       <div className="space-y-2 mb-4">
         {lignes.length === 0 && <p className="text-[13px] text-ink-soft italic">Aucun mouvement saisi pour cette journée.</p>}
@@ -232,7 +244,7 @@ function MouvementJourModal({ modal, onClose, date, user, accent, moduleLabel, a
             <span className="font-bold tabular">{Math.abs(l.quantite)}</span>
             {l.motif && <span className="text-ink-soft truncate">— {l.motif}</span>}
             <span className="ml-auto text-[11px] text-ink-soft/70">{l.agentNom}</span>
-            <button onClick={() => supprimerMouvementAnimal(l.id)} className="text-[#FF453A] hover:opacity-70" title="Supprimer"><Trash2 size={14} /></button>
+            {supprimerOk && <button onClick={() => setConfirmCible(l)} className="text-[#FF453A] hover:opacity-70" title="Supprimer"><Trash2 size={14} /></button>}
           </div>
         ))}
       </div>
@@ -255,19 +267,27 @@ function MouvementJourModal({ modal, onClose, date, user, accent, moduleLabel, a
       </div>
       {identifie && dir === "entree" && (types.includes("achat") || types.includes("naissance")) && (
         <div className="mt-2">
-          <label className="block text-[11px] font-semibold text-ink-soft mb-1">Identifiant de l'animal (optionnel) — l'inscrit au registre individuel</label>
+          <label className="block text-[11px] font-semibold text-ink-soft mb-1">Identifiant de l'animal (optionnel) : l'inscrit au registre individuel</label>
           <TextInput value={identifiant} onChange={(e) => setIdentifiant(e.target.value)} placeholder="Ex : B-014" />
         </div>
       )}
       {identifie && dir === "sortie" && (
         <div className="mt-2">
-          <label className="block text-[11px] font-semibold text-ink-soft mb-1">Animal concerné (optionnel) — le marque « {STATUT_SORTIE[typeActuel] || "sorti"} » dans le registre</label>
+          <label className="block text-[11px] font-semibold text-ink-soft mb-1">Animal concerné (optionnel) : le marque « {STATUT_SORTIE[typeActuel] || "sorti"} » dans le registre</label>
           <Select value={individuId} onChange={(e) => setIndividuId(e.target.value)}>
             <option value="">— Non précisé —</option>
             {actifs.map((a) => <option key={a.id} value={a.id}>{a.identifiant}</option>)}
           </Select>
         </div>
       )}
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre="Supprimer ce mouvement ?"
+        description={confirmCible ? `Vous allez supprimer « ${TYPES_MOUVEMENT_ANIMAL[confirmCible.type]?.label || confirmCible.type} : ${Math.abs(confirmCible.quantite)} ».` : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
     </Modal>
   );
 }

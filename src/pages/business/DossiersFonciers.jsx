@@ -10,6 +10,9 @@ import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useFoncierStore } from "../../store/foncierStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutModifier, peutSupprimer } from "../../lib/modules";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 const TYPES_DOSSIER = ["Vente / Cession", "Immatriculation", "Mutation de nom", "Morcellement", "Donation", "Héritage", "Lotissement", "Autre"];
 const CATEGORIES_FRAIS = [
@@ -34,6 +37,8 @@ export default function DossiersFonciers() {
   const config = useOutletContext();
   const { user } = useAuthStore();
   const { dossiers, frais, chargerFoncier, ajouterDossier, modifierDossier, supprimerDossier, ajouterFrais, supprimerFrais } = useFoncierStore();
+  const modifierOk = peutModifier(user?.role);
+  const supprimerOk = peutSupprimer(user?.role);
 
   useEffect(() => { chargerFoncier(); }, [chargerFoncier]);
 
@@ -42,6 +47,7 @@ export default function DossiersFonciers() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [fraisForm, setFraisForm] = useState({ categorie: "administratif", libelle: "", montant: "", date: new Date().toISOString().slice(0, 10) });
+  const [confirmCible, setConfirmCible] = useState(null); // { type: "dossier" | "frais", data }
 
   const totalDossier = (dossierId) => frais.filter((f) => f.dossierId === dossierId).reduce((s, f) => s + f.montant, 0);
   const totalGeneral = dossiers.reduce((s, d) => s + totalDossier(d.id), 0);
@@ -75,10 +81,16 @@ export default function DossiersFonciers() {
     setModal(null);
   }
 
-  async function supprimer(d) {
-    if (!window.confirm(`Supprimer le dossier « ${d.numero} » et tous ses frais ?`)) return;
-    await supprimerDossier(d.id);
-    if (detailId === d.id) setDetailId(null);
+  async function confirmerSuppression(motif) {
+    const { type, data } = confirmCible;
+    if (type === "frais") {
+      await enregistrerMotifSuppression({ user, table: "foncier_frais", label: data.libelle || labelCat(data.categorie), motif, secteurId: config.secteurId });
+      return supprimerFrais(data.id);
+    }
+    await enregistrerMotifSuppression({ user, table: "foncier_dossiers", label: data.numero, motif, secteurId: config.secteurId });
+    const res = await supprimerDossier(data.id);
+    if (res.ok && detailId === data.id) setDetailId(null);
+    return res;
   }
 
   async function submitFrais(e) {
@@ -90,7 +102,7 @@ export default function DossiersFonciers() {
 
   return (
     <div>
-      <TopBarSimple title="Dossiers fonciers" subtitle={`${config.nom} — dossiers, frais engagés, total par dossier`} icon={FolderOpen} accent={config.color} />
+      <TopBarSimple title="Dossiers fonciers" subtitle={`${config.nom} : dossiers, frais engagés, total par dossier`} icon={FolderOpen} accent={config.color} />
 
       <div className="grid grid-cols-2 gap-4 mb-5">
         <StatTile icon={FolderOpen} label="Dossiers" value={String(dossiers.length)} tone={config.color} />
@@ -125,7 +137,7 @@ export default function DossiersFonciers() {
                 <td className="px-3 py-2.5 text-right tabular font-bold text-[#B45309]">{Math.round(totalDossier(d.id)).toLocaleString("fr-FR")}</td>
                 <td className="px-3 py-2.5 text-center"><Badge tone={STATUTS[d.statut]?.tone}>{STATUTS[d.statut]?.label}</Badge></td>
                 <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => supprimer(d)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>
+                  {supprimerOk && <button onClick={() => setConfirmCible({ type: "dossier", data: d })} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}
                 </td>
               </tr>
             ))}
@@ -164,8 +176,8 @@ export default function DossiersFonciers() {
         )}
       </Modal>
 
-      {/* Détail — frais du dossier */}
-      <Modal open={!!detail} onClose={() => setDetailId(null)} title={detail ? `Dossier ${detail.numero} — ${detail.commune}` : ""}
+      {/* Détail : frais du dossier */}
+      <Modal open={!!detail} onClose={() => setDetailId(null)} title={detail ? `Dossier ${detail.numero} : ${detail.commune}` : ""}
         icon={FolderOpen} accent={config.color} moduleLabel={config.nom}
         footer={<Button variant="ghost" onClick={() => setDetailId(null)}>Fermer</Button>}>
         {detail && (
@@ -173,7 +185,7 @@ export default function DossiersFonciers() {
             <div className="flex items-center gap-2 flex-wrap">
               <Badge tone={STATUTS[detail.statut]?.tone}>{STATUTS[detail.statut]?.label}</Badge>
               <span className="text-[12.5px] text-ink-soft">{detail.type} · {detail.proprietaire}</span>
-              <button onClick={() => { setDetailId(null); openEdit(detail); }} className="ml-auto text-[12px] text-[#0A84FF] hover:underline">Modifier infos</button>
+              {modifierOk && <button onClick={() => { setDetailId(null); openEdit(detail); }} className="ml-auto text-[12px] text-[#0A84FF] hover:underline">Modifier infos</button>}
             </div>
 
             {parCategorie.length > 0 && (
@@ -201,7 +213,7 @@ export default function DossiersFonciers() {
                     <span className="flex-1 truncate text-ink-soft">{f.libelle || "—"}</span>
                     <span className="whitespace-nowrap text-ink-soft/70">{new Date(f.date).toLocaleDateString("fr-FR")}</span>
                     <span className="font-bold tabular text-ink">{Math.round(f.montant).toLocaleString("fr-FR")}</span>
-                    <button onClick={() => supprimerFrais(f.id)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={13} /></button>
+                    {supprimerOk && <button onClick={() => setConfirmCible({ type: "frais", data: f })} className="text-[#FF453A] hover:opacity-70"><Trash2 size={13} /></button>}
                   </div>
                 ))}
               </div>
@@ -228,6 +240,14 @@ export default function DossiersFonciers() {
           </div>
         )}
       </Modal>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre={confirmCible?.type === "frais" ? "Supprimer ce frais ?" : "Supprimer ce dossier ?"}
+        description={confirmCible ? (confirmCible.type === "frais" ? `Vous allez supprimer le frais « ${confirmCible.data.libelle || labelCat(confirmCible.data.categorie)} ».` : `Vous allez supprimer le dossier « ${confirmCible.data.numero} » et tous ses frais.`) : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
     </div>
   );
 }

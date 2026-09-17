@@ -8,14 +8,25 @@ import MobileTabBar from "./MobileTabBar";
 // l'ordre du tableau NAV construit dans BusinessLayout.jsx. Limité à 2 par
 // secteur pour garder la barre lisible sur mobile — à la demande explicite
 // de l'utilisateur (2026-08-19).
-const ESSENTIELS = {
-  agro: ["saisie", "facturation"],
-  logistique: ["facturation", "stock"],
-  briqueterie: ["production", "facturation"],
-  foncier: ["dossiers", "besoins"],
-  garderie: ["enfants", "paiements"],
-  egpro: ["projets", "taches"],
-};
+//
+// Basé sur les indicateurs de `config` (forfaits/campagnes/stock/transport),
+// pas sur `config.id` : un secteur "succursale" (ex. « MAXI GYM KARA »,
+// « MAXI LOGISTIQUE KARA ») a un id slugifié différent du preset de base et
+// ne matcherait jamais une table indexée par id — ce bug faisait afficher
+// une barre mobile sans AUCUN raccourci pour MAXI GYM et MAXI COM (constaté
+// par l'utilisateur, 2026-09-14), corrigé ici en réutilisant les mêmes
+// indicateurs déjà fiabilisés pour les succursales dans BusinessLayout.jsx.
+function essentielsDeSecteur(config) {
+  if (config.forfaits) return ["abonnements", "coachs"]; // MAXI GYM : pointage clients + coachs, l'usage quotidien
+  if (config.campagnes) return ["campagnes", "facturation"]; // MAXI COM
+  if (config.stock === "animaux") return ["saisie", "facturation"]; // MAXI AGRO
+  if (config.stock === "briques") return ["production", "facturation"]; // E-BRIQUETERIE
+  if (config.stock === "materiel") return ["transport", "facturation"]; // MAXI LOGISTIQUE
+  if (config.foncier) return ["dossiers", "besoins"];
+  if (config.garderie) return ["enfants", "paiements"];
+  if (config.egpro) return ["projets", "taches"];
+  return [];
+}
 
 // Enrobe MobileTabBar pour BusinessLayout.jsx : calcule les items propres à
 // CE secteur (c'est ce qui la rend différente d'un secteur à l'autre) à
@@ -23,7 +34,7 @@ const ESSENTIELS = {
 // d'accès (stock/garderie/egpro...) déjà présente dans BusinessLayout.jsx.
 export default function MobileBottomNav({ config, nav, onOpenMenu }) {
   const dashboard = nav.find((n) => n.end);
-  const essentielsSegments = ESSENTIELS[config.id] || [];
+  const essentielsSegments = essentielsDeSecteur(config);
   const essentiels = essentielsSegments
     .map((seg) => nav.find((n) => n.to.endsWith(`/${seg}`)))
     .filter(Boolean);

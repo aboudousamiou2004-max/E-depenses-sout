@@ -1,13 +1,15 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { Loader2, DatabaseZap } from "lucide-react";
+import { DatabaseZap } from "lucide-react";
 import { useAuthStore } from "./store/authStore";
 import { supabaseConfigured } from "./lib/supabaseClient";
 import ErrorBoundary from "./components/ErrorBoundary";
+import SplashScreen from "./components/SplashScreen";
 import AppLayout from "./components/layout/AppLayout";
 import BusinessRoute from "./components/layout/BusinessRoute";
 import ModuleGuard from "./components/ModuleGuard";
 import Login from "./pages/Login";
 import Portal from "./pages/Portal";
+import ChoixSecteurVille from "./pages/ChoixSecteurVille";
 import Dashboard from "./pages/Dashboard";
 import Depenses from "./pages/Depenses";
 import Recettes from "./pages/Recettes";
@@ -18,6 +20,7 @@ import Flux from "./pages/Flux";
 import Banque from "./pages/Banque";
 import Partenaires from "./pages/Partenaires";
 import Journal from "./pages/Journal";
+import Archives from "./pages/Archives";
 import Parametres from "./pages/Parametres";
 import Utilisateurs from "./pages/admin/Utilisateurs";
 import BusinessDashboard from "./pages/business/BusinessDashboard";
@@ -44,6 +47,16 @@ import Paiements from "./pages/business/Paiements";
 import CantineRepas from "./pages/business/CantineRepas";
 import SanteInfirmerie from "./pages/business/SanteInfirmerie";
 import AnalysePilotage from "./pages/business/AnalysePilotage";
+import Forfaits from "./pages/business/Forfaits";
+import Clients from "./pages/business/Clients";
+import ClientsPartenaires from "./pages/business/ClientsPartenaires";
+import Coachs from "./pages/business/Coachs";
+import Seances from "./pages/business/Seances";
+import Abonnements from "./pages/business/Abonnements";
+import AnalysesGym from "./pages/business/AnalysesGym";
+import Campagnes from "./pages/business/Campagnes";
+import Transport from "./pages/business/Transport";
+import AnalysesSecteur from "./pages/business/AnalysesSecteur";
 
 function Protected({ children }) {
   const { user, status } = useAuthStore();
@@ -53,11 +66,7 @@ function Protected({ children }) {
   // flash de la page de connexion à chaque rechargement pour un utilisateur
   // pourtant déjà connecté.
   if (status === "loading") {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 size={22} className="animate-spin text-ink-soft" strokeWidth={2.2} />
-      </div>
-    );
+    return <SplashScreen />;
   }
   if (!user) return <Navigate to="/login" replace />;
   return children;
@@ -93,6 +102,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
 
         <Route path="/portal" element={<Protected><Portal /></Protected>} />
+        <Route path="/module/:base" element={<Protected><ChoixSecteurVille /></Protected>} />
         <Route path="/utilisateurs" element={<Protected><Utilisateurs /></Protected>} />
 
         <Route
@@ -115,6 +125,7 @@ export default function App() {
           <Route path="banque" element={<Banque />} />
           <Route path="partenaires" element={<Partenaires />} />
           <Route path="journal" element={<Journal />} />
+          <Route path="archives" element={<Archives />} />
           <Route path="parametres" element={<Parametres />} />
         </Route>
 
@@ -150,6 +161,17 @@ export default function App() {
           <Route path="cantine" element={<CantineRepas />} />
           <Route path="infirmerie" element={<SanteInfirmerie />} />
           <Route path="analyse" element={<AnalysePilotage />} />
+          <Route path="forfaits" element={<Forfaits />} />
+          <Route path="clients" element={<Clients />} />
+          <Route path="clients-partenaires" element={<ClientsPartenaires />} />
+          <Route path="coachs" element={<Coachs />} />
+          <Route path="seances" element={<Seances />} />
+          <Route path="abonnements" element={<Abonnements />} />
+          <Route path="pilotage" element={<AnalysesGym />} />
+          <Route path="partenaires" element={<Partenaires />} />
+          <Route path="campagnes" element={<Campagnes />} />
+          <Route path="transport" element={<Transport />} />
+          <Route path="bilan" element={<AnalysesSecteur />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/portal" replace />} />

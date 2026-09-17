@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, BellOff, AlertTriangle, Info, CheckCircle2, XCircle, Loader2, CheckCheck } from "lucide-react";
+import { Bell, BellOff, Loader2, CheckCheck } from "lucide-react";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 import { pushSupporte, statutAbonnementPush, activerNotificationsPush, desactiverNotificationsPush } from "../../lib/push";
 
 const TYPE_STYLE = {
-  warning: { color: "#FF9F0A", icon: AlertTriangle },
-  info: { color: "#0A84FF", icon: Info },
-  success: { color: "#30D158", icon: CheckCircle2 },
-  danger: { color: "#FF453A", icon: XCircle },
+  warning: { color: "#FF9F0A" },
+  info: { color: "#0A84FF" },
+  success: { color: "#30D158" },
+  danger: { color: "#FF453A" },
 };
 
 const PUSH_LABEL = {
@@ -23,7 +23,7 @@ const PUSH_LABEL = {
 const PUSH_CAPTION = {
   actif: "Actives, même app fermée",
   inactif: "Reçois les alertes app fermée",
-  refuse: "Bloquées — réglages du navigateur",
+  refuse: "Bloquées : réglages du navigateur",
   "non-supporte": "Navigateur non compatible",
 };
 
@@ -192,7 +192,6 @@ export default function NotificationBell() {
                 )}
                 {mesNotifs.map((n) => {
                   const style = TYPE_STYLE[n.type] || TYPE_STYLE.info;
-                  const Icon = style.icon;
                   return (
                     <button
                       key={n.id}
@@ -203,11 +202,9 @@ export default function NotificationBell() {
                       style={{ width: "calc(100% - 12px)" }}
                     >
                       {!n.lu && <span className="absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#0A84FF]" />}
-                      <div
-                        className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                        style={{ background: `${style.color}1a`, color: style.color, opacity: n.lu ? 0.6 : 1 }}
-                      >
-                        <Icon size={14} strokeWidth={2.2} />
+                      <div className="relative w-8 h-8 shrink-0 mt-0.5" style={{ opacity: n.lu ? 0.6 : 1 }}>
+                        <img src="/logo_termitiere.png" alt="" className="w-8 h-8 rounded-full object-contain bg-white shadow-[0_1px_3px_rgba(0,0,0,0.15)]" />
+                        <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-white" style={{ background: style.color }} />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">

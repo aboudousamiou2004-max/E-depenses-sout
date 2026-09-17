@@ -58,7 +58,7 @@ export default function ProductionBriques() {
 
   return (
     <div>
-      <TopBarSimple title="Production" subtitle={`${config.nom} — production de briques et séchage jusqu'à la vente`} icon={Factory} accent={config.color} />
+      <TopBarSimple title="Production" subtitle={`${config.nom} : production de briques et séchage jusqu'à la vente`} icon={Factory} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Factory} label="En appâtam" value={String(totalAppatam)} tone="#8E8E93" />
@@ -103,7 +103,7 @@ export default function ProductionBriques() {
             const type = typesBriques.find((t) => t.id === j.typeId);
             return (
               <div key={j.id} className="text-[12px] px-1">
-                <span className="font-semibold text-ink">{type?.nom}</span> — {j.action} <span className="font-bold tabular">{j.quantite}</span>
+                <span className="font-semibold text-ink">{type?.nom}</span> : {j.action} <span className="font-bold tabular">{j.quantite}</span>
               </div>
             );
           })}

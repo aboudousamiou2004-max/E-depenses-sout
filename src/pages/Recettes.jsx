@@ -14,7 +14,9 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte, matchPeriode, budgetSecteurMois, depensesSecteurMois, statutBudget } from "../lib/logic";
-import { ROLES_ACCES_TOTAL } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutConfirmerBudget, secteurIdsPourFiltre } from "../lib/modules";
+import ConfirmSuppressionModal from "../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 
 const ORIGINES = ["Vente", "Prestation", "Facturation client", "Subvention"];
 
@@ -42,6 +44,8 @@ export default function Recettes() {
   const [filtreOrigine, setFiltreOrigine] = useState("");
   const [detail, setDetail] = useState(null);
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
+  const peutConfirmer = peutConfirmerBudget(user?.role);
 
   // ── Budget par secteur (allocation / révision) ──
   const [revision, setRevision] = useState(null); // { budget, secteur, requiertValidation }
@@ -50,9 +54,15 @@ export default function Recettes() {
   const [revSaving, setRevSaving] = useState(false);
   const [revError, setRevError] = useState("");
   const [validationBusy, setValidationBusy] = useState(null);
+  const [confirmSuppressionBudget, setConfirmSuppressionBudget] = useState(false);
+
+  // Un secteur désactivé depuis Paramètres ne doit plus apparaître dans cette
+  // liste (ni dans les alertes) — seul l'écran Paramètres continue de le
+  // lister, pour permettre de le réactiver.
+  const secteursActifs = useMemo(() => secteurs.filter((s) => s.actif !== false), [secteurs]);
 
   const budgetParSecteur = useMemo(() => {
-    return secteurs.map((s) => {
+    return secteursActifs.map((s) => {
       const budget = budgets.find((b) => b.secteurId === s.id && b.annee === periode.annee && b.mois === periode.mois);
       const alloue = budgetSecteurMois(budgets, s.id, periode.annee, periode.mois);
       const depense = totalMontant(depensesSecteurMois(depenses, s.id, periode.annee, periode.mois));
@@ -64,7 +74,7 @@ export default function Recettes() {
       const requiertValidation = users.some((u) => (u.modules || []).includes(s.id));
       return { secteur: s, budget, alloue, depense, reste: alloue - depense, pct, statut: statutBudget(pct / 100), requiertValidation };
     });
-  }, [secteurs, budgets, depenses, users, periode]);
+  }, [secteursActifs, budgets, depenses, users, periode]);
 
   function ouvrirRevision(bs) {
     setRevision(bs);
@@ -111,20 +121,19 @@ export default function Recettes() {
     setValidationBusy(null);
   }
 
-  async function supprimerBudgetActuel() {
-    if (!revision?.budget) return;
-    if (!window.confirm(`Supprimer le budget alloué de ${revision.secteur.nom} pour cette période ?`)) return;
-    setRevSaving(true);
-    await supprimerBudget(revision.budget.id);
-    setRevSaving(false);
-    setRevision(null);
+  async function confirmerSuppressionBudget(motif) {
+    if (!revision?.budget) return { ok: false, error: "Rien à supprimer" };
+    await enregistrerMotifSuppression({ user, table: "budgets", label: `Budget ${revision.secteur.nom}`, motif, secteurId: revision.secteur.id });
+    const res = await supprimerBudget(revision.budget.id);
+    if (res.ok) setRevision(null);
+    return res;
   }
 
   // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
   // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
   useEffect(() => {
-    if (!form.secteurId && secteurs.length > 0) setForm((f) => ({ ...f, secteurId: secteurs[0].id }));
-  }, [secteurs, form.secteurId]);
+    if (!form.secteurId && secteursActifs.length > 0) setForm((f) => ({ ...f, secteurId: secteursActifs[0].id }));
+  }, [secteursActifs, form.secteurId]);
 
   function secteurOf(id) {
     return secteurs.find((s) => s.id === id);
@@ -135,7 +144,8 @@ export default function Recettes() {
   // ci-dessous) : sert de socle à la fois au tableau détaillé et aux KPI par
   // secteur (qui, eux, restent toujours calculés sur la période en cours).
   const baseFiltree = useMemo(() => {
-    let rows = secteurFiltre === "tous" ? recettes : recettes.filter((r) => r.secteurId === secteurFiltre);
+    const ids = secteurIdsPourFiltre(secteurFiltre, secteurs);
+    let rows = ids ? recettes.filter((r) => ids.includes(r.secteurId)) : recettes;
     if (filtreOrigine) rows = rows.filter((r) => r.origine === filtreOrigine);
     if (respecterPeriode) rows = rows.filter((r) => matchPeriode(r.date, periode));
     if (recherche.trim()) {
@@ -172,8 +182,8 @@ export default function Recettes() {
   // (secteursEnAlerte, seuil 80 %), affiché ici pour croiser revenus encaissés
   // et secteurs qui dépensent au-delà de leur budget alloué.
   const alertes = useMemo(
-    () => secteursEnAlerte(secteurs, depenses, budgets, periode.annee, periode.mois),
-    [secteurs, depenses, budgets, periode]
+    () => secteursEnAlerte(secteursActifs, depenses, budgets, periode.annee, periode.mois),
+    [secteursActifs, depenses, budgets, periode]
   );
 
   async function submit(e) {
@@ -192,7 +202,7 @@ export default function Recettes() {
     <div>
       <TopBar title="Recette et Budget" subtitle="Encaissements et budget alloué par secteur d'activité" icon={Wallet} accent="#30D158" />
 
-      {/* KPI par secteur — revenu du mois en cours */}
+      {/* KPI par secteur : revenu du mois en cours */}
       {kpiParSecteur.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
           {kpiParSecteur.map(({ secteur, montant }) => (
@@ -228,13 +238,13 @@ export default function Recettes() {
         </GlassCard>
       )}
 
-      {/* Budget par secteur — allocation / révision, avec historique */}
+      {/* Budget par secteur : allocation / révision, avec historique */}
       <GlassCard className="p-5 mb-5" hover={false}>
         <div className="flex items-center gap-2 mb-3">
           <Wallet size={16} className="text-[#B45309]" strokeWidth={2.4} />
           <h3 className="font-bold tracking-tight text-ink">Budget par secteur</h3>
           <span className="text-[12.5px] text-ink-soft font-medium">
-            — {new Date(periode.annee, periode.mois).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+            : {new Date(periode.annee, periode.mois).toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
           </span>
         </div>
         <div className="flex flex-col gap-2">
@@ -283,9 +293,9 @@ export default function Recettes() {
                   <Send size={12} className="shrink-0 text-[#B45309]" />
                   <span className="text-[11.5px] text-[#93400a]">
                     <strong>{fmtFCFA(bs.budget.montantPropose)}</strong> proposés par {bs.budget.proposeParText}
-                    {bs.budget.motifPropose ? ` — ${bs.budget.motifPropose}` : ""} · en attente de confirmation
+                    {bs.budget.motifPropose ? ` : ${bs.budget.motifPropose}` : ""} · en attente de confirmation
                   </span>
-                  {peutModifier && (
+                  {peutConfirmer && (
                     <button onClick={() => confirmerReception(bs)} disabled={validationBusy === bs.budget.id}
                       className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#30D158] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#29b84c] disabled:opacity-60 transition-colors">
                       <CheckCircle2 size={12} /> {validationBusy === bs.budget.id ? "Confirmation…" : "Confirmer la réception"}
@@ -299,7 +309,7 @@ export default function Recettes() {
         </div>
       </GlassCard>
 
-      {/* Filtres — source, période, + bouton d'ajout (la recherche est dans la TopBar) */}
+      {/* Filtres : source, période, + bouton d'ajout (la recherche est dans la TopBar) */}
       <div className="flex flex-wrap items-end gap-3 mb-4">
         <div className="w-full sm:w-48">
           <label className="block text-[11.5px] font-semibold text-ink-soft mb-1.5 ml-1">Source</label>
@@ -369,8 +379,10 @@ export default function Recettes() {
         recette={detail}
         secteurs={secteurs}
         peutModifier={peutModifier}
+        peutSupprimer={peutSupprimer}
         modifierRecette={modifierRecette}
         supprimerRecette={supprimerRecette}
+        currentUser={user}
         onClose={() => setDetail(null)}
       />
 
@@ -392,7 +404,7 @@ export default function Recettes() {
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Secteur">
             <Select value={form.secteurId} onChange={(e) => setForm({ ...form, secteurId: e.target.value })}>
-              {secteurs.map((s) => (
+              {secteursActifs.map((s) => (
                 <option key={s.id} value={s.id}>{s.nom}</option>
               ))}
             </Select>
@@ -419,7 +431,7 @@ export default function Recettes() {
       <Modal
         open={!!revision}
         onClose={() => setRevision(null)}
-        title={revision ? `${revision.alloue > 0 ? "Réviser" : "Allouer"} le budget — ${revision.secteur.nom}` : "Budget"}
+        title={revision ? `${revision.alloue > 0 ? "Réviser" : "Allouer"} le budget : ${revision.secteur.nom}` : "Budget"}
         icon={Wallet}
         accent={revision?.secteur?.color || "#30D158"}
         moduleLabel={revision?.secteur?.nom}
@@ -431,7 +443,7 @@ export default function Recettes() {
               {revError && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2">{revError}</p>}
               {revision.requiertValidation && (
                 <p className="rounded-xl border border-[#FF9F0A]/30 bg-[#FF9F0A]/10 px-3 py-2 text-[11px] text-[#93400a]">
-                  <Send size={12} className="inline mr-1" /> Ce montant sera envoyé à l'équipe du secteur pour confirmation — il ne comptera comme « Budget alloué » qu'une fois la réception confirmée.
+                  <Send size={12} className="inline mr-1" /> Ce montant sera envoyé à l'équipe du secteur pour confirmation : il ne comptera comme « Budget alloué » qu'une fois la réception confirmée.
                 </p>
               )}
               {estAllocation ? (
@@ -457,7 +469,7 @@ export default function Recettes() {
 
               <div className="flex items-center justify-between gap-2 pt-1">
                 {revision.alloue > 0 ? (
-                  <Button variant="danger" onClick={supprimerBudgetActuel} disabled={revSaving}><Trash2 size={14} className="mr-1" />Supprimer</Button>
+                  <Button variant="danger" onClick={() => setConfirmSuppressionBudget(true)} disabled={revSaving}><Trash2 size={14} className="mr-1" />Supprimer</Button>
                 ) : <span />}
                 <Button onClick={confirmerRevision} disabled={revSaving}>
                   {revSaving ? "Enregistrement…" : revision.requiertValidation ? "Envoyer au secteur" : estAllocation ? "Allouer" : "Confirmer la révision"}
@@ -482,6 +494,14 @@ export default function Recettes() {
           );
         })()}
       </Modal>
+
+      <ConfirmSuppressionModal
+        open={confirmSuppressionBudget}
+        titre="Supprimer ce budget ?"
+        description={revision ? `Vous allez supprimer le budget alloué de ${revision.secteur.nom} pour cette période.` : ""}
+        onConfirm={confirmerSuppressionBudget}
+        onClose={() => setConfirmSuppressionBudget(false)}
+      />
     </div>
   );
 }

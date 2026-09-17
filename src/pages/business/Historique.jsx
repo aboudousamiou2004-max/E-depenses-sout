@@ -51,7 +51,7 @@ export default function Historique() {
 
   return (
     <div>
-      <TopBarSimple title="Historique" subtitle={`${config.nom} — dépenses et recettes, filtrées par période`} icon={History} accent={config.color} />
+      <TopBarSimple title="Mouvements" subtitle={`${config.nom} : dépenses et recettes, filtrées par période`} icon={History} accent={config.color} />
 
       <div className="grid grid-cols-3 gap-4 mb-5">
         <StatTile icon={ArrowUpCircle} label="Dépensé (période)" value={fmt(totalDepense) + " FCFA"} tone="#FF453A" />
@@ -99,8 +99,8 @@ export default function Historique() {
                 <td className="px-3 py-2.5"><Badge tone={m.type === "depense" ? "coral" : "mint"}>{m.type === "depense" ? "Dépense" : "Recette"}</Badge></td>
                 <td className="px-3 py-2.5 text-ink">
                   {m.type === "depense" ? (m.description || m.categorie || "—") : (m.description || m.origine || "—")}
-                  {m.type === "depense" && m.beneficiaireNom && <span className="text-ink-soft"> — {m.beneficiaireNom}</span>}
-                  {m.type === "recette" && m.client && <span className="text-ink-soft"> — {m.client}</span>}
+                  {m.type === "depense" && m.beneficiaireNom && <span className="text-ink-soft"> : {m.beneficiaireNom}</span>}
+                  {m.type === "recette" && m.client && <span className="text-ink-soft"> : {m.client}</span>}
                 </td>
                 <td className={`px-3 py-2.5 text-right tabular font-bold ${m.type === "depense" ? "text-[#b3241b]" : "text-[#1a7d34]"}`}>{m.type === "depense" ? "−" : "+"}{fmt(m.montant)}</td>
                 <td className="px-3 py-2.5 text-center">{m.type === "depense" ? <Badge tone={STATUTS_DEPENSE[m.statut]?.tone}>{STATUTS_DEPENSE[m.statut]?.label}</Badge> : <span className="text-ink-soft/50">—</span>}</td>

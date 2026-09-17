@@ -8,6 +8,10 @@ import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useGarderieStore } from "../../store/garderieStore";
+import { useAuthStore } from "../../store/authStore";
+import { peutSupprimer } from "../../lib/modules";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 const MODES_PAIEMENT = [
   { id: "espece", label: "Espèces" },
@@ -26,6 +30,8 @@ export default function Paiements() {
   const config = useOutletContext();
   const [searchParams, setSearchParams] = useSearchParams();
   const { enfants, paiements, chargerGarderie, ajouterPaiement, supprimerPaiement } = useGarderieStore();
+  const { user } = useAuthStore();
+  const supprimerOk = peutSupprimer(user?.role);
 
   useEffect(() => { chargerGarderie(); }, [chargerGarderie]);
 
@@ -33,6 +39,7 @@ export default function Paiements() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmCible, setConfirmCible] = useState(null);
   const [form, setForm] = useState({ enfantId: filtreEnfant, mois: moisCourant(), montant: "", montantCantine: "", date: new Date().toISOString().slice(0, 10), modePaiement: "espece" });
 
   const soldeEnfantMois = (enfantId, mois) => paiements.filter((p) => p.enfantId === enfantId && p.mois === mois).reduce((s, p) => s + p.montant, 0);
@@ -56,6 +63,12 @@ export default function Paiements() {
   function nomEnfant(id) {
     const e = enfants.find((x) => x.id === id);
     return e ? `${e.nom} ${e.prenom}` : "—";
+  }
+
+  async function confirmerSuppression(motif) {
+    const p = confirmCible;
+    await enregistrerMotifSuppression({ user, table: "garderie_paiements", label: `${nomEnfant(p.enfantId)} : ${Math.round(p.montant)} FCFA`, motif, secteurId: config.secteurId });
+    return supprimerPaiement(p.id);
   }
 
   function ouvrirForm() {
@@ -92,7 +105,7 @@ export default function Paiements() {
 
   return (
     <div>
-      <TopBarSimple title="Paiements" subtitle={`${config.nom} — encaissements, cantine, impayés`} icon={Wallet} accent={config.color} />
+      <TopBarSimple title="Paiements" subtitle={`${config.nom} : encaissements, cantine, impayés`} icon={Wallet} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
         <StatTile icon={Coins} label="Revenu du mois" value={Math.round(revenuMois).toLocaleString("fr-FR") + " FCFA"} tone="#30D158" />
@@ -142,7 +155,7 @@ export default function Paiements() {
                   +{Math.round(p.montant).toLocaleString("fr-FR")}
                   {p.montantCantine > 0 && <span className="block text-[11px] font-normal text-ink-soft/60">dont {Math.round(p.montantCantine).toLocaleString("fr-FR")} cantine</span>}
                 </td>
-                <td className="px-3 py-2.5 text-right"><button onClick={() => supprimerPaiement(p.id)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button></td>
+                <td className="px-3 py-2.5 text-right">{supprimerOk && <button onClick={() => setConfirmCible(p)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}</td>
               </tr>
             ))}
           </tbody>
@@ -177,11 +190,19 @@ export default function Paiements() {
             <Field label="Date"><TextInput type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} /></Field>
             <Field label="Montant total (FCFA)"><TextInput type="number" min="0" value={form.montant} onChange={(e) => setForm((f) => ({ ...f, montant: e.target.value }))} /></Field>
           </div>
-          <Field label="Dont cantine (FCFA)" hint="Optionnel — pour information">
+          <Field label="Dont cantine (FCFA)" hint="Optionnel : pour information">
             <TextInput type="number" min="0" value={form.montantCantine} onChange={(e) => setForm((f) => ({ ...f, montantCantine: e.target.value }))} placeholder="0" />
           </Field>
         </form>
       </Modal>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre="Supprimer ce paiement ?"
+        description={confirmCible ? `Vous allez supprimer le paiement de ${Math.round(confirmCible.montant).toLocaleString("fr-FR")} FCFA de ${nomEnfant(confirmCible.enfantId)}.` : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
     </div>
   );
 }

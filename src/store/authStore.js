@@ -9,6 +9,9 @@ import { useSanteGarderieStore } from "./santeGarderieStore";
 import { useCantineStore } from "./cantineStore";
 import { useEgproStore } from "./egproStore";
 import { useBesoinsStore } from "./besoinsStore";
+import { useGymStore } from "./gymStore";
+import { useComStore } from "./comStore";
+import { useTransportStore } from "./transportStore";
 
 // Même mapping snake_case → camelCase que dataStore.js (mapUser) — dupliqué en
 // petit ici plutôt qu'importé, pour ne pas créer un couplage entre les deux
@@ -54,6 +57,9 @@ export const useAuthStore = create((set, get) => ({
         useCantineStore.getState().reset();
         useEgproStore.getState().reset();
         useBesoinsStore.getState().reset();
+        useGymStore.getState().reset();
+        useComStore.getState().reset();
+        useTransportStore.getState().reset();
       }
     });
   },
@@ -71,6 +77,9 @@ export const useAuthStore = create((set, get) => ({
       useCantineStore.getState().reset();
       useEgproStore.getState().reset();
       useBesoinsStore.getState().reset();
+      useGymStore.getState().reset();
+      useComStore.getState().reset();
+      useTransportStore.getState().reset();
       return;
     }
     set({ user: mapProfil(data), status: "authenticated" });

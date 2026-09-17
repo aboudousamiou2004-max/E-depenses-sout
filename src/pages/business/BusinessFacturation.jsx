@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, FileText, Trash2 } from "lucide-react";
@@ -12,24 +12,32 @@ import RecetteDetailModal from "../../components/RecetteDetailModal";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
 import { useStockStore } from "../../store/stockStore";
+import { useGymStore, niveauLabel } from "../../store/gymStore";
 import { useUIStore } from "../../store/uiStore";
 import { fmtFCFA, fmtCompact, totalMontant, matchPeriode } from "../../lib/logic";
-import { ROLES_ACCES_TOTAL } from "../../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../../lib/modules";
 
 export default function BusinessFacturation() {
   const config = useOutletContext();
   const { secteurs, recettes, addRecette, modifierRecette, supprimerRecette } = useDataStore();
   const { user } = useAuthStore();
-  const { typesBriques, stockBriques, venteBriques, referentielMateriel, addMouvementMateriel } = useStockStore();
+  const { typesBriques, stockBriques, venteBriques, referentielMateriel: tousArticlesMateriel, addMouvementMateriel } = useStockStore();
+  const { forfaits, chargerForfaits } = useGymStore();
   const { periode, recherche } = useUIStore();
   const venteDeBriques = config.stock === "briques";
   const locationMateriel = config.stock === "materiel";
+  const referentielMateriel = useMemo(() => tousArticlesMateriel.filter((a) => a.secteurId === config.secteurId), [tousArticlesMateriel, config.secteurId]);
+
+  useEffect(() => {
+    if (config.forfaits) chargerForfaits(config.secteurId);
+  }, [config.forfaits, config.secteurId]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [selection, setSelection] = useState(null);
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
 
   const [form, setForm] = useState({
     type: config.typesFacturation[0],
@@ -42,6 +50,7 @@ export default function BusinessFacturation() {
     briqueTypeId: typesBriques[0]?.id,
     briqueQuantite: "",
     lignes: [{ articleId: referentielMateriel[0]?.id, qte: 1, jours: 1 }],
+    forfaitNiveau: "simple",
   });
 
   const isVenteBriques = venteDeBriques && form.type === "Vente de briques";
@@ -49,6 +58,14 @@ export default function BusinessFacturation() {
   const stockDispoBrique = briqueChoisie ? stockBriques[briqueChoisie.id]?.pret || 0 : 0;
 
   const isLocationOuPrestation = locationMateriel && (form.type === "Location" || form.type === "Prestation");
+
+  // MAXI GYM : une Séance ou un Abonnement se facture selon l'un des 3
+  // forfaits (voir « Nos forfaits ») — le prix se remplit automatiquement,
+  // sauf pour le forfait Classique dont le tarif est négocié à la saisie.
+  const isSeanceOuAbonnementGym = config.forfaits && (form.type === "Séance" || form.type === "Abonnement");
+  const forfaitChoisi = forfaits.find((f) => f.niveau === form.forfaitNiveau);
+  const prixForfait = form.type === "Séance" ? forfaitChoisi?.prixSeance : forfaitChoisi?.prixAbonnement;
+  const prixForfaitLibre = isSeanceOuAbonnementGym && (prixForfait === null || prixForfait === undefined);
 
   function articleDe(id) { return referentielMateriel.find((a) => a.id === id); }
   function ligneMontant(l) { return (Number(l.qte) || 0) * (Number(l.jours) || 0) * (articleDe(l.articleId)?.tarifLocation || 0); }
@@ -87,7 +104,7 @@ export default function BusinessFacturation() {
       }
       const montant = qte * (briqueChoisie?.tarifVente || 0);
       const res = await addRecette(
-        { secteurId: config.secteurId, montant, date: form.date, origine: `${form.type} — ${briqueChoisie?.nom}`, client: form.client, description: form.description },
+        { secteurId: config.secteurId, montant, date: form.date, origine: `${form.type} : ${briqueChoisie?.nom}`, client: form.client, description: form.description },
         user
       );
       if (!res.ok) {
@@ -108,7 +125,7 @@ export default function BusinessFacturation() {
         const res = await addRecette(
           {
             secteurId: config.secteurId, montant: ligneMontant(l), date: form.dateSortie, dateRetour: form.dateRetour,
-            origine: `${form.type} — ${article.nom} (${l.jours}j)`, client: form.client, description: form.description,
+            origine: `${form.type} : ${article.nom} (${l.jours}j)`, client: form.client, description: form.description,
             articleId: l.articleId, quantite: Number(l.qte) || 0, jours: Number(l.jours) || 0,
           },
           user
@@ -118,7 +135,7 @@ export default function BusinessFacturation() {
           return setError(res.error);
         }
         const resSortie = await addMouvementMateriel(
-          { articleId: l.articleId, type: "sortie", quantite: l.qte, motif: `${form.type} — ${form.client || "client"}`, date: form.dateSortie },
+          { articleId: l.articleId, type: "sortie", quantite: l.qte, motif: `${form.type} : ${form.client || "client"}`, date: form.dateSortie, secteurId: config.secteurId },
           user
         );
         if (!resSortie.ok) {
@@ -127,6 +144,18 @@ export default function BusinessFacturation() {
         }
       }
       setSaving(false);
+    } else if (isSeanceOuAbonnementGym) {
+      const montant = prixForfaitLibre ? Number(form.montant) || 0 : Number(prixForfait) || 0;
+      if (montant <= 0) {
+        setSaving(false);
+        return setError("Montant requis");
+      }
+      const res = await addRecette(
+        { secteurId: config.secteurId, montant, date: form.date, origine: `${form.type} : ${niveauLabel(form.forfaitNiveau)}`, client: form.client, description: form.description },
+        user
+      );
+      setSaving(false);
+      if (!res.ok) return setError(res.error);
     } else {
       if (!form.montant) {
         setSaving(false);
@@ -148,7 +177,7 @@ export default function BusinessFacturation() {
 
   return (
     <div>
-      <TopBarSimple title="Prestations" subtitle={`${config.nom} — prestations et locations facturées`} icon={FileText} accent={config.color} />
+      <TopBarSimple title="Prestations" subtitle={`${config.nom} : prestations et locations facturées`} icon={FileText} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={FileText} label="Total facturé (affiché)" value={fmtCompact(total) + " FCFA"} tone={config.color} />
@@ -221,12 +250,11 @@ export default function BusinessFacturation() {
       >
         <form onSubmit={submit}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
-          <Field label="Type">
-            <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-              {config.typesFacturation.map((t) => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </Select>
+          <Field label="Type" hint="Suggestions du secteur, ou saisie libre">
+            <TextInput list="types-facturation-suggestions" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} placeholder="ex : Prestation" />
+            <datalist id="types-facturation-suggestions">
+              {config.typesFacturation.map((t) => <option key={t} value={t} />)}
+            </datalist>
           </Field>
           <Field label="Client">
             <TextInput value={form.client} onChange={(e) => setForm({ ...form, client: e.target.value })} placeholder="Nom du client" />
@@ -250,6 +278,31 @@ export default function BusinessFacturation() {
               <p className="text-[12.5px] text-ink-soft -mt-1 mb-3">
                 Montant estimé : <span className="font-bold text-ink">{fmtFCFA(Math.min(Number(form.briqueQuantite) || 0, stockDispoBrique) * (briqueChoisie?.tarifVente || 0))}</span>
               </p>
+            </>
+          ) : isSeanceOuAbonnementGym ? (
+            <>
+              <Field label="Forfait">
+                <Select value={form.forfaitNiveau} onChange={(e) => setForm({ ...form, forfaitNiveau: e.target.value })}>
+                  {forfaits.map((f) => <option key={f.niveau} value={f.niveau}>{niveauLabel(f.niveau)}</option>)}
+                </Select>
+              </Field>
+              {form.type === "Séance" && forfaitChoisi && !forfaitChoisi.seanceProposee && (
+                <p className="text-[12px] text-[#b3241b] -mt-2 mb-3">Ce forfait ne propose pas de séance à l'unité : choisissez « Abonnement » ou un autre forfait.</p>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {prixForfaitLibre ? (
+                  <Field label="Montant (FCFA)" hint="Tarif négocié à la souscription">
+                    <TextInput type="number" min="0" value={form.montant} onChange={(e) => setForm({ ...form, montant: e.target.value })} />
+                  </Field>
+                ) : (
+                  <Field label="Montant">
+                    <p className="glass w-full rounded-2xl px-3.5 py-2.5 text-[14px] font-bold text-ink">{fmtFCFA(prixForfait || 0)}</p>
+                  </Field>
+                )}
+                <Field label="Date">
+                  <TextInput type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                </Field>
+              </div>
             </>
           ) : isLocationOuPrestation ? (
             <>
@@ -285,7 +338,7 @@ export default function BusinessFacturation() {
                         Montant : <span className="font-bold text-ink">{fmtFCFA(ligneMontant(l))}</span> ({l.qte} × {l.jours}j × {fmtFCFA(article.tarifLocation)})
                       </p>
                     ) : (
-                      <p className="text-[12px] text-[#b3241b] -mt-1">Aucun tarif de location réglé pour cet article — réglez-le depuis Stock magasin.</p>
+                      <p className="text-[12px] text-[#b3241b] -mt-1">Aucun tarif de location réglé pour cet article : réglez-le depuis Stock magasin.</p>
                     )}
                   </div>
                 );
@@ -330,8 +383,10 @@ export default function BusinessFacturation() {
         recette={selection}
         secteurs={secteurs}
         peutModifier={peutModifier}
+        peutSupprimer={peutSupprimer}
         modifierRecette={modifierRecette}
         supprimerRecette={supprimerRecette}
+        currentUser={user}
         onClose={() => setSelection(null)}
       />
     </div>

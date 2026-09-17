@@ -4,8 +4,10 @@ import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
 import Field, { TextInput, Select } from "./ui/Field";
+import ConfirmSuppressionModal from "./ui/ConfirmSuppressionModal";
 import { fmtFCFA, statutLabel } from "../lib/logic";
 import { lireFichier, ouvrirPiece, formatTaille } from "../lib/fichiers";
+import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 
 function Row({ label, children }) {
   return (
@@ -18,9 +20,11 @@ function Row({ label, children }) {
 
 // Vue détaillée d'une dépense, avec bascule vers un formulaire d'édition et
 // suppression — réutilisée par Depenses.jsx, BusinessDepenses.jsx, et par le
-// détail ouvert en cliquant sur un KPI (TransactionsListModal). Édition et
-// suppression restent réservées aux approbateurs (RLS + `peutModifier`).
-export default function DepenseDetailModal({ depense, secteurs, categories, users = [], peutModifier, modifierDepense, supprimerDepense, changerStatutDepense, currentUser, onClose, onDeleted }) {
+// détail ouvert en cliquant sur un KPI (TransactionsListModal). `peutModifier`
+// (édition + validation) et `peutSupprimer` sont distincts : Superviseur/
+// Gérant peuvent supprimer sans pouvoir modifier ni valider (à la demande de
+// l'utilisateur, 2026-09-14).
+export default function DepenseDetailModal({ depense, secteurs, categories, users = [], peutModifier, peutSupprimer, modifierDepense, supprimerDepense, changerStatutDepense, currentUser, onClose, onDeleted }) {
   const [mode, setMode] = useState("vue");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -34,6 +38,7 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
   // mode vue.
   const [enregistree, setEnregistree] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [confirmOuvert, setConfirmOuvert] = useState(false);
 
   useEffect(() => {
     if (depense) {
@@ -93,14 +98,16 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
     setMode("vue");
   }
 
-  async function supprimer() {
-    if (!window.confirm(`Supprimer définitivement cette dépense de ${fmtFCFA(affichee.montant)} ?`)) return;
+  async function confirmerSuppression(motif) {
     setDeleting(true);
+    await enregistrerMotifSuppression({ user: currentUser, table: "depenses", label: `${affichee.categorie} : ${fmtFCFA(affichee.montant)}`, motif, secteurId: affichee.secteurId });
     const res = await supprimerDepense(depense.id);
     setDeleting(false);
-    if (!res.ok) return setError(res.error);
-    onDeleted?.(depense.id);
-    onClose();
+    if (res.ok) {
+      onDeleted?.(depense.id);
+      onClose();
+    }
+    return res;
   }
 
   async function valider(statut) {
@@ -121,7 +128,7 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
       accent={secteur?.color || "#FF453A"}
       moduleLabel={secteur?.nom}
       footer={
-        peutModifier &&
+        (peutModifier || peutSupprimer) &&
         (mode === "edition" ? (
           <>
             <Button variant="ghost" onClick={() => setMode("vue")}>Annuler</Button>
@@ -139,10 +146,12 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
                 </Button>
               </>
             )}
-            <Button variant="ghost" icon={Trash2} onClick={supprimer} disabled={deleting} className="text-[#FF453A]">
-              {deleting ? "Suppression…" : "Supprimer"}
-            </Button>
-            <Button icon={Pencil} onClick={() => setMode("edition")}>Modifier</Button>
+            {peutSupprimer && (
+              <Button variant="ghost" icon={Trash2} onClick={() => setConfirmOuvert(true)} disabled={deleting} className="text-[#FF453A]">
+                {deleting ? "Suppression…" : "Supprimer"}
+              </Button>
+            )}
+            {peutModifier && <Button icon={Pencil} onClick={() => setMode("edition")}>Modifier</Button>}
           </>
         ))
       }
@@ -188,10 +197,11 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
               {secteurs.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
             </Select>
           </Field>
-          <Field label="Catégorie">
-            <Select value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })}>
-              {categoriesDuSecteur.map((c) => <option key={c} value={c}>{c}</option>)}
-            </Select>
+          <Field label="Catégorie" hint="Suggestions du secteur, ou saisie libre">
+            <TextInput list="categories-suggestions-edition" value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })} />
+            <datalist id="categories-suggestions-edition">
+              {categoriesDuSecteur.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Montant (FCFA)">
@@ -246,10 +256,18 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
             )}
           </Field>
           <p className="text-[12px] text-ink-soft">
-            Le statut (« {st.label} ») n'est pas modifiable ici — il suit le circuit d'autorisation.
+            Le statut (« {st.label} ») n'est pas modifiable ici : il suit le circuit d'autorisation.
           </p>
         </form>
       )}
+
+      <ConfirmSuppressionModal
+        open={confirmOuvert}
+        titre="Supprimer cette dépense ?"
+        description={`Vous allez supprimer définitivement la dépense « ${affichee.categorie} » de ${fmtFCFA(affichee.montant)}.`}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmOuvert(false)}
+      />
     </Modal>
   );
 }

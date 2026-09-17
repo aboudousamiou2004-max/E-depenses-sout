@@ -14,7 +14,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode } from "../../lib/logic";
 import { exporterDepensesExcel } from "../../lib/exportExcel";
-import { ROLES_ACCES_TOTAL } from "../../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../../lib/modules";
 
 export default function BusinessDepenses() {
   const config = useOutletContext();
@@ -28,14 +28,18 @@ export default function BusinessDepenses() {
   const [selection, setSelection] = useState(null);
   const [form, setForm] = useState({ categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
 
   const categoriesDuSecteur = useMemo(
     () => categories.filter((c) => c.secteurId === config.secteurId).map((c) => c.nom),
     [categories, config.secteurId]
   );
 
+  // Présélectionne la première catégorie suggérée — seulement tant que
+  // l'utilisateur n'a rien saisi lui-même. La catégorie reste une saisie
+  // libre (voir champ ci-dessous), jamais une valeur imposée.
   useEffect(() => {
-    if (categoriesDuSecteur.length > 0 && !categoriesDuSecteur.includes(form.categorie)) {
+    if (categoriesDuSecteur.length > 0 && !form.categorie) {
       setForm((f) => ({ ...f, categorie: categoriesDuSecteur[0] }));
     }
   }, [categoriesDuSecteur, form.categorie]);
@@ -72,7 +76,7 @@ export default function BusinessDepenses() {
 
   return (
     <div>
-      <TopBarSimple title="Dépenses" subtitle={`${config.nom} — saisie des dépenses du secteur`} icon={Receipt} accent={config.color} />
+      <TopBarSimple title="Dépenses" subtitle={`${config.nom} : saisie des dépenses du secteur`} icon={Receipt} accent={config.color} />
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
@@ -152,13 +156,11 @@ export default function BusinessDepenses() {
       >
         <form onSubmit={submit}>
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
-          <Field label="Catégorie">
-            <Select value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })}>
-              {categoriesDuSecteur.length === 0 && <option value="">Aucune catégorie configurée pour ce secteur</option>}
-              {categoriesDuSecteur.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </Select>
+          <Field label="Catégorie" hint="Suggestions du secteur, ou saisie libre">
+            <TextInput list="categories-suggestions-business" value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })} placeholder="ex : Carburant" />
+            <datalist id="categories-suggestions-business">
+              {categoriesDuSecteur.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Montant (FCFA)">
@@ -190,9 +192,9 @@ export default function BusinessDepenses() {
             <FileText size={14} strokeWidth={2.2} className="shrink-0" />
             {evaluation.declenche
               ? evaluation.budget === 0
-                ? "Aucun budget défini pour ce secteur ce mois-ci — cette dépense déclenchera automatiquement le circuit d'autorisation d'E-DÉPENSES (PAU et GE en seront notifiés)."
-                : `Ce montant dépasserait le budget restant du secteur (${fmtFCFA(evaluation.restant)} sur ${fmtFCFA(evaluation.budget)}) — le circuit d'autorisation d'E-DÉPENSES sera déclenché, PAU et GE en seront notifiés.`
-              : `Ce montant reste dans le budget alloué (${fmtFCFA(evaluation.restant)} restant sur ${fmtFCFA(evaluation.budget)}) — décaissement direct.`}
+                ? "Aucun budget défini pour ce secteur ce mois-ci : cette dépense déclenchera automatiquement le circuit d'autorisation d'E-DÉPENSES (PAU et GE en seront notifiés)."
+                : `Ce montant dépasserait le budget restant du secteur (${fmtFCFA(evaluation.restant)} sur ${fmtFCFA(evaluation.budget)}) : le circuit d'autorisation d'E-DÉPENSES sera déclenché, PAU et GE en seront notifiés.`
+              : `Ce montant reste dans le budget alloué (${fmtFCFA(evaluation.restant)} restant sur ${fmtFCFA(evaluation.budget)}) : décaissement direct.`}
           </div>
         </form>
       </Modal>
@@ -203,6 +205,7 @@ export default function BusinessDepenses() {
         categories={categories}
         users={users}
         peutModifier={peutModifier}
+        peutSupprimer={peutSupprimer}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
         changerStatutDepense={changerStatutDepense}

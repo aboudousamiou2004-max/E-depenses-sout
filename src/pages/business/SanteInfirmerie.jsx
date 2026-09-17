@@ -11,6 +11,7 @@ import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useSanteGarderieStore } from "../../store/santeGarderieStore";
 import { useGarderieStore } from "../../store/garderieStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutModifier } from "../../lib/modules";
 
 const TYPES_INCIDENT = [
   { id: "accident", label: "Accident / blessure" },
@@ -48,7 +49,7 @@ export default function SanteInfirmerie() {
 
   return (
     <div>
-      <TopBarSimple title="Santé & Infirmerie" subtitle={`${config.nom} — incidents et soins courants`} icon={Stethoscope} accent={config.color} />
+      <TopBarSimple title="Santé & Infirmerie" subtitle={`${config.nom} : incidents et soins courants`} icon={Stethoscope} accent={config.color} />
 
       <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-black/[0.03] p-1 mb-4">
         {[{ v: "incidents", l: "Incidents", Icon: AlertTriangle }, { v: "soins", l: "Soins courants", Icon: Thermometer }].map((o) => (
@@ -71,6 +72,7 @@ function nomEnfant(enfants, id) {
 
 function Incidents({ incidents, enfants, user, config }) {
   const { ajouterIncident, modifierIncident, marquerIncidentResolu } = useSanteGarderieStore();
+  const modifierOk = peutModifier(user?.role);
   const [filtreResolu, setFiltreResolu] = useState("false");
   const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -138,7 +140,7 @@ function Incidents({ incidents, enfants, user, config }) {
                 <td className="px-3 py-2.5 text-center">
                   {i.resolu ? <Badge tone="mint">Résolu</Badge> : <button onClick={() => marquerIncidentResolu(i.id)} className="text-[11px] font-semibold text-[#0A84FF] hover:underline">Marquer résolu</button>}
                 </td>
-                <td className="px-3 py-2.5 text-right"><button onClick={() => ouvrir(i)} className="text-[11px] font-semibold text-ink-soft hover:text-ink">Éditer</button></td>
+                <td className="px-3 py-2.5 text-right">{modifierOk && <button onClick={() => ouvrir(i)} className="text-[11px] font-semibold text-ink-soft hover:text-ink">Éditer</button>}</td>
               </tr>
             ))}
           </tbody>
@@ -175,6 +177,7 @@ function Incidents({ incidents, enfants, user, config }) {
 
 function Soins({ soins, enfants, user, config }) {
   const { ajouterSoin, modifierSoin } = useSanteGarderieStore();
+  const modifierOk = peutModifier(user?.role);
   const [filtreSuivi, setFiltreSuivi] = useState("");
   const [modal, setModal] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -239,7 +242,7 @@ function Soins({ soins, enfants, user, config }) {
                   </div>
                 </td>
                 <td className="px-3 py-2.5 text-center">{s.aSuivre ? <Badge tone="amber">À suivre</Badge> : <Badge tone="mint">Clôturé</Badge>}</td>
-                <td className="px-3 py-2.5 text-right"><button onClick={() => ouvrir(s)} className="text-[11px] font-semibold text-ink-soft hover:text-ink">Éditer</button></td>
+                <td className="px-3 py-2.5 text-right">{modifierOk && <button onClick={() => ouvrir(s)} className="text-[11px] font-semibold text-ink-soft hover:text-ink">Éditer</button>}</td>
               </tr>
             ))}
           </tbody>

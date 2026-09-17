@@ -1,7 +1,7 @@
 import { Search } from "lucide-react";
 import { useDataStore } from "../../store/dataStore";
 import { useUIStore } from "../../store/uiStore";
-import { modulesMetier } from "../../lib/modules";
+import { modulesMetier, groupesModules } from "../../lib/modules";
 import NotificationBell from "./NotificationBell";
 import PeriodeFilter from "./PeriodeFilter";
 
@@ -33,7 +33,11 @@ export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF"
   const gradient = `linear-gradient(135deg, ${accent}d9 0%, ${darkenHex(accent, 0.58)}cc 100%)`;
   // Ne proposer dans ce filtre que les secteurs réellement utilisés (mêmes
   // règles que la navigation : actifs, hors BTP piloté par le circuit PAU).
-  const secteursFiltrables = modulesMetier(secteurs);
+  // Un module décliné par ville (MAXI GYM, MAXI LOGISTIQUE...) n'a qu'UNE
+  // seule entrée ici, `grupo:<base>` — la sélectionner cumule tous ses lieux
+  // (voir secteurIdsPourFiltre), à la demande explicite de l'utilisateur
+  // (2026-09-15) — jamais une entrée par ville dans ce menu.
+  const groupesFiltrables = groupesModules(modulesMetier(secteurs));
 
   return (
     <div className="mb-5">
@@ -71,11 +75,17 @@ export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF"
             className="glass rounded-2xl px-3.5 py-2.5 text-sm font-semibold text-ink outline-none cursor-pointer flex-1 sm:flex-none min-w-0"
           >
             <option value="tous">Tous les secteurs</option>
-            {secteursFiltrables.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.nom}
-              </option>
-            ))}
+            {groupesFiltrables.map((g) =>
+              g.modules.length > 1 ? (
+                <option key={g.base} value={`grupo:${g.base}`}>
+                  {g.base} (tous lieux)
+                </option>
+              ) : (
+                <option key={g.modules[0].id} value={g.modules[0].id}>
+                  {g.modules[0].nom}
+                </option>
+              )
+            )}
           </select>
           <NotificationBell />
         </div>

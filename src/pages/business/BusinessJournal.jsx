@@ -33,7 +33,7 @@ export default function BusinessJournal() {
 
   return (
     <div>
-      <TopBarSimple title="Journal" subtitle="Toute l'activité de l'application — traçabilité complète (réservé à l'administration)" icon={ScrollText} accent={config.color} />
+      <TopBarSimple title="Journal" subtitle="Toute l'activité de l'application : traçabilité complète (réservé à l'administration)" icon={ScrollText} accent={config.color} />
 
       <div className="relative mb-4 max-w-sm">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-soft/50" />

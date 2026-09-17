@@ -11,11 +11,11 @@ import DepenseDetailModal from "../components/DepenseDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
-import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode, SEUIL_APPROBATION_FIXE } from "../lib/logic";
+import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode } from "../lib/logic";
 import { exporterDepensesExcel } from "../lib/exportExcel";
 import { exporterDepensesPDF, exporterDepensesCSV } from "../lib/exportDocs";
 import { lireFichier, formatTaille } from "../lib/fichiers";
-import { ROLES_ACCES_TOTAL } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, secteurIdsPourFiltre } from "../lib/modules";
 
 const ligneVide = () => ({ secteurId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), natureFlux: "exploitation", sourceFinancement: "entreprise", description: "", imprevue: false });
 
@@ -36,35 +36,45 @@ export default function Depenses() {
   // Mêmes rôles que le circuit d'autorisation (is_approbateur côté RLS) — un
   // agent peut soumettre une dépense mais pas la modifier/effacer après coup.
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
 
   const categoriesDuSecteur = useMemo(
     () => categories.filter((c) => c.secteurId === form.secteurId).map((c) => c.nom),
     [categories, form.secteurId]
   );
 
+  // Un secteur désactivé depuis Paramètres ne doit plus être proposé pour une
+  // nouvelle saisie (formulaires ci-dessous) — seul Paramètres continue de le
+  // lister, pour permettre de le réactiver. Les dépenses déjà enregistrées
+  // sous ce secteur restent affichées normalement (lookup sur `secteurs` brut).
+  const secteursActifs = useMemo(() => secteurs.filter((s) => s.actif !== false), [secteurs]);
+
   // `secteurs` se charge de façon asynchrone (Supabase) — vide au premier
   // rendu, donc on ne peut pas présélectionner secteurs[0] dans l'état initial.
   useEffect(() => {
-    if (!form.secteurId && secteurs.length > 0) setForm((f) => ({ ...f, secteurId: secteurs[0].id }));
-  }, [secteurs, form.secteurId]);
+    if (!form.secteurId && secteursActifs.length > 0) setForm((f) => ({ ...f, secteurId: secteursActifs[0].id }));
+  }, [secteursActifs, form.secteurId]);
 
-  // La catégorie sélectionnée doit rester cohérente avec le secteur choisi —
-  // les catégories sont désormais propres à chaque secteur (voir Paramètres).
+  // Présélectionne la première catégorie suggérée du secteur choisi — mais
+  // seulement tant que l'utilisateur n'a rien saisi lui-même. La catégorie
+  // reste une saisie libre (voir champ ci-dessous) : ce n'est qu'une
+  // suggestion de départ, jamais une valeur imposée.
   useEffect(() => {
-    if (categoriesDuSecteur.length > 0 && !categoriesDuSecteur.includes(form.categorie)) {
+    if (categoriesDuSecteur.length > 0 && !form.categorie) {
       setForm((f) => ({ ...f, categorie: categoriesDuSecteur[0] }));
     }
   }, [categoriesDuSecteur, form.categorie]);
 
   const filtrees = useMemo(() => {
-    let rows = secteurFiltre === "tous" ? depenses : depenses.filter((d) => d.secteurId === secteurFiltre);
+    const ids = secteurIdsPourFiltre(secteurFiltre, secteurs);
+    let rows = ids ? depenses.filter((d) => ids.includes(d.secteurId)) : depenses;
     if (respecterPeriode) rows = rows.filter((d) => matchPeriode(d.date, periode));
     if (recherche.trim()) {
       const q = recherche.toLowerCase();
       rows = rows.filter((d) => d.categorie.toLowerCase().includes(q) || (d.description || "").toLowerCase().includes(q));
     }
     return rows;
-  }, [depenses, secteurFiltre, respecterPeriode, periode, recherche]);
+  }, [depenses, secteurFiltre, secteurs, respecterPeriode, periode, recherche]);
   const list = useMemo(() => [...filtrees].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 60), [filtrees]);
 
   function secteurOf(id) {
@@ -130,7 +140,7 @@ export default function Depenses() {
 
   const montantNum = Number(form.montant || 0);
   const dateForm = form.date ? new Date(form.date) : new Date();
-  const evaluation = evaluationAutorisation(depenses, budgets, form.secteurId, dateForm.getFullYear(), dateForm.getMonth(), montantNum, form.imprevue);
+  const evaluation = evaluationAutorisation(depenses, budgets, form.secteurId, dateForm.getFullYear(), dateForm.getMonth(), montantNum);
 
   return (
     <div>
@@ -233,18 +243,16 @@ export default function Depenses() {
           {error && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{error}</p>}
           <Field label="Secteur">
             <Select value={form.secteurId} onChange={(e) => setForm({ ...form, secteurId: e.target.value })}>
-              {secteurs.map((s) => (
+              {secteursActifs.map((s) => (
                 <option key={s.id} value={s.id}>{s.nom}</option>
               ))}
             </Select>
           </Field>
-          <Field label="Catégorie">
-            <Select value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })}>
-              {categoriesDuSecteur.length === 0 && <option value="">Aucune catégorie configurée pour ce secteur</option>}
-              {categoriesDuSecteur.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </Select>
+          <Field label="Catégorie" hint="Suggestions du secteur, ou saisie libre">
+            <TextInput list="categories-suggestions" value={form.categorie} onChange={(e) => setForm({ ...form, categorie: e.target.value })} placeholder="ex : Carburant" />
+            <datalist id="categories-suggestions">
+              {categoriesDuSecteur.map((c) => <option key={c} value={c} />)}
+            </datalist>
           </Field>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Montant (FCFA)">
@@ -272,7 +280,7 @@ export default function Depenses() {
           <Field label="Motif">
             <TextInput value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Motif de la dépense" />
           </Field>
-          <Field label="Bénéficiaire" hint="Optionnel — qui reçoit l'argent">
+          <Field label="Bénéficiaire" hint="Optionnel : qui reçoit l'argent">
             <TextInput value={form.beneficiaireNom} onChange={(e) => setForm({ ...form, beneficiaireNom: e.target.value })} placeholder="ex : Kofi Adjovi" />
           </Field>
 
@@ -311,14 +319,10 @@ export default function Depenses() {
           <div className="flex items-center gap-2 text-[12.5px] font-medium px-3.5 py-2.5 rounded-2xl bg-black/[0.03] text-ink-soft">
             <FileText size={14} strokeWidth={2.2} className="shrink-0" />
             {evaluation.declenche
-              ? evaluation.imprevue
-                ? "Dépense marquée imprévue — le circuit d'autorisation sera déclenché, PAU et GE en seront notifiés."
-                : evaluation.depasseSeuil
-                  ? `Ce montant dépasse le seuil de ${fmtFCFA(SEUIL_APPROBATION_FIXE)} — le circuit d'autorisation sera déclenché, PAU et GE en seront notifiés.`
-                  : evaluation.budget === 0
-                    ? "Aucun budget défini pour ce secteur ce mois-ci — cette dépense déclenchera automatiquement le circuit d'autorisation (PAU et GE en seront notifiés)."
-                    : `Ce montant dépasserait le budget restant du secteur (${fmtFCFA(evaluation.restant)} sur ${fmtFCFA(evaluation.budget)}) — le circuit d'autorisation sera déclenché, PAU et GE en seront notifiés.`
-              : `Ce montant reste dans le budget alloué (${fmtFCFA(evaluation.restant)} restant sur ${fmtFCFA(evaluation.budget)}) — décaissement direct.`}
+              ? evaluation.budget === 0
+                ? "Aucun budget défini pour ce secteur ce mois-ci : cette dépense déclenchera automatiquement le circuit d'autorisation (PAU et GE en seront notifiés)."
+                : `Ce montant dépasserait le budget restant du secteur (${fmtFCFA(evaluation.restant)} sur ${fmtFCFA(evaluation.budget)}) : le circuit d'autorisation sera déclenché, PAU et GE en seront notifiés.`
+              : `Ce montant reste dans le budget alloué (${fmtFCFA(evaluation.restant)} restant sur ${fmtFCFA(evaluation.budget)}) : décaissement direct.`}
           </div>
         </form>
       </Modal>
@@ -352,14 +356,14 @@ export default function Depenses() {
                 <div className="sm:col-span-3">
                   <Select value={r.secteurId} onChange={(e) => setLigneLot(i, "secteurId", e.target.value)}>
                     <option value="">— Secteur —</option>
-                    {secteurs.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
+                    {secteursActifs.map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
                   </Select>
                 </div>
                 <div className="sm:col-span-2">
-                  <Select value={r.categorie} onChange={(e) => setLigneLot(i, "categorie", e.target.value)}>
-                    <option value="">— Catégorie —</option>
-                    {categories.filter((c) => c.secteurId === r.secteurId).map((c) => <option key={c.id} value={c.nom}>{c.nom}</option>)}
-                  </Select>
+                  <TextInput list={`categories-lot-${i}`} value={r.categorie} onChange={(e) => setLigneLot(i, "categorie", e.target.value)} placeholder="Catégorie" />
+                  <datalist id={`categories-lot-${i}`}>
+                    {categories.filter((c) => c.secteurId === r.secteurId).map((c) => <option key={c.id} value={c.nom} />)}
+                  </datalist>
                 </div>
                 <div className="sm:col-span-2">
                   <TextInput type="number" min="0" value={r.montant} onChange={(e) => setLigneLot(i, "montant", e.target.value)} placeholder="Montant" />
@@ -390,6 +394,7 @@ export default function Depenses() {
         categories={categories}
         users={users}
         peutModifier={peutModifier}
+        peutSupprimer={peutSupprimer}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
         changerStatutDepense={changerStatutDepense}
