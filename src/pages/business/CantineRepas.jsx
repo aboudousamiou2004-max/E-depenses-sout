@@ -36,7 +36,7 @@ export default function CantineRepas() {
 
   return (
     <div>
-      <TopBarSimple title="Cantine & Repas" subtitle={`${config.nom} — menu du jour et appétit par enfant`} icon={Utensils} accent={config.color} />
+      <TopBarSimple title="Cantine & Repas" subtitle={`${config.nom} : menu du jour et appétit par enfant`} icon={Utensils} accent={config.color} />
 
       <div className="flex flex-wrap items-end gap-3 mb-5">
         <div>

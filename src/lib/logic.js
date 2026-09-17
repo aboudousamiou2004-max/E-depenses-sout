@@ -28,9 +28,15 @@ export function budgetSecteurMois(budgets, secteurId, annee, mois) {
   return budgets.find((b) => b.secteurId === secteurId && b.annee === annee && b.mois === mois)?.montant ?? 0;
 }
 
+// N'impacte le tableau de bord (solde, revenu, consommation du budget...)
+// qu'une fois la dépense VALIDÉE (approuvée ou décaissée) — une dépense
+// encore « en attente » d'un membre de l'administration ne doit pas encore
+// être retirée du revenu du secteur, à la demande explicite de l'utilisateur
+// (2026-09-17) : « une fois que c'est validé... cette dépense est retirée
+// dans le revenu du secteur ». Une dépense refusée ne compte jamais.
 export function depensesSecteurMois(depenses, secteurId, annee, mois, jour = null) {
   return depenses.filter((d) => {
-    if (d.secteurId !== secteurId || d.statut === "refusee") return false;
+    if (d.secteurId !== secteurId || d.statut === "refusee" || d.statut === "en_attente") return false;
     return matchPeriode(d.date, { annee, mois, jour });
   });
 }
@@ -96,29 +102,20 @@ export function croissance(actuel, precedent) {
   return (actuel - precedent) / precedent;
 }
 
-// Seuil fixe du circuit d'autorisation — porté depuis termitiere-platform
-// (SEUIL_APPROBATION_PAU). Au-delà de ce montant, une dépense passe en attente
-// d'approbation même si elle reste dans le budget alloué. Doit rester
-// synchronisé avec `v_seuil_fixe` dans compute_depense_statut() côté serveur
-// (voir supabase/migration_fonctionnalites_depense.sql) — celui-ci reste seul
-// juge côté serveur, cette constante ne sert qu'à l'indication affichée dans
-// le formulaire de saisie.
-export const SEUIL_APPROBATION_FIXE = 20000;
-
 // Reproduit côté client, pour l'indication affichée dans le formulaire de
 // saisie, la même règle que le trigger serveur `compute_depense_statut` :
-// TROIS déclencheurs indépendants, un seul suffit — seuil fixe, dépense
-// imprévue, ou dépassement du budget alloué au secteur pour le mois. Le
-// trigger reste seul juge côté serveur — ceci n'est qu'un indicateur, jamais
-// appliqué tel quel.
-export function evaluationAutorisation(depenses, budgets, secteurId, annee, mois, montantSaisi, imprevue = false) {
+// SEUL déclencheur — dépassement du budget alloué au secteur pour le mois
+// (l'absence de budget défini compte comme un dépassement). Le seuil fixe et
+// le flag « imprévue » ne déclenchent plus l'autorisation — à la demande
+// explicite de l'utilisateur (2026-09-17), qui annule la décision prise le
+// 2026-08-17 (voir git history de compute_depense_statut). Le trigger reste
+// seul juge côté serveur — ceci n'est qu'un indicateur, jamais appliqué tel quel.
+export function evaluationAutorisation(depenses, budgets, secteurId, annee, mois, montantSaisi) {
   const budget = budgetSecteurMois(budgets, secteurId, annee, mois);
   const dejaDepense = totalMontant(depensesSecteurMois(depenses, secteurId, annee, mois));
   const montant = Number(montantSaisi) || 0;
   const depasseBudget = budget === 0 || dejaDepense + montant > budget;
-  const depasseSeuil = montant >= SEUIL_APPROBATION_FIXE;
-  const declenche = depasseBudget || depasseSeuil || !!imprevue;
-  return { declenche, budget, dejaDepense, restant: Math.max(0, budget - dejaDepense), depasseBudget, depasseSeuil, imprevue: !!imprevue };
+  return { declenche: depasseBudget, budget, dejaDepense, restant: Math.max(0, budget - dejaDepense), depasseBudget };
 }
 
 export function statutLabel(statut) {

@@ -20,6 +20,7 @@ import {
   tableauSecteurs, secteursEnAlerte, totalMontant, depensesSecteurMois, budgetSecteurMois,
   fmtFCFA, fmtCompact, last12Months, croissance,
 } from "../lib/logic";
+import { secteurIdsPourFiltre } from "../lib/modules";
 
 const COULEURS_SUGGEREES = ["#0A84FF", "#30D158", "#FF9F0A", "#BF5AF2", "#FF453A", "#64D2FF", "#5E5CE6", "#8E8E93"];
 
@@ -47,10 +48,30 @@ export default function Dashboard() {
     navigate("/depense/recettes", { state: { ouvrirBudgetPour: res.secteur.id } });
   }
 
-  const secteurActif = secteurFiltre !== "tous" ? secteurs.find((s) => s.id === secteurFiltre) : null;
+  // Un secteur précis OU un module entier décliné par ville, sélectionné
+  // comme un tout (`grupo:<base>`, voir TopBar.jsx) — cumule alors tous ses
+  // lieux (Lomé + Kara...) plutôt que de n'en montrer qu'un, à la demande
+  // explicite de l'utilisateur (2026-09-15).
+  const idsFiltre = useMemo(() => secteurIdsPourFiltre(secteurFiltre, secteurs), [secteurFiltre, secteurs]);
+  const vueFiltree = useMemo(() => {
+    if (!idsFiltre || idsFiltre.length === 0) return null;
+    if (secteurFiltre.startsWith("grupo:")) {
+      const premier = secteurs.find((s) => idsFiltre.includes(s.id));
+      return { ids: idsFiltre, nom: secteurFiltre.slice(6), color: premier?.color || "#0A84FF" };
+    }
+    const s = secteurs.find((s) => s.id === idsFiltre[0]);
+    return s ? { ids: idsFiltre, nom: s.nom, color: s.color } : null;
+  }, [idsFiltre, secteurFiltre, secteurs]);
 
-  const secteursData = useMemo(() => tableauSecteurs(secteurs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteurs, depenses, budgets, periode]);
-  const alertes = useMemo(() => secteursEnAlerte(secteurs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteurs, depenses, budgets, periode]);
+  // Un secteur désactivé depuis Paramètres doit disparaître de toutes les
+  // vues financières consolidées (graphique, alertes) — seul l'écran
+  // Paramètres lui-même continue de le lister, pour permettre de le
+  // réactiver. Les dépenses/recettes déjà enregistrées sous ce secteur ne
+  // sont pas affectées : seules les vues "liste des secteurs" filtrent.
+  const secteursActifs = useMemo(() => secteurs.filter((s) => s.actif !== false), [secteurs]);
+
+  const secteursData = useMemo(() => tableauSecteurs(secteursActifs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteursActifs, depenses, budgets, periode]);
+  const alertes = useMemo(() => secteursEnAlerte(secteursActifs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteursActifs, depenses, budgets, periode]);
 
   const totalDepense = totalMontant(secteursData.map((s) => ({ montant: s.depense })));
   const totalBudget = totalMontant(secteursData.map((s) => ({ montant: s.budget })));
@@ -82,14 +103,19 @@ export default function Dashboard() {
     });
   }, [secteurs, depenses]);
 
-  if (secteurActif) {
+  if (vueFiltree) {
     return (
       <div>
-        <TopBar title="Tableau de bord" subtitle={`${secteurActif.nom} — vue financière du secteur`} icon={LayoutGrid} accent={secteurActif.color} />
+        <TopBar
+          title="Tableau de bord"
+          subtitle={vueFiltree.ids.length > 1 ? `${vueFiltree.nom} : vue financière cumulée (${vueFiltree.ids.length} lieux)` : `${vueFiltree.nom} : vue financière du secteur`}
+          icon={LayoutGrid}
+          accent={vueFiltree.color}
+        />
         <SecteurOverview
-          secteurId={secteurActif.id}
-          nom={secteurActif.nom}
-          color={secteurActif.color}
+          secteurIds={vueFiltree.ids}
+          nom={vueFiltree.nom}
+          color={vueFiltree.color}
           labelRecettes="Dernières recettes"
           onVoirDepenses={() => navigate("/depense/depenses")}
           onVoirRecettes={() => navigate("/depense/recettes")}
@@ -100,7 +126,7 @@ export default function Dashboard() {
 
   return (
     <div>
-      <TopBar title="Tableau de bord" subtitle="Vue consolidée — pilotage financier de LA TERMITIÈRE" icon={LayoutGrid} accent="#0A84FF" />
+      <TopBar title="Tableau de bord" subtitle="Vue consolidée : pilotage financier de LA TERMITIÈRE" icon={LayoutGrid} accent="#0A84FF" />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 lg:auto-rows-[172px] gap-4 sm:gap-5">
         <StatTile
@@ -109,14 +135,14 @@ export default function Dashboard() {
           value={fmtCompact(totalDepense) + " FCFA"}
           trend={croissance(totalDepense, totalPrecedent)}
           tone="#0A84FF"
-          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} — tous secteurs`, items: depensesPeriodeToutes })}
+          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} : tous secteurs`, items: depensesPeriodeToutes })}
         />
         <StatTile
           icon={TrendingUp}
           label="Budget consommé"
           value={`${Math.round(tauxGlobal * 100)}%`}
           tone="#30D158"
-          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} — tous secteurs`, items: depensesPeriodeToutes })}
+          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} : tous secteurs`, items: depensesPeriodeToutes })}
         />
         <StatTile
           icon={AlertTriangle}
@@ -138,7 +164,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
             <div>
               <h3 className="font-bold tracking-tight text-ink">Dépenses par secteur</h3>
-              <p className="text-[12.5px] text-ink-soft font-medium">Mois en cours — comparé au budget alloué</p>
+              <p className="text-[12.5px] text-ink-soft font-medium">Mois en cours : comparé au budget alloué</p>
             </div>
             <div className="flex items-center gap-2">
               <Badge tone="accent">
@@ -188,7 +214,7 @@ export default function Dashboard() {
         {/* Tendance 12 mois */}
         <GlassCard className="col-span-2 lg:row-span-2 p-5 sm:p-6 flex flex-col">
           <h3 className="font-bold tracking-tight text-ink mb-0.5">Tendance des dépenses</h3>
-          <p className="text-[12.5px] text-ink-soft font-medium mb-2">12 derniers mois — tous secteurs</p>
+          <p className="text-[12.5px] text-ink-soft font-medium mb-2">12 derniers mois : tous secteurs</p>
           <div className="flex-1 h-64 lg:h-auto -ml-2">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trend}>
@@ -214,7 +240,7 @@ export default function Dashboard() {
                 whileHover={{ x: 3 }}
                 onClick={() => setVueTransactions({
                   type: "depense",
-                  title: `Dépenses ${suffixePeriode} — ${a.nom}`,
+                  title: `Dépenses ${suffixePeriode} : ${a.nom}`,
                   items: depensesPeriodeToutes.filter((d) => d.secteurId === a.id),
                 })}
                 className="flex items-center justify-between gap-3 px-3.5 py-3 rounded-2xl bg-white/50 hover:bg-white/75 transition-colors cursor-pointer"
@@ -276,7 +302,7 @@ export default function Dashboard() {
           </div>
         </Field>
         <p className="mt-1 text-[12px] text-ink-soft">
-          Le nouveau secteur apparaît aussitôt dans les filtres et les formulaires de dépense/recette. Aucun budget n'est défini par défaut — vous pourrez en saisir un dès le premier mois.
+          Le nouveau secteur apparaît aussitôt dans les filtres et les formulaires de dépense/recette. Aucun budget n'est défini par défaut : vous pourrez en saisir un dès le premier mois.
         </p>
       </Modal>
 

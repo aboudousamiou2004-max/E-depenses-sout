@@ -10,6 +10,9 @@ import Modal from "../../components/ui/Modal";
 import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useBesoinsStore, CATEGORIES_BESOIN, catLabelBesoin } from "../../store/besoinsStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutModifier, peutSupprimer } from "../../lib/modules";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 const STATUTS = {
   a_traiter: { label: "À traiter", tone: "amber" }, en_cours: { label: "En cours", tone: "accent" },
@@ -41,6 +44,8 @@ export default function Besoins() {
   useEffect(() => { chargerBesoins(); }, [chargerBesoins]);
 
   const estAdmin = ROLES_ADMIN.includes(user?.role);
+  const modifierOk = peutModifier(user?.role);
+  const supprimerOk = peutSupprimer(user?.role);
   const liste = useMemo(() => besoins.filter((b) => b.secteurId === config.secteurId), [besoins, config.secteurId]);
 
   const [filtreStatut, setFiltreStatut] = useState("");
@@ -51,6 +56,7 @@ export default function Besoins() {
   const [error, setError] = useState("");
   const [observationTexte, setObservationTexte] = useState("");
   const [observationOuverte, setObservationOuverte] = useState(false);
+  const [confirmCible, setConfirmCible] = useState(null);
 
   const filtree = useMemo(() => liste
     .filter((b) => !filtreStatut || b.statut === filtreStatut)
@@ -79,11 +85,12 @@ export default function Besoins() {
     setModal(null);
   }
 
-  async function supprimer(b) {
-    if (!window.confirm(`Supprimer le besoin « ${b.titre} » ?`)) return;
+  async function confirmerSuppression(motif) {
+    const b = confirmCible;
+    await enregistrerMotifSuppression({ user, table: "besoins", label: b.titre, motif, secteurId: config.secteurId });
     const res = await supprimerBesoin(b.id);
-    if (!res.ok) return alert(res.error);
-    if (detailId === b.id) setDetailId(null);
+    if (res.ok && detailId === b.id) setDetailId(null);
+    return res;
   }
 
   async function refuser(b) {
@@ -101,7 +108,7 @@ export default function Besoins() {
 
   return (
     <div>
-      <TopBarSimple title="Besoins" subtitle={`${config.nom} — demandes reçues par les directeurs et l'administration`} icon={PackagePlus} accent={config.color} />
+      <TopBarSimple title="Besoins" subtitle={`${config.nom} : demandes reçues par les directeurs et l'administration`} icon={PackagePlus} accent={config.color} />
 
       <div className="grid grid-cols-2 gap-4 mb-5">
         <StatTile icon={PackagePlus} label="À traiter" value={String(enAttente)} tone={config.color} />
@@ -155,7 +162,7 @@ export default function Besoins() {
                         <button onClick={() => refuser(b)} title="Refuser" className="text-[#FF453A] hover:opacity-70"><X size={15} /></button>
                       </>
                     )}
-                    <button onClick={() => supprimer(b)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>
+                    {supprimerOk && <button onClick={() => setConfirmCible(b)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}
                   </div>
                 </td>
               </tr>
@@ -204,7 +211,7 @@ export default function Besoins() {
               <Badge tone={VALIDATIONS[detail.validation]?.tone}>{VALIDATIONS[detail.validation]?.label}</Badge>
               <Badge tone={STATUTS[detail.statut]?.tone}>{STATUTS[detail.statut]?.label}</Badge>
               <Badge tone={PRIORITES[detail.priorite]?.tone}>{PRIORITES[detail.priorite]?.label}</Badge>
-              <button onClick={() => { setDetailId(null); openEdit(detail); }} className="ml-auto flex items-center gap-1 text-[12px] text-[#0A84FF] hover:underline"><Pencil size={12} /> Modifier</button>
+              {modifierOk && <button onClick={() => { setDetailId(null); openEdit(detail); }} className="ml-auto flex items-center gap-1 text-[12px] text-[#0A84FF] hover:underline"><Pencil size={12} /> Modifier</button>}
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-[12.5px]">
@@ -264,6 +271,14 @@ export default function Besoins() {
           </div>
         )}
       </Modal>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre="Supprimer ce besoin ?"
+        description={confirmCible ? `Vous allez supprimer le besoin « ${confirmCible.titre} ».` : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { LogOut, ChevronRight, Users, Home } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { useDataStore } from "../store/dataStore";
-import { modulesAccessibles, MODULE_DEPENSE, ROLES_ACCES_TOTAL } from "../lib/modules";
+import { modulesAccessibles, MODULE_DEPENSE, ROLES_ACCES_TOTAL, groupesModules } from "../lib/modules";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtCompact } from "../lib/logic";
 import GlassCard from "../components/ui/GlassCard";
 import NotificationBell from "../components/layout/NotificationBell";
@@ -18,6 +18,14 @@ export default function Portal() {
   const navigate = useNavigate();
 
   const accessibles = useMemo(() => modulesAccessibles(user, secteurs), [user, secteurs]);
+  // Un module décliné par ville (MAXI GYM, MAXI LOGISTIQUE...) ne doit
+  // occuper qu'UNE SEULE place sur le Portail, jamais une carte par lieu —
+  // à la demande explicite de l'utilisateur (2026-09-15) : « sur la page
+  // d'accueil on ne doit avoir que les modules, c'est quand on clique dessus
+  // qu'on a les secteurs (Lomé, Kara...) ». Le détail par lieu vit
+  // uniquement sur l'écran /module/:base (voir ChoixSecteurVille.jsx),
+  // atteint en cliquant la carte du module.
+  const groupes = useMemo(() => groupesModules(accessibles), [accessibles]);
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
   // Barre mobile du Portail — pas de « Plus » ici (pas de sidebar caché à
   // ouvrir), juste les raccourcis utiles depuis l'accueil, à la demande de
@@ -41,6 +49,16 @@ export default function Portal() {
     }
     const budget = budgetSecteurMois(budgets, m.secteurId, now.annee, now.mois);
     const depense = totalMontant(depensesSecteurMois(depenses, m.secteurId, now.annee, now.mois));
+    return budget ? `${Math.round((depense / budget) * 100)}% du budget` : `${fmtCompact(depense)} FCFA ce mois`;
+  }
+
+  // Même calcul que kpiPourModule, mais cumulé sur tous les secteurs d'un
+  // module décliné par ville (Lomé + Kara...), pour que la carte du groupe
+  // affiche un chiffre cohérent avec l'ensemble qu'elle représente.
+  function kpiPourGroupe(groupe) {
+    const ids = groupe.modules.map((m) => m.secteurId);
+    const budget = ids.reduce((s, id) => s + budgetSecteurMois(budgets, id, now.annee, now.mois), 0);
+    const depense = totalMontant(ids.flatMap((id) => depensesSecteurMois(depenses, id, now.annee, now.mois)));
     return budget ? `${Math.round((depense / budget) * 100)}% du budget` : `${fmtCompact(depense)} FCFA ce mois`;
   }
 
@@ -114,46 +132,61 @@ export default function Portal() {
           </div>
         </motion.div>
 
-        {accessibles.length === 0 ? (
+        {groupes.length === 0 ? (
           <GlassCard className="p-10 text-center" hover={false}>
             <p className="text-ink-soft">Aucun module ne vous a encore été attribué. Contactez un administrateur.</p>
           </GlassCard>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-            {accessibles.map((m, i) => (
-              <motion.button
-                key={m.id}
-                initial={{ opacity: 0, y: 14 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05, duration: 0.4 }}
-                whileHover={{ y: -4 }}
-                onClick={() => navigate(m.path)}
-                className="glass rounded-[18px] sm:rounded-[28px] p-3.5 sm:p-6 text-left flex flex-col gap-2 sm:gap-4 group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: `${m.color}1f` }}>
-                    {m.id === MODULE_DEPENSE.id ? (
-                      <img src="/logo_termitiere.png" alt="" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
-                    ) : (
-                      <m.icon size={17} strokeWidth={2.2} style={{ color: m.color }} className="w-[17px] h-[17px] sm:w-[22px] sm:h-[22px]" />
-                    )}
-                  </div>
-                  <ChevronRight size={16} className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-ink-soft group-hover:translate-x-1 group-hover:text-ink transition-all" />
-                </div>
-                <div>
-                  <p className="font-bold tracking-tight text-ink text-[13.5px] sm:text-[15px]">{m.nom}</p>
-                  <p className="text-[11px] sm:text-[12.5px] text-ink-soft font-medium mt-0.5">{m.description}</p>
-                </div>
-                <p className="text-[10.5px] sm:text-[12px] font-semibold" style={{ color: m.color }}>
-                  {kpiPourModule(m)}
-                </p>
-              </motion.button>
-            ))}
+            {groupes.map((g, i) =>
+              g.modules.length > 1 ? (
+                <CarteModule
+                  key={g.base}
+                  m={{ id: g.base, nom: g.base, description: g.modules[0].description, color: g.modules[0].color, icon: g.modules[0].icon }}
+                  i={i}
+                  kpi={kpiPourGroupe(g)}
+                  onClick={() => navigate(`/module/${encodeURIComponent(g.base)}`)}
+                />
+              ) : (
+                <CarteModule key={g.modules[0].id} m={g.modules[0]} i={i} kpi={kpiPourModule(g.modules[0])} onClick={() => navigate(g.modules[0].path)} />
+              )
+            )}
           </div>
         )}
       </div>
 
       <MobileTabBar items={navMobile} accent="#7A1128" pillId="mobile-nav-pill-portal" />
     </div>
+  );
+}
+
+function CarteModule({ m, i, kpi, onClick }) {
+  return (
+    <motion.button
+      initial={{ opacity: 0, y: 14 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: i * 0.05, duration: 0.4 }}
+      whileHover={{ y: -4 }}
+      onClick={onClick}
+      className="glass rounded-[18px] sm:rounded-[28px] p-3.5 sm:p-6 text-left flex flex-col gap-2 sm:gap-4 group"
+    >
+      <div className="flex items-center justify-between">
+        <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center overflow-hidden" style={{ background: `${m.color}1f` }}>
+          {m.id === MODULE_DEPENSE.id ? (
+            <img src="/logo_termitiere.png" alt="" className="w-6 h-6 sm:w-8 sm:h-8 object-contain" />
+          ) : (
+            <m.icon size={17} strokeWidth={2.2} style={{ color: m.color }} className="w-[17px] h-[17px] sm:w-[22px] sm:h-[22px]" />
+          )}
+        </div>
+        <ChevronRight size={16} className="w-4 h-4 sm:w-[18px] sm:h-[18px] text-ink-soft group-hover:translate-x-1 group-hover:text-ink transition-all" />
+      </div>
+      <div>
+        <p className="font-bold tracking-tight text-ink text-[13.5px] sm:text-[15px]">{m.nom}</p>
+        <p className="text-[11px] sm:text-[12.5px] text-ink-soft font-medium mt-0.5">{m.description}</p>
+      </div>
+      <p className="text-[10.5px] sm:text-[12px] font-semibold" style={{ color: m.color }}>
+        {kpi}
+      </p>
+    </motion.button>
   );
 }

@@ -3,6 +3,7 @@ import { useDataStore } from "../../store/dataStore";
 import { modulesMetier } from "../../lib/modules";
 import ModuleGuard from "../ModuleGuard";
 import BusinessLayout from "./BusinessLayout";
+import SplashScreen from "../SplashScreen";
 
 // Point d'entrée unique de tous les modules métiers — remplace les anciennes
 // routes statiques une par une (/agro, /logistique, ...) par une seule route
@@ -18,7 +19,7 @@ export default function BusinessRoute() {
   if (!config) {
     // Secteur inexistant, ou pas encore chargé (chargerTout est asynchrone) —
     // le second cas se résorbe de lui-même dès que la requête répond.
-    if (!loaded) return null;
+    if (!loaded) return <SplashScreen />;
     return <Navigate to="/portal" replace />;
   }
 

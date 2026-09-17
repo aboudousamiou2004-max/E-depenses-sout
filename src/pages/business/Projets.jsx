@@ -11,6 +11,9 @@ import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useEgproStore } from "../../store/egproStore";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutModifier, peutSupprimer } from "../../lib/modules";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 const TYPES_PROJET = [
   { id: "construction", label: "Construction" }, { id: "amenagement", label: "Aménagement" },
@@ -40,6 +43,8 @@ export default function Projets() {
   const { user } = useAuthStore();
   const { projets, taches, versementsClient, chargerEgpro, ajouterProjet, modifierProjet, supprimerProjet, demarrerProjet, terminerProjet, ajouterVersementClient, supprimerVersementClient } = useEgproStore();
   const { depenses, chargerDepenses } = useDataStore();
+  const modifierOk = peutModifier(user?.role);
+  const supprimerOk = peutSupprimer(user?.role);
 
   useEffect(() => { chargerEgpro(); chargerDepenses(); }, [chargerEgpro, chargerDepenses]);
 
@@ -48,6 +53,7 @@ export default function Projets() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [versForm, setVersForm] = useState({ montant: "", date: new Date().toISOString().slice(0, 10), note: "" });
+  const [confirmCible, setConfirmCible] = useState(null); // { type: "projet" | "versement", data }
 
   const depenseParProjet = useMemo(() => {
     const map = {};
@@ -85,10 +91,16 @@ export default function Projets() {
     setModal(null);
   }
 
-  async function supprimer(p) {
-    if (!window.confirm(`Supprimer le projet « ${p.nom} » et ses tâches ?`)) return;
-    await supprimerProjet(p.id);
-    if (detailId === p.id) setDetailId(null);
+  async function confirmerSuppression(motif) {
+    const { type, data } = confirmCible;
+    if (type === "versement") {
+      await enregistrerMotifSuppression({ user, table: "egpro_versements_client", label: `${fmt(data.montant)} FCFA`, motif, secteurId: config.secteurId });
+      return supprimerVersementClient(data.id);
+    }
+    await enregistrerMotifSuppression({ user, table: "egpro_projets", label: data.nom, motif, secteurId: config.secteurId });
+    const res = await supprimerProjet(data.id);
+    if (res.ok && detailId === data.id) setDetailId(null);
+    return res;
   }
 
   async function submitVersement(e) {
@@ -100,7 +112,7 @@ export default function Projets() {
 
   return (
     <div>
-      <TopBarSimple title="Projets" subtitle={`${config.nom} — suivi budget, contrat client et avancement`} icon={FolderKanban} accent={config.color} />
+      <TopBarSimple title="Projets" subtitle={`${config.nom} : suivi budget, contrat client et avancement`} icon={FolderKanban} accent={config.color} />
 
       <div className="grid grid-cols-3 gap-4 mb-5">
         <StatTile icon={FolderKanban} label="Projets en cours" value={String(enCours)} tone={config.color} />
@@ -138,7 +150,7 @@ export default function Projets() {
                 <td className="px-3 py-2.5 text-right tabular font-bold text-[#B45309]">{fmt(depenseParProjet[p.id] || 0)}</td>
                 <td className="px-3 py-2.5 text-center"><Badge tone={STATUTS[p.statut]?.tone}>{STATUTS[p.statut]?.label}</Badge></td>
                 <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                  <button onClick={() => supprimer(p)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>
+                  {supprimerOk && <button onClick={() => setConfirmCible({ type: "projet", data: p })} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}
                 </td>
               </tr>
             ))}
@@ -225,7 +237,7 @@ export default function Projets() {
                 <div className="ml-auto flex gap-2">
                   {detail.statut === "planification" && <Button size="sm" icon={Play} onClick={() => demarrerProjet(detail)}>Démarrer</Button>}
                   {detail.statut === "en_cours" && <Button size="sm" icon={CheckCircle2} onClick={() => terminerProjet(detail.id)}>Terminer</Button>}
-                  <button onClick={() => { setDetailId(null); openEdit(detail); }} className="text-[12px] text-[#0A84FF] hover:underline">Modifier</button>
+                  {modifierOk && <button onClick={() => { setDetailId(null); openEdit(detail); }} className="text-[12px] text-[#0A84FF] hover:underline">Modifier</button>}
                 </div>
               </div>
 
@@ -282,7 +294,7 @@ export default function Projets() {
                           <span className="text-ink-soft">{new Date(v.date).toLocaleDateString("fr-FR")}</span>
                           {v.note && <span className="flex-1 truncate italic text-ink-soft">« {v.note} »</span>}
                           <span className="font-mono font-bold text-ink">{fmt(v.montant)}</span>
-                          <button onClick={() => supprimerVersementClient(v.id)} className="text-[#FF453A]/60 hover:text-[#FF453A]"><Trash2 size={12} /></button>
+                          {supprimerOk && <button onClick={() => setConfirmCible({ type: "versement", data: v })} className="text-[#FF453A]/60 hover:text-[#FF453A]"><Trash2 size={12} /></button>}
                         </div>
                       ))}
                     </div>
@@ -298,6 +310,14 @@ export default function Projets() {
           );
         })()}
       </Modal>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre={confirmCible?.type === "versement" ? "Supprimer ce versement ?" : "Supprimer ce projet ?"}
+        description={confirmCible ? (confirmCible.type === "versement" ? `Vous allez supprimer le versement de ${fmt(confirmCible.data.montant)} FCFA.` : `Vous allez supprimer le projet « ${confirmCible.data.nom} » et ses tâches.`) : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
     </div>
   );
 }

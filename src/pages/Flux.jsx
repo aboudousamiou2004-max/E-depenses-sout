@@ -33,7 +33,7 @@ export default function Flux() {
       </div>
 
       <GlassCard className="p-4 sm:p-6" hover={false}>
-        <h3 className="font-bold tracking-tight text-ink mb-0.5">Évolution des flux — 12 derniers mois</h3>
+        <h3 className="font-bold tracking-tight text-ink mb-0.5">Évolution des flux : 12 derniers mois</h3>
         <p className="text-[12.5px] text-ink-soft font-medium mb-3">Entrées vs sorties, tous secteurs confondus</p>
         <div className="h-[260px] sm:h-[340px] -ml-2">
           <ResponsiveContainer width="100%" height="100%">

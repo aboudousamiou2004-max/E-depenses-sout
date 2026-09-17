@@ -6,7 +6,7 @@ import RecetteDetailModal from "./RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, statutLabel } from "../lib/logic";
-import { ROLES_ACCES_TOTAL } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../lib/modules";
 
 // Ouverte en cliquant sur un KPI du tableau de bord (général ou sectoriel) —
 // liste les dépenses/recettes qui composent ce chiffre, avec un clic sur une
@@ -17,6 +17,7 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
   const { user } = useAuthStore();
   const [selection, setSelection] = useState(null);
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
 
   function secteurOf(id) {
     return secteurs.find((s) => s.id === id);
@@ -58,6 +59,7 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
           categories={categories}
           users={users}
           peutModifier={peutModifier}
+          peutSupprimer={peutSupprimer}
           modifierDepense={modifierDepense}
           supprimerDepense={supprimerDepense}
           changerStatutDepense={changerStatutDepense}
@@ -69,8 +71,10 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
           recette={selection}
           secteurs={secteurs}
           peutModifier={peutModifier}
+          peutSupprimer={peutSupprimer}
           modifierRecette={modifierRecette}
           supprimerRecette={supprimerRecette}
+          currentUser={user}
           onClose={() => setSelection(null)}
         />
       )}

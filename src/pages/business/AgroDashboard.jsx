@@ -4,7 +4,7 @@ import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler,
 } from "chart.js";
 import { Line, Doughnut, Bar } from "react-chartjs-2";
-import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack, Tag, Plus, LayoutGrid, Syringe, Search, PawPrint } from "lucide-react";
+import { TrendingUp, TrendingDown, Boxes, HeartPulse, Skull, Stethoscope, Sprout, ShoppingCart, Wallet, Egg, HeartCrack, Tag, Plus, LayoutGrid, Syringe, Search, PawPrint, Pencil } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import Modal from "../../components/ui/Modal";
@@ -155,10 +155,10 @@ export default function AgroDashboard() {
 
   // Chiffre d'affaires (recettes du secteur agro) — uniquement pour « Toutes ».
   const ca = useMemo(() => {
-    const inSecteur = recettes.filter((r) => r.secteurId === "agro");
+    const inSecteur = recettes.filter((r) => r.secteurId === config.secteurId);
     const sumIn = (s, e) => inSecteur.filter((r) => r.date >= s && r.date <= e).reduce((acc, r) => acc + (r.montant || 0), 0);
     return { courant: sumIn(start, end), precedent: sumIn(prevStart, prevEnd), liste: inSecteur.filter((r) => r.date >= start && r.date <= end).sort((a, b) => (a.date < b.date ? 1 : -1)) };
-  }, [recettes, start, end, prevStart, prevEnd]);
+  }, [recettes, start, end, prevStart, prevEnd, config.secteurId]);
 
   // Détails décès / naissances / ventes (scope, période) — pour les modales.
   const decesDetail = useMemo(() => mvtPeriode.filter((m) => m.type === "deces").map((m) => ({ date: m.date, espece: especes.find((e) => e.id === m.especeId)?.nom, qte: Math.abs(m.quantite), motif: m.motif || "—", agent: m.agentNom })).sort((a, b) => (a.date < b.date ? 1 : -1)), [mvtPeriode, especes]);
@@ -290,7 +290,7 @@ export default function AgroDashboard() {
     <div className="space-y-5">
       <TopBarSimple
         title="Cheptel"
-        subtitle={`${config.nom} — effectifs, santé et suivi du cheptel par espèce`}
+        subtitle={`${config.nom} : effectifs, santé et suivi du cheptel par espèce`}
         icon={PawPrint}
         accent={config.color}
         showPeriodeFilter={false}
@@ -337,7 +337,7 @@ export default function AgroDashboard() {
 
       {/* Indicateurs */}
       <div>
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-soft/70">Indicateurs — {scopeLabel}</p>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wide text-ink-soft/70">Indicateurs : {scopeLabel}</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
           <Indic title="Effectif en stock" value={fmtNum(ind.effectif)} icon={Boxes} color="#2563eb" sub={`${especesScope.length} espèce(s)`} />
           <Indic title="Naissances" value={fmtNum(ind.naiss)} icon={Egg} color="#16a34a" sub={`${naissancesDetail.length} enregistrement(s)`} delta={ind.naiss - indPrec.naiss} onClick={() => setModalKey("naissances")} />
@@ -357,9 +357,9 @@ export default function AgroDashboard() {
           <GlassCard hover={false} className="p-4">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-soft/70">Taux de morbidité — {scopeLabel}</p>
+                <p className="text-[11px] font-medium uppercase tracking-wide text-ink-soft/70">Taux de morbidité : {scopeLabel}</p>
                 <p className="text-2xl font-extrabold text-[#d97706]">{ind.morbidite.toFixed(1)} %</p>
-                <p className="mt-0.5 text-[11px] text-ink-soft/70">{ind.malades} malade(s) / {fmtNum(ind.effectif)} têtes — courbe & prévision</p>
+                <p className="mt-0.5 text-[11px] text-ink-soft/70">{ind.malades} malade(s) / {fmtNum(ind.effectif)} têtes : courbe & prévision</p>
               </div>
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#d97706]/10 text-[#d97706]"><Stethoscope size={20} /></div>
             </div>
@@ -371,7 +371,7 @@ export default function AgroDashboard() {
           </GlassCard>
         </button>
         <GlassCard hover={false} className="p-4">
-          <p className="font-bold tracking-tight text-ink mb-2">{repartition.parEspece ? `Répartition par espèce — ${scopeLabel}` : "Répartition par catégorie"}</p>
+          <p className="font-bold tracking-tight text-ink mb-2">{repartition.parEspece ? `Répartition par espèce : ${scopeLabel}` : "Répartition par catégorie"}</p>
           <div className="h-64">
             {repartition.rows.some((r) => r.total > 0)
               ? <Doughnut data={repartitionData} options={{ maintainAspectRatio: false, plugins: { legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } } } }} />
@@ -381,7 +381,7 @@ export default function AgroDashboard() {
       </div>
 
       <GlassCard hover={false} className="p-4">
-        <p className="font-bold tracking-tight text-ink mb-1">Naissances · Décès · Ventes — {scopeLabel}</p>
+        <p className="font-bold tracking-tight text-ink mb-1">Naissances · Décès · Ventes : {scopeLabel}</p>
         <div className="mb-2 flex flex-wrap items-center gap-3 text-[11px] text-ink-soft">
           <span className="font-semibold text-[#16a34a]">🐣 {fmtNum(ind.naiss)} naissance(s)</span>
           <span className="font-semibold text-[#dc2626]">💀 {fmtNum(ind.dec)} décès</span>
@@ -399,7 +399,7 @@ export default function AgroDashboard() {
       </GlassCard>
 
       <GlassCard hover={false} className="p-4">
-        <p className="font-bold tracking-tight text-ink mb-1">{scope === TOUTES ? "Courbe de croissance par catégorie" : `Courbe de croissance par espèce — ${scopeLabel}`}</p>
+        <p className="font-bold tracking-tight text-ink mb-1">{scope === TOUTES ? "Courbe de croissance par catégorie" : `Courbe de croissance par espèce : ${scopeLabel}`}</p>
         <div className="h-64">
           {!croissanceChart.vide
             ? <Line data={croissanceChart} options={{ maintainAspectRatio: false, interaction: { mode: "index", intersect: false }, plugins: { legend: { display: true, position: "bottom", labels: { boxWidth: 12, font: { size: 10 } } } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }} />
@@ -407,9 +407,9 @@ export default function AgroDashboard() {
         </div>
       </GlassCard>
 
-      {/* Détail par espèce — chaque ligne s'ouvre en détail complet (clic) */}
+      {/* Détail par espèce : chaque ligne s'ouvre en détail complet (clic) */}
       <GlassCard hover={false} className="p-2 overflow-hidden">
-        <p className="font-bold tracking-tight text-ink px-3 pt-3 mb-1">Détail par espèce — {scopeLabel}</p>
+        <p className="font-bold tracking-tight text-ink px-3 pt-3 mb-1">Détail par espèce : {scopeLabel}</p>
         <p className="px-3 pb-2 text-[11px] text-ink-soft/60">Cliquez une espèce pour son détail complet sur la période.</p>
         {especeRows.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-ink-soft/60">Aucune espèce.</p>
@@ -452,7 +452,7 @@ export default function AgroDashboard() {
       </GlassCard>
 
       {/* Détail complet d'une espèce (clic sur une ligne du tableau ci-dessus) */}
-      <Modal open={!!especeDetail} onClose={() => setEspeceDetailId(null)} title={especeDetail ? `${especeDetail.nom} — ${especeDetail.cat}` : ""} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setEspeceDetailId(null)}>Fermer</Button>}>
+      <Modal open={!!especeDetail} onClose={() => setEspeceDetailId(null)} title={especeDetail ? `${especeDetail.nom} : ${especeDetail.cat}` : ""} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setEspeceDetailId(null)}>Fermer</Button>}>
         {especeDetail && (
           <div className="space-y-3">
             <div className="grid grid-cols-3 gap-2">
@@ -479,52 +479,52 @@ export default function AgroDashboard() {
               </div>
             )}
             {CAT_ANIMAUX_IDENTIFIES.includes(especeDetail.cat) && (
-              <RegistreIndividuel especeId={especeDetail.id} animaux={animauxIndividuels.filter((a) => a.especeId === especeDetail.id)} />
+              <RegistreIndividuel especeId={especeDetail.id} especeNom={especeDetail.nom} animaux={animauxIndividuels.filter((a) => a.especeId === especeDetail.id)} />
             )}
           </div>
         )}
       </Modal>
 
       {/* Modales détaillées */}
-      <Modal open={modalKey === "naissances"} onClose={() => setModalKey(null)} title={`Naissances — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#16a34a]/10 px-3 py-2 text-[13px] text-[#16653c]"><strong>{fmtNum(ind.naiss)}</strong> naissance(s) sur la période — période préc. : {fmtNum(indPrec.naiss)}</p>
+      <Modal open={modalKey === "naissances"} onClose={() => setModalKey(null)} title={`Naissances : ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#16a34a]/10 px-3 py-2 text-[13px] text-[#16653c]"><strong>{fmtNum(ind.naiss)}</strong> naissance(s) sur la période : période préc. : {fmtNum(indPrec.naiss)}</p>
         <DetailTable rows={naissancesDetail} cols={["Date", "Espèce", "Nés", "Agent"]} render={(n) => [fmtDateShort(n.date), n.espece, n.qte, n.agent || "—"]} empty="Aucune naissance sur la période." />
       </Modal>
-      <Modal open={modalKey === "deces"} onClose={() => setModalKey(null)} title={`Décès — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]"><strong>{fmtNum(ind.dec)}</strong> décès sur la période — période préc. : {fmtNum(indPrec.dec)}</p>
+      <Modal open={modalKey === "deces"} onClose={() => setModalKey(null)} title={`Décès : ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]"><strong>{fmtNum(ind.dec)}</strong> décès sur la période : période préc. : {fmtNum(indPrec.dec)}</p>
         <DetailTable rows={decesDetail} cols={["Date", "Espèce", "Qté", "Motif", "Agent"]} render={(d) => [fmtDateShort(d.date), d.espece, d.qte, d.motif, d.agent || "—"]} empty="Aucun décès sur la période." />
       </Modal>
-      <Modal open={modalKey === "mortalite"} onClose={() => setModalKey(null)} title={`Mortalité — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]">Taux : <strong>{ind.mortalite.toFixed(1)} %</strong> — {ind.dec} décès / {fmtNum(ind.base)} têtes (effectif en début de période)</p>
+      <Modal open={modalKey === "mortalite"} onClose={() => setModalKey(null)} title={`Mortalité : ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]">Taux : <strong>{ind.mortalite.toFixed(1)} %</strong> : {ind.dec} décès / {fmtNum(ind.base)} têtes (effectif en début de période)</p>
         <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Décès / Effectif début de période) × 100</p>
         <DetailTable rows={decesDetail} cols={["Date", "Espèce", "Qté", "Motif", "Agent"]} render={(d) => [fmtDateShort(d.date), d.espece, d.qte, d.motif, d.agent || "—"]} empty="Aucun décès sur la période." />
       </Modal>
-      <Modal open={modalKey === "letalite"} onClose={() => setModalKey(null)} title={`Létalité — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]">Taux : <strong>{ind.letalite.toFixed(1)} %</strong> — {ind.dec} décès / {ind.casMaladie} cas de maladie (malades + décès)</p>
-        <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Décès / Cas de maladie) × 100 — part des animaux tombés malades qui n'ont pas survécu.</p>
+      <Modal open={modalKey === "letalite"} onClose={() => setModalKey(null)} title={`Létalité : ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#dc2626]/10 px-3 py-2 text-[13px] text-[#991b1b]">Taux : <strong>{ind.letalite.toFixed(1)} %</strong> : {ind.dec} décès / {ind.casMaladie} cas de maladie (malades + décès)</p>
+        <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Décès / Cas de maladie) × 100 : part des animaux tombés malades qui n'ont pas survécu.</p>
         <DetailTable rows={decesDetail} cols={["Date", "Espèce", "Qté", "Motif", "Agent"]} render={(d) => [fmtDateShort(d.date), d.espece, d.qte, d.motif, d.agent || "—"]} empty="Aucun décès sur la période." />
       </Modal>
-      <Modal open={modalKey === "croissance"} onClose={() => setModalKey(null)} title={`Croissance & naissances — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#16a34a]/10 px-3 py-2 text-[13px] text-[#16653c]">Taux : <strong>{ind.croissance.toFixed(1)} %</strong> — {ind.naiss} naissance(s)</p>
+      <Modal open={modalKey === "croissance"} onClose={() => setModalKey(null)} title={`Croissance & naissances : ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#16a34a]/10 px-3 py-2 text-[13px] text-[#16653c]">Taux : <strong>{ind.croissance.toFixed(1)} %</strong> : {ind.naiss} naissance(s)</p>
         <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : ((Naissances − Décès) / Effectif début de période) × 100</p>
         <DetailTable rows={naissancesDetail} cols={["Date", "Espèce", "Nés", "Agent"]} render={(n) => [fmtDateShort(n.date), n.espece, n.qte, n.agent || "—"]} empty="Aucune naissance sur la période." />
       </Modal>
-      <Modal open={modalKey === "morbidite"} onClose={() => setModalKey(null)} title={`Morbidité — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#d97706]/10 px-3 py-2 text-[13px] text-[#92400e]">Taux : <strong>{ind.morbidite.toFixed(1)} %</strong> — {ind.malades} malade(s) / {fmtNum(ind.effectif)} têtes</p>
-        <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Malades / Effectif) × 100 — prévision : tendance + moyenne mobile (7 jours)</p>
+      <Modal open={modalKey === "morbidite"} onClose={() => setModalKey(null)} title={`Morbidité : ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#d97706]/10 px-3 py-2 text-[13px] text-[#92400e]">Taux : <strong>{ind.morbidite.toFixed(1)} %</strong> : {ind.malades} malade(s) / {fmtNum(ind.effectif)} têtes</p>
+        <p className="my-2 text-[11px] italic text-ink-soft/60">Formule : (Malades / Effectif) × 100 : prévision : tendance + moyenne mobile (7 jours)</p>
         {morbiditePrevision.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {morbiditePrevision.map((v, i) => <span key={i} className="rounded-xl bg-[#9333ea]/10 px-2.5 py-1 text-[11px] font-semibold text-[#6b21a8]">J+{i + 1} : {v.toFixed(1)} %</span>)}
           </div>
         )}
       </Modal>
-      <Modal open={modalKey === "ventes"} onClose={() => setModalKey(null)} title={`Ventes (volume) — ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#0d9488]/10 px-3 py-2 text-[13px] text-[#0f766e]">{fmtNum(venduVolume)} unité(s) vendue(s) — période préc. : {fmtNum(indPrec.ventes)}</p>
+      <Modal open={modalKey === "ventes"} onClose={() => setModalKey(null)} title={`Ventes (volume) : ${scopeLabel}`} icon={PawPrint} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#0d9488]/10 px-3 py-2 text-[13px] text-[#0f766e]">{fmtNum(venduVolume)} unité(s) vendue(s) : période préc. : {fmtNum(indPrec.ventes)}</p>
         <DetailTable rows={ventesDetail} cols={["Date", "Espèce", "Qté", "Motif"]} render={(v) => [fmtDateShort(v.date), v.espece, v.qte, v.motif]} empty="Aucune vente sur la période." />
       </Modal>
-      <Modal open={modalKey === "ca"} onClose={() => setModalKey(null)} title={`Chiffre d'affaires — ${scopeLabel}`} icon={Wallet} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
-        <p className="rounded-2xl bg-[#7c3aed]/10 px-3 py-2 text-[13px] text-[#5b21b6]">{fmtMoney(ca.courant)} — période préc. : {fmtMoney(ca.precedent)}</p>
-        <p className="my-2 text-[11px] italic text-ink-soft/60">Total des recettes du secteur agro (tous types confondus — pas de détail par catégorie dans ce projet).</p>
+      <Modal open={modalKey === "ca"} onClose={() => setModalKey(null)} title={`Chiffre d'affaires : ${scopeLabel}`} icon={Wallet} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={() => setModalKey(null)}>Fermer</Button>}>
+        <p className="rounded-2xl bg-[#7c3aed]/10 px-3 py-2 text-[13px] text-[#5b21b6]">{fmtMoney(ca.courant)} : période préc. : {fmtMoney(ca.precedent)}</p>
+        <p className="my-2 text-[11px] italic text-ink-soft/60">Total des recettes du secteur agro (tous types confondus : pas de détail par catégorie dans ce projet).</p>
         <DetailTable rows={ca.liste} cols={["Date", "Origine", "Montant"]} render={(r) => [fmtDateShort(r.date), r.origine, fmtMoney(r.montant)]} empty="Aucune recette certifiée sur la période." />
       </Modal>
       </>
@@ -584,7 +584,7 @@ function EspecesIndividuelles({ especes, animauxIndividuels, config }) {
         {lignes.length === 0 ? (
           <p className="py-10 text-center text-[13px] text-ink-soft/60">
             <Tag size={22} className="inline-block mb-1.5 opacity-40" /><br />
-            Aucun animal identifié — ajoutez un identifiant depuis Saisie journalière ou le détail d'une espèce.
+            Aucun animal identifié : ajoutez un identifiant depuis Saisie journalière ou le détail d'une espèce.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -636,7 +636,7 @@ function FicheAnimal({ animal, especeNom, fiches, config, onClose }) {
   const timeline = [
     { date: animal.dateEntree, label: "Entrée dans l'effectif", tone: "#16a34a" },
     ...vaccinsRecus.map((f) => ({ date: f.date, label: `${f.type === "vaccination" ? "💉" : f.type === "traitement" ? "💊" : f.type === "deparasitage" ? "🪱" : "🔧"} ${f.produit}`, tone: "#0A84FF" })),
-    ...(animal.statut !== "actif" ? [{ date: animal.dateSortie, label: `Sortie — ${{ vendu: "Vendu", mort: "Mort", perdu: "Perdu" }[animal.statut]}${animal.motifSortie ? ` (${animal.motifSortie})` : ""}`, tone: "#dc2626" }] : []),
+    ...(animal.statut !== "actif" ? [{ date: animal.dateSortie, label: `Sortie : ${{ vendu: "Vendu", mort: "Mort", perdu: "Perdu" }[animal.statut]}${animal.motifSortie ? ` (${animal.motifSortie})` : ""}`, tone: "#dc2626" }] : []),
   ].filter((t) => t.date).sort((a, b) => (a.date < b.date ? -1 : 1));
 
   async function save() {
@@ -647,7 +647,7 @@ function FicheAnimal({ animal, especeNom, fiches, config, onClose }) {
   }
 
   return (
-    <Modal open={!!animal} onClose={onClose} title={`${animal.identifiant} — ${especeNom}`} icon={Tag} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={onClose}>Fermer</Button>}>
+    <Modal open={!!animal} onClose={onClose} title={`${animal.identifiant} : ${especeNom}`} icon={Tag} accent={config.color} moduleLabel={config.nom} footer={<Button variant="ghost" onClick={onClose}>Fermer</Button>}>
       <div className="space-y-3">
         <div className="grid grid-cols-3 gap-2">
           <MiniStat label="Sexe" value={animal.sexe === "male" ? "Mâle" : animal.sexe === "femelle" ? "Femelle" : "—"} color="#374151" />
@@ -722,7 +722,7 @@ function Indic(props) {
             </span>
           )}
         </div>
-        {sub && <p className="mt-0.5 text-[10.5px] text-ink-soft/60">{sub}{onClick ? " — détails" : ""}</p>}
+        {sub && <p className="mt-0.5 text-[10.5px] text-ink-soft/60">{sub}{onClick ? " : détails" : ""}</p>}
       </GlassCard>
     </button>
   );
@@ -742,19 +742,42 @@ function MiniStat({ label, value, color }) {
 // désigner précisément quel animal sort (vente/décès/perte, via Saisie
 // journalière) ou reçoit un vaccin (via Santé animale), plutôt qu'un simple
 // décompte agrégé par espèce.
-function RegistreIndividuel({ especeId, animaux }) {
-  const { ajouterAnimalIndividuel, sortirAnimalIndividuel } = useStockStore();
+// Identifiant par défaut proposé à la création (Préfixe = 1ère lettre de
+// l'espèce + numéro séquentiel, ex. « B-001 ») — à la demande explicite de
+// l'utilisateur (2026-09-17) : « quand j'ajoute des animaux ils doivent
+// avoir des identifiant par défaut ». Reste modifiable par l'utilisateur
+// avant l'enregistrement (et après, via le bouton « Modifier »).
+function genererIdentifiantParDefaut(especeNom, animaux) {
+  const prefixe = (especeNom || "A").trim().charAt(0).toUpperCase() || "A";
+  const existants = new Set(animaux.map((a) => a.identifiant));
+  let n = animaux.length + 1;
+  let candidat = `${prefixe}-${String(n).padStart(3, "0")}`;
+  while (existants.has(candidat)) { n++; candidat = `${prefixe}-${String(n).padStart(3, "0")}`; }
+  return candidat;
+}
+
+function RegistreIndividuel({ especeId, especeNom, animaux }) {
+  const { ajouterAnimalIndividuel, modifierAnimalIndividuel, sortirAnimalIndividuel } = useStockStore();
   const [openAjout, setOpenAjout] = useState(false);
   const [form, setForm] = useState({ identifiant: "", sexe: "", dateEntree: todayStr() });
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({ identifiant: "", sexe: "", dateEntree: "" });
   const [sortieId, setSortieId] = useState(null);
   const [sortieForm, setSortieForm] = useState({ statut: "vendu", date: todayStr(), motif: "" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [editError, setEditError] = useState("");
 
   const actifs = [...animaux].filter((a) => a.statut === "actif").sort((a, b) => a.identifiant.localeCompare(b.identifiant));
   const sortis = [...animaux].filter((a) => a.statut !== "actif").sort((a, b) => (a.dateSortie < b.dateSortie ? 1 : -1));
   const statutLabel = { vendu: "Vendu", mort: "Mort", perdu: "Perdu" };
   const statutTone = { vendu: "mint", mort: "coral", perdu: "amber" };
+
+  function ouvrirAjout() {
+    setForm({ identifiant: genererIdentifiantParDefaut(especeNom, animaux), sexe: "", dateEntree: todayStr() });
+    setError("");
+    setOpenAjout(true);
+  }
 
   async function ajouter() {
     if (!form.identifiant.trim()) return;
@@ -763,8 +786,23 @@ function RegistreIndividuel({ especeId, animaux }) {
     const res = await ajouterAnimalIndividuel({ especeId, ...form });
     setSaving(false);
     if (!res.ok) return setError(res.error);
-    setForm({ identifiant: "", sexe: "", dateEntree: todayStr() });
     setOpenAjout(false);
+  }
+
+  function ouvrirModification(a) {
+    setEditId(a.id);
+    setEditForm({ identifiant: a.identifiant, sexe: a.sexe || "", dateEntree: a.dateEntree || todayStr() });
+    setEditError("");
+  }
+
+  async function confirmerModification() {
+    if (!editForm.identifiant.trim()) return;
+    setSaving(true);
+    setEditError("");
+    const res = await modifierAnimalIndividuel(editId, editForm);
+    setSaving(false);
+    if (!res.ok) return setEditError(res.error);
+    setEditId(null);
   }
 
   async function confirmerSortie() {
@@ -777,8 +815,8 @@ function RegistreIndividuel({ especeId, animaux }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <p className="text-[11px] font-bold uppercase text-ink-soft/70">Registre individuel — {actifs.length} actif(s)</p>
-        <button onClick={() => setOpenAjout((v) => !v)} className="flex items-center gap-1 text-[11px] font-semibold text-[#0A84FF]"><Plus size={12} /> Ajouter un identifiant</button>
+        <p className="text-[11px] font-bold uppercase text-ink-soft/70">Registre individuel : {actifs.length} actif(s)</p>
+        <button onClick={() => (openAjout ? setOpenAjout(false) : ouvrirAjout())} className="flex items-center gap-1 text-[11px] font-semibold text-[#0A84FF]"><Plus size={12} /> Ajouter un animal</button>
       </div>
 
       {openAjout && (
@@ -793,7 +831,28 @@ function RegistreIndividuel({ especeId, animaux }) {
             </Select>
             <TextInput type="date" value={form.dateEntree} onChange={(e) => setForm({ ...form, dateEntree: e.target.value })} />
           </div>
+          <p className="text-[10.5px] text-ink-soft/60">Identifiant proposé automatiquement : modifiable avant l'enregistrement.</p>
           <Button size="sm" onClick={ajouter} disabled={saving}>{saving ? "…" : "Enregistrer"}</Button>
+        </div>
+      )}
+
+      {editId && (
+        <div className="rounded-2xl bg-[#0A84FF]/5 p-2.5 mb-2 space-y-2">
+          <p className="text-[11px] font-semibold text-ink">Modifier {animaux.find((a) => a.id === editId)?.identifiant}</p>
+          {editError && <p className="text-[11px] text-[#b3241b]">{editError}</p>}
+          <div className="grid grid-cols-3 gap-2">
+            <TextInput value={editForm.identifiant} onChange={(e) => setEditForm({ ...editForm, identifiant: e.target.value })} placeholder="Identifiant" autoFocus />
+            <Select value={editForm.sexe} onChange={(e) => setEditForm({ ...editForm, sexe: e.target.value })}>
+              <option value="">Sexe ?</option>
+              <option value="male">Mâle</option>
+              <option value="femelle">Femelle</option>
+            </Select>
+            <TextInput type="date" value={editForm.dateEntree} onChange={(e) => setEditForm({ ...editForm, dateEntree: e.target.value })} />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={confirmerModification} disabled={saving}>{saving ? "…" : "Enregistrer"}</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditId(null)}>Annuler</Button>
+          </div>
         </div>
       )}
 
@@ -805,7 +864,8 @@ function RegistreIndividuel({ especeId, animaux }) {
             <Tag size={10} className="text-ink-soft/60" />
             <span className="font-semibold text-ink">{a.identifiant}</span>
             {a.sexe && <span className="text-ink-soft/60">{a.sexe === "male" ? "♂" : "♀"}</span>}
-            <button onClick={() => { setSortieId(a.id); setSortieForm({ statut: "vendu", date: todayStr(), motif: "" }); }} className="ml-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-[#b3241b] hover:bg-[#FF453A]/10">Sortir</button>
+            <button onClick={() => ouvrirModification(a)} title="Modifier" className="ml-1 rounded-full p-1 text-ink-soft/60 hover:bg-black/5 hover:text-ink"><Pencil size={10} /></button>
+            <button onClick={() => { setSortieId(a.id); setSortieForm({ statut: "vendu", date: todayStr(), motif: "" }); }} className="rounded-full px-1.5 py-0.5 text-[10px] font-semibold text-[#b3241b] hover:bg-[#FF453A]/10">Sortir</button>
           </div>
         ))}
       </div>
@@ -837,7 +897,7 @@ function RegistreIndividuel({ especeId, animaux }) {
               <div key={a.id} className="flex items-center gap-2 text-[11.5px]">
                 <span className="font-semibold text-ink">{a.identifiant}</span>
                 <Badge tone={statutTone[a.statut]}>{statutLabel[a.statut]}</Badge>
-                <span className="text-ink-soft/60">{a.dateSortie ? fmtDateShort(a.dateSortie) : ""}{a.motifSortie ? ` — ${a.motifSortie}` : ""}</span>
+                <span className="text-ink-soft/60">{a.dateSortie ? fmtDateShort(a.dateSortie) : ""}{a.motifSortie ? ` : ${a.motifSortie}` : ""}</span>
               </div>
             ))}
           </div>

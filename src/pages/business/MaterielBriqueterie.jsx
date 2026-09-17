@@ -77,7 +77,7 @@ export default function MaterielBriqueterie() {
 
   return (
     <div>
-      <TopBarSimple title="Matériel" subtitle={`${config.nom} — équipement de l'exploitation, y compris en location`} icon={Wrench} accent={config.color} />
+      <TopBarSimple title="Matériel" subtitle={`${config.nom} : équipement de l'exploitation, y compris en location`} icon={Wrench} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Wrench} label="Articles référencés" value={String(lignes.length)} tone={config.color} />
@@ -106,7 +106,7 @@ export default function MaterielBriqueterie() {
               </thead>
               <tbody>
                 {lignes.length === 0 && (
-                  <tr><td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucun article — commencez par « Nouvel article ».</td></tr>
+                  <tr><td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucun article : commencez par « Nouvel article ».</td></tr>
                 )}
                 {lignes.map((l, i) => (
                   <motion.tr key={l.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i, 8) * 0.02 }} className="text-[13.5px] hover:bg-white/50 transition-colors">
@@ -209,7 +209,7 @@ export default function MaterielBriqueterie() {
             </Field>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Tarif de location / jour (FCFA)" hint="Informatif — pas encore facturable depuis Prestations">
+            <Field label="Tarif de location / jour (FCFA)" hint="Informatif : pas encore facturable depuis Prestations">
               <TextInput type="number" value={articleForm.tarifLocation} onChange={(e) => setArticleForm({ ...articleForm, tarifLocation: e.target.value })} placeholder="5000" />
             </Field>
             <Field label="Stock initial" hint="0 si aucun stock actuel">

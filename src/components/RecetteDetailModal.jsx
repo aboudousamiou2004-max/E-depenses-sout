@@ -4,7 +4,9 @@ import Modal from "./ui/Modal";
 import Button from "./ui/Button";
 import Badge from "./ui/Badge";
 import Field, { TextInput, Select } from "./ui/Field";
+import ConfirmSuppressionModal from "./ui/ConfirmSuppressionModal";
 import { fmtFCFA } from "../lib/logic";
+import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 
 const ORIGINES = ["Vente", "Prestation", "Facturation client", "Subvention"];
 const ORIGINE_TONE = { "Vente": "mint", "Prestation": "accent", "Facturation client": "mint", "Subvention": "grape" };
@@ -19,13 +21,16 @@ function Row({ label, children }) {
 }
 
 // Équivalent de DepenseDetailModal pour les recettes — réutilisée par
-// Recettes.jsx et BusinessFacturation.jsx.
-export default function RecetteDetailModal({ recette, secteurs, peutModifier, modifierRecette, supprimerRecette, onClose, onDeleted }) {
+// Recettes.jsx et BusinessFacturation.jsx. `peutModifier` et `peutSupprimer`
+// sont distincts : Superviseur/Gérant peuvent supprimer sans pouvoir
+// modifier (à la demande de l'utilisateur, 2026-09-14).
+export default function RecetteDetailModal({ recette, secteurs, peutModifier, peutSupprimer, modifierRecette, supprimerRecette, currentUser, onClose, onDeleted }) {
   const [mode, setMode] = useState("vue");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
+  const [confirmOuvert, setConfirmOuvert] = useState(false);
   // Voir DepenseDetailModal — `recette` est un instantané pris au clic, non
   // reconnecté au store après un rechargement suite à une sauvegarde.
   const [enregistree, setEnregistree] = useState(null);
@@ -55,14 +60,16 @@ export default function RecetteDetailModal({ recette, secteurs, peutModifier, mo
     setMode("vue");
   }
 
-  async function supprimer() {
-    if (!window.confirm(`Supprimer définitivement cette recette de ${fmtFCFA(affichee.montant)} ?`)) return;
+  async function confirmerSuppression(motif) {
     setDeleting(true);
+    await enregistrerMotifSuppression({ user: currentUser, table: "recettes", label: `${affichee.origine} : ${fmtFCFA(affichee.montant)}`, motif, secteurId: affichee.secteurId });
     const res = await supprimerRecette(recette.id);
     setDeleting(false);
-    if (!res.ok) return setError(res.error);
-    onDeleted?.(recette.id);
-    onClose();
+    if (res.ok) {
+      onDeleted?.(recette.id);
+      onClose();
+    }
+    return res;
   }
 
   return (
@@ -71,7 +78,7 @@ export default function RecetteDetailModal({ recette, secteurs, peutModifier, mo
       onClose={onClose}
       title={mode === "edition" ? "Modifier la recette" : affichee.origine || "Détail de la recette"}
       footer={
-        peutModifier &&
+        (peutModifier || peutSupprimer) &&
         (mode === "edition" ? (
           <>
             <Button variant="ghost" onClick={() => setMode("vue")}>Annuler</Button>
@@ -79,10 +86,12 @@ export default function RecetteDetailModal({ recette, secteurs, peutModifier, mo
           </>
         ) : (
           <>
-            <Button variant="ghost" icon={Trash2} onClick={supprimer} disabled={deleting} className="text-[#FF453A]">
-              {deleting ? "Suppression…" : "Supprimer"}
-            </Button>
-            <Button icon={Pencil} onClick={() => setMode("edition")}>Modifier</Button>
+            {peutSupprimer && (
+              <Button variant="ghost" icon={Trash2} onClick={() => setConfirmOuvert(true)} disabled={deleting} className="text-[#FF453A]">
+                {deleting ? "Suppression…" : "Supprimer"}
+              </Button>
+            )}
+            {peutModifier && <Button icon={Pencil} onClick={() => setMode("edition")}>Modifier</Button>}
           </>
         ))
       }
@@ -121,6 +130,14 @@ export default function RecetteDetailModal({ recette, secteurs, peutModifier, mo
           </div>
         </form>
       )}
+
+      <ConfirmSuppressionModal
+        open={confirmOuvert}
+        titre="Supprimer cette recette ?"
+        description={`Vous allez supprimer définitivement la recette « ${affichee.origine} » de ${fmtFCFA(affichee.montant)}.`}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmOuvert(false)}
+      />
     </Modal>
   );
 }

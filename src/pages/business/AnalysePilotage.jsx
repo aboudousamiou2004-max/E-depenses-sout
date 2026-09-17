@@ -74,7 +74,7 @@ export default function AnalysePilotage() {
 
   return (
     <div className="space-y-5">
-      <TopBarSimple title="Analyse & Pilotage" subtitle={`${config.nom} — effectifs, revenu, impayés`} icon={BarChart3} accent={config.color} showPeriodeFilter={false} />
+      <TopBarSimple title="Analyse & Pilotage" subtitle={`${config.nom} : effectifs, revenu, impayés`} icon={BarChart3} accent={config.color} showPeriodeFilter={false} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatTile icon={Users} label="Enfants actifs" value={String(actifs.length)} tone={config.color} />

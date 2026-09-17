@@ -29,8 +29,10 @@ const RETOUR_LABEL = { retour_ok: "Bon état", retour_casse: "Cassé", retour_pe
 export default function Retour() {
   const config = useOutletContext();
   const { user } = useAuthStore();
-  const { referentielMateriel, mouvementsMateriel, addMouvementMateriel } = useStockStore();
+  const { referentielMateriel: tousArticles, mouvementsMateriel: tousMouvements, addMouvementMateriel } = useStockStore();
   const { addRecette } = useDataStore();
+  const referentielMateriel = useMemo(() => tousArticles.filter((a) => a.secteurId === config.secteurId), [tousArticles, config.secteurId]);
+  const mouvementsMateriel = useMemo(() => tousMouvements.filter((m) => m.secteurId === config.secteurId), [tousMouvements, config.secteurId]);
 
   const [modal, setModal] = useState(null); // { article, enAttente }
   const [form, setForm] = useState({ ok: "", casse: "", perdu: "", dedommagement: "", motif: "", date: new Date().toISOString().slice(0, 10) });
@@ -70,7 +72,7 @@ export default function Retour() {
       ["retour_perdu", Number(form.perdu) || 0],
     ].filter(([, qte]) => qte > 0);
     for (const [type, quantite] of lignes) {
-      const res = await addMouvementMateriel({ articleId: modal.id, type, quantite, motif: form.motif, date: form.date }, user);
+      const res = await addMouvementMateriel({ articleId: modal.id, type, quantite, motif: form.motif, date: form.date, secteurId: config.secteurId }, user);
       if (!res.ok) {
         setSaving(false);
         return setError(res.error);
@@ -80,7 +82,7 @@ export default function Retour() {
     if (dedommagement > 0) {
       const resDedo = await addRecette({
         secteurId: config.secteurId, montant: dedommagement, date: form.date,
-        origine: `Dédommagement — ${modal.nom} (casse/perte)`, description: form.motif,
+        origine: `Dédommagement : ${modal.nom} (casse/perte)`, description: form.motif,
       }, user);
       if (!resDedo.ok) {
         setSaving(false);
@@ -93,7 +95,7 @@ export default function Retour() {
 
   return (
     <div>
-      <TopBarSimple title="Retour" subtitle={`${config.nom} — validation des retours de matériel, casse et pertes`} icon={RotateCcw} accent={config.color} />
+      <TopBarSimple title="Retour" subtitle={`${config.nom} : validation des retours de matériel, casse et pertes`} icon={RotateCcw} accent={config.color} />
 
       <GlassCard className="p-2 overflow-hidden mb-5" hover={false}>
         <p className="font-bold tracking-tight text-ink px-3 pt-3 mb-1">En attente de retour</p>
@@ -170,7 +172,7 @@ export default function Retour() {
       <Modal
         open={!!modal}
         onClose={() => setModal(null)}
-        title={modal ? `Retour — ${modal.nom}` : ""}
+        title={modal ? `Retour : ${modal.nom}` : ""}
         icon={RotateCcw}
         accent={config.color}
         moduleLabel={config.nom}
@@ -201,7 +203,7 @@ export default function Retour() {
                 <p className="flex items-center gap-1.5 text-[12px] text-[#93400a] bg-[#FF9F0A1a] rounded-xl px-3 py-2 mt-2 mb-3">
                   <AlertTriangle size={13} /> La casse/perte est comptée comme une perte de capital (visible dans Analyses).
                 </p>
-                <Field label="Dédommagement (FCFA)" hint="Somme facturée au client pour compenser les dégâts — enregistrée comme recette du secteur">
+                <Field label="Dédommagement (FCFA)" hint="Somme facturée au client pour compenser les dégâts : enregistrée comme recette du secteur">
                   <TextInput type="number" min="0" value={form.dedommagement} onChange={(e) => setForm({ ...form, dedommagement: e.target.value })} placeholder="0" />
                 </Field>
               </>

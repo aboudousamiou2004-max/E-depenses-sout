@@ -2,6 +2,7 @@ import { useOutletContext, useNavigate } from "react-router-dom";
 import { LayoutGrid } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import SecteurOverview from "../../components/SecteurOverview";
+import CoachDuJour from "../../components/CoachDuJour";
 
 export default function BusinessDashboard() {
   const config = useOutletContext();
@@ -9,7 +10,7 @@ export default function BusinessDashboard() {
 
   return (
     <div>
-      <TopBarSimple title="Tableau de bord" subtitle={`${config.nom} — vue financière du secteur`} icon={LayoutGrid} accent={config.color} />
+      <TopBarSimple title="Tableau de bord" subtitle={`${config.nom} : vue financière du secteur`} icon={LayoutGrid} accent={config.color} />
       <SecteurOverview
         secteurId={config.secteurId}
         nom={config.nom}
@@ -18,6 +19,7 @@ export default function BusinessDashboard() {
         onVoirDepenses={() => navigate(`${config.path}/depenses`)}
         onVoirRecettes={() => navigate(`${config.path}/facturation`)}
       />
+      {config.forfaits && <CoachDuJour secteurId={config.secteurId} accent={config.color} />}
     </div>
   );
 }

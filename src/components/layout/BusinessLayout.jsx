@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, ChevronLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus, History, ScrollText } from "lucide-react";
+import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, ChevronLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus, History, ScrollText, Tag, Users, Megaphone, Truck, Ticket, CalendarCheck, Handshake, Dumbbell, PieChart } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import MobileBottomNav from "./MobileBottomNav";
 
@@ -21,19 +21,53 @@ export default function BusinessLayout({ config }) {
   const NAV = [
     { to: config.path, label: "Tableau de bord", icon: LayoutGrid, end: true },
     // Prestations : sans objet pour E-GARDERIE (pas de prestation générique
-    // — l'inscription et le frais qui l'accompagne se font depuis Enfants) ni
+    // — l'inscription et le frais qui l'accompagne se font depuis Enfants),
     // pour E-G.PRO (la facturation client se fait désormais depuis Projets —
-    // contrat + versements — à la demande de l'utilisateur, 2026-08-18).
-    ...(!["garderie", "egpro"].includes(config.id) ? [{ to: `${config.path}/facturation`, label: "Prestations", icon: FileText }] : []),
+    // contrat + versements — à la demande de l'utilisateur, 2026-08-18), ni
+    // pour MAXI GYM (la facturation passe uniquement par Séances et
+    // Abonnements, qui remplacent ce volet générique).
+    ...(!config.garderie && !config.egpro && !config.forfaits ? [{ to: `${config.path}/facturation`, label: "Prestations", icon: FileText }] : []),
     { to: `${config.path}/depenses`, label: "Dépenses", icon: Receipt },
     // Besoins : disponible dans TOUS les modules métier — demandes reçues par
     // les directeurs et l'administration, à la demande de l'utilisateur
     // (2026-08-18). Un besoin validé crée une dépense réelle.
     { to: `${config.path}/besoins`, label: "Besoins", icon: PackagePlus },
-    // Historique : disponible dans TOUS les modules métier — dépenses et
-    // recettes du secteur, filtrables par période/type, ouvert à qui a déjà
-    // accès au module (mêmes droits que Dépenses).
-    { to: `${config.path}/historique`, label: "Historique", icon: History },
+    // Mouvements (ex-« Historique ») : disponible dans TOUS les modules
+    // métier — dépenses et recettes du secteur, filtrables par
+    // période/type, ouvert à qui a déjà accès au module (mêmes droits que
+    // Dépenses). Renommé pour éviter la confusion avec Journal (audit des
+    // actions utilisateurs) — la route reste /historique pour ne pas casser
+    // les liens existants.
+    { to: `${config.path}/historique`, label: "Mouvements", icon: History },
+    // Analyses (générique) : disponible PAR DÉFAUT dans tout secteur qui n'a
+    // pas déjà son propre volet d'analyse dédié (MAXI LOGISTIQUE → Analyses
+    // /matériel, MAXI GYM → Pilotage & Analyses, E-BRIQUETERIE → Marge &
+    // Bénéfice, E-GARDERIE → Analyse & Pilotage) — dépenses/recettes/solde
+    // et évolution sur 6 mois, pour que tout nouveau secteur créé depuis
+    // Paramètres ait un volet de pilotage financier sans code additionnel.
+    ...(!config.forfaits && config.stock !== "materiel" && config.stock !== "briques" && !config.garderie ? [
+      { to: `${config.path}/bilan`, label: "Analyses", icon: PieChart },
+    ] : []),
+    // MAXI GYM — reproduit l'ensemble des volets de la plateforme réelle
+    // (sauf Compte bancaire, propre à E-DÉPENSES) : Nos forfaits (les 3
+    // formules Simple/Classique/VIP, base de prix de la facturation),
+    // Séances/Abonnements (vues filtrées des recettes déjà saisies),
+    // Clients/Clients partenaires (individuels vs entreprises), Coachs,
+    // Pilotage & Analyses, Partenaires (fournisseurs — réutilise la page
+    // globale, comme Journal).
+    ...(config.forfaits ? [
+      { to: `${config.path}/forfaits`, label: "Nos forfaits", icon: Tag },
+      { to: `${config.path}/seances`, label: "Séances", icon: Ticket },
+      { to: `${config.path}/abonnements`, label: "Abonnements", icon: CalendarCheck },
+      { to: `${config.path}/clients`, label: "Clients", icon: Users },
+      { to: `${config.path}/clients-partenaires`, label: "Clients partenaires", icon: Handshake },
+      { to: `${config.path}/coachs`, label: "Coachs", icon: Dumbbell },
+      { to: `${config.path}/pilotage`, label: "Pilotage & Analyses", icon: BarChart3 },
+      { to: `${config.path}/partenaires`, label: "Partenaires", icon: Handshake },
+    ] : []),
+    // Campagnes : spécifique à MAXI COM — suivi par campagne (client, budget,
+    // statut), plus fin que la seule liste de dépenses/recettes du secteur.
+    ...(config.campagnes ? [{ to: `${config.path}/campagnes`, label: "Campagnes", icon: Megaphone }] : []),
     ...(stockNav ? [{ to: `${config.path}/stock`, label: stockNav.label, icon: stockNav.icon }] : []),
     // Saisie journalière + Santé animale : spécifiques au cheptel MAXI AGRO —
     // cf. termitiere-platform/src/modules/agro/{Saisie,Sante}.jsx.
@@ -50,6 +84,10 @@ export default function BusinessLayout({ config }) {
       { to: `${config.path}/materiel`, label: "Matériel", icon: Wrench },
       { to: `${config.path}/marge`, label: "Marge & Bénéfice", icon: Scale },
     ] : []),
+    // Transport : spécifique à MAXI LOGISTIQUE — suivi opérationnel des
+    // courses/trajets (client, itinéraire, véhicule, chauffeur), distinct de
+    // la facturation Prestation/Location déjà générique.
+    ...(config.transport ? [{ to: `${config.path}/transport`, label: "Transport", icon: Truck }] : []),
     // Analyses + Retour : spécifiques à MAXI LOGISTIQUE — rentabilité
     // locative (CA par article, taux d'utilisation, pertes) et validation
     // des retours de matériel (bon état / cassé / perdu).
@@ -59,20 +97,20 @@ export default function BusinessLayout({ config }) {
     ] : []),
     // Dossiers fonciers : spécifique à E-FONCIER — cf.
     // termitiere-platform/src/modules/foncier/Dossiers.jsx.
-    ...(config.id === "foncier" ? [{ to: `${config.path}/dossiers`, label: "Dossiers fonciers", icon: FolderOpen }] : []),
+    ...(config.foncier ? [{ to: `${config.path}/dossiers`, label: "Dossiers fonciers", icon: FolderOpen }] : []),
     // Projets, Tâches : spécifiques à E-G.PRO — porté (simplifié) depuis
     // termitiere-platform/src/modules/projet/{Projets,Taches}.jsx, à la
     // demande de l'utilisateur (2026-08-18), scope "Projets + Tâches"
     // choisi car rattachable aux dépenses (contrairement à Planning,
     // Documents, Galerie photos, hors scope de cette application).
-    ...(config.id === "egpro" ? [
+    ...(config.egpro ? [
       { to: `${config.path}/projets`, label: "Projets", icon: FolderKanban },
       { to: `${config.path}/taches`, label: "Tâches", icon: ListTodo },
     ] : []),
     // Enfants, Paiements, Cantine & Repas, Santé & Infirmerie, Analyse &
     // Pilotage : spécifiques à E-GARDERIE — cf. termitiere-platform/src/
     // modules/garderie/{Enfants,Paiements,Cantine,Incidents,Analyses}.jsx.
-    ...(config.id === "garderie" ? [
+    ...(config.garderie ? [
       { to: `${config.path}/enfants`, label: "Enfants", icon: Baby },
       { to: `${config.path}/paiements`, label: "Paiements", icon: Wallet },
       { to: `${config.path}/cantine`, label: "Cantine & Repas", icon: Utensils },

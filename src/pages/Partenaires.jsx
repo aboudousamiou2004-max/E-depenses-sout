@@ -8,7 +8,9 @@ import Modal from "../components/ui/Modal";
 import Field, { TextInput } from "../components/ui/Field";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore } from "../store/authStore";
-import { ROLES_ACCES_TOTAL } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../lib/modules";
+import ConfirmSuppressionModal from "../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 
 // Contacts externes (fournisseurs, prestataires, banque…) — pas des employés.
 // Porté depuis termitiere-platform/src/shared/partenaires/Partenaires.jsx.
@@ -16,6 +18,7 @@ export default function Partenaires() {
   const { partenaires, addPartenaire, modifierPartenaire, supprimerPartenaire } = useDataStore();
   const { user } = useAuthStore();
   const peutGerer = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
   const [modal, setModal] = useState(null); // { data, id }
   const [toDelete, setToDelete] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -37,26 +40,24 @@ export default function Partenaires() {
     setModal(null);
   }
 
-  async function confirmerSuppression() {
-    setSaving(true);
-    await supprimerPartenaire(toDelete.id);
-    setSaving(false);
-    setToDelete(null);
+  async function confirmerSuppression(motif) {
+    await enregistrerMotifSuppression({ user, table: "partenaires", label: toDelete.nom, motif });
+    return supprimerPartenaire(toDelete.id);
   }
 
   return (
     <div>
-      <TopBar title="Partenaires" subtitle="Contacts externes du secteur — fournisseurs, prestataires, banque…" icon={Handshake} accent="#7c3aed" />
+      <TopBar title="Partenaires" subtitle="Contacts externes du secteur : fournisseurs, prestataires, banque…" icon={Handshake} accent="#7c3aed" />
 
       {peutGerer ? (
         <div className="flex justify-end mb-4">
           <Button icon={Plus} onClick={openCreate}>Nouveau partenaire</Button>
         </div>
-      ) : (
+      ) : !peutSupprimer ? (
         <GlassCard className="p-4 mb-4">
-          <p className="text-[13px] text-ink-soft">👁️ Consultation seule — la gestion des partenaires est réservée à la direction.</p>
+          <p className="text-[13px] text-ink-soft">👁️ Consultation seule : la gestion des partenaires est réservée à la direction.</p>
         </GlassCard>
-      )}
+      ) : null}
 
       <GlassCard className="p-2 overflow-hidden" hover={false}>
         <table className="w-full min-w-[520px] border-collapse">
@@ -80,10 +81,10 @@ export default function Partenaires() {
                   {p.contact ? <span className="inline-flex items-center gap-1.5"><Phone size={13} /> {p.contact}</span> : "—"}
                 </td>
                 <td className="px-4 py-3">
-                  {peutGerer && (
+                  {(peutGerer || peutSupprimer) && (
                     <div className="flex justify-end gap-1">
-                      <button onClick={() => openEdit(p)} className="rounded-lg p-1.5 text-[#0A84FF] hover:bg-[#0A84FF]/10"><Pencil size={14} /></button>
-                      <button onClick={() => setToDelete(p)} className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></button>
+                      {peutGerer && <button onClick={() => openEdit(p)} className="rounded-lg p-1.5 text-[#0A84FF] hover:bg-[#0A84FF]/10"><Pencil size={14} /></button>}
+                      {peutSupprimer && <button onClick={() => setToDelete(p)} className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></button>}
                     </div>
                   )}
                 </td>
@@ -117,14 +118,13 @@ export default function Partenaires() {
         )}
       </Modal>
 
-      <Modal
+      <ConfirmSuppressionModal
         open={!!toDelete}
+        titre="Supprimer ce partenaire ?"
+        description={toDelete ? `Vous allez supprimer « ${toDelete.nom} ». Cette action est irréversible.` : ""}
+        onConfirm={confirmerSuppression}
         onClose={() => setToDelete(null)}
-        title="Supprimer ce partenaire ?"
-        footer={<><Button variant="ghost" onClick={() => setToDelete(null)}>Annuler</Button><Button variant="danger" onClick={confirmerSuppression} disabled={saving}>Supprimer</Button></>}
-      >
-        {toDelete && <p className="text-[13px] text-ink-soft">Vous allez supprimer « <strong className="text-ink">{toDelete.nom}</strong> ». Cette action est irréversible.</p>}
-      </Modal>
+      />
     </div>
   );
 }

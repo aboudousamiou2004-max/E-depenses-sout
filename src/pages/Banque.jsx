@@ -9,8 +9,10 @@ import Modal from "../components/ui/Modal";
 import Field, { TextInput } from "../components/ui/Field";
 import { useDataStore } from "../store/dataStore";
 import { fmtFCFA } from "../lib/logic";
-import { ROLES_ACCES_TOTAL } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../lib/modules";
 import { useAuthStore } from "../store/authStore";
+import ConfirmSuppressionModal from "../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 
 // Compte bancaire — mouvements de dépôts/retraits, miroir du relevé bancaire,
 // avec solde courant calculé automatiquement. Porté depuis
@@ -20,6 +22,7 @@ export default function Banque() {
   const { banque, addMouvementBanque, modifierMouvementBanque, supprimerMouvementBanque, definirSoldeOuverture } = useDataStore();
   const { user } = useAuthStore();
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
 
   const [modal, setModal] = useState(null); // { data, id }
   const [modalOuverture, setModalOuverture] = useState(null);
@@ -70,11 +73,9 @@ export default function Banque() {
     setModalOuverture(null);
   }
 
-  async function confirmerSuppression() {
-    setSaving(true);
-    await supprimerMouvementBanque(toDelete.id);
-    setSaving(false);
-    setToDelete(null);
+  async function confirmerSuppression(motif) {
+    await enregistrerMotifSuppression({ user, table: "banque_mouvements", label: `${fmtFCFA(toDelete.montant)} du ${new Date(toDelete.date).toLocaleDateString("fr-FR")}`, motif });
+    return supprimerMouvementBanque(toDelete.id);
   }
 
   function exportExcel() {
@@ -99,7 +100,7 @@ export default function Banque() {
 
   return (
     <div>
-      <TopBar title="Compte bancaire" subtitle="Dépôts et retraits — miroir du relevé bancaire de l'entreprise" icon={Landmark} accent="#0A84FF" />
+      <TopBar title="Compte bancaire" subtitle="Dépôts et retraits : miroir du relevé bancaire de l'entreprise" icon={Landmark} accent="#0A84FF" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
         <StatTile icon={Landmark} label="Solde actuel" value={fmtFCFA(soldeActuel)} tone="#0A84FF" onClick={peutModifier ? () => setModalOuverture({ date: ouverture?.date || new Date().toISOString().slice(0, 10), montant: soldeInitial }) : undefined} />
@@ -151,10 +152,10 @@ export default function Banque() {
                   <td className="px-4 py-2.5 text-right tabular font-bold text-[#b3241b]">{m.type === "retrait" ? "-" + fmtFCFA(m.montant) : ""}</td>
                   <td className="px-4 py-2.5 text-right tabular font-extrabold text-ink">{fmtFCFA(m.solde)}</td>
                   <td className="px-4 py-2.5">
-                    {peutModifier && (
+                    {(peutModifier || peutSupprimer) && (
                       <div className="flex justify-end gap-1">
-                        <button onClick={() => openEdit(m)} className="rounded-lg p-1.5 text-[#0A84FF] hover:bg-[#0A84FF]/10"><Pencil size={14} /></button>
-                        <button onClick={() => setToDelete(m)} className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></button>
+                        {peutModifier && <button onClick={() => openEdit(m)} className="rounded-lg p-1.5 text-[#0A84FF] hover:bg-[#0A84FF]/10"><Pencil size={14} /></button>}
+                        {peutSupprimer && <button onClick={() => setToDelete(m)} className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></button>}
                       </div>
                     )}
                   </td>
@@ -235,14 +236,13 @@ export default function Banque() {
         )}
       </Modal>
 
-      <Modal
+      <ConfirmSuppressionModal
         open={!!toDelete}
+        titre="Supprimer ce mouvement ?"
+        description={toDelete ? `Vous allez supprimer le mouvement de ${fmtFCFA(toDelete.montant)} du ${new Date(toDelete.date).toLocaleDateString("fr-FR")}.` : ""}
+        onConfirm={confirmerSuppression}
         onClose={() => setToDelete(null)}
-        title="Supprimer ce mouvement ?"
-        footer={<><Button variant="ghost" onClick={() => setToDelete(null)}>Annuler</Button><Button variant="danger" onClick={confirmerSuppression} disabled={saving}>Supprimer</Button></>}
-      >
-        {toDelete && <p className="text-[13px] text-ink-soft">Vous allez supprimer le mouvement de <strong className="text-ink">{fmtFCFA(toDelete.montant)}</strong> du {new Date(toDelete.date).toLocaleDateString("fr-FR")}. Cette action est irréversible.</p>}
-      </Modal>
+      />
     </div>
   );
 }

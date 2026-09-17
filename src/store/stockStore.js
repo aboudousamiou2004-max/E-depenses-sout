@@ -11,8 +11,8 @@ import { TYPES_MOUVEMENT_ANIMAL } from "../data/stockData";
 
 const nextId = (p) => `${p}_${crypto.randomUUID()}`;
 
-const mapArticle = (r) => ({ id: r.id, nom: r.nom, cat: r.cat, unite: r.unite, coutAchat: Number(r.cout_achat), tarifLocation: Number(r.tarif_location) || 0, initQuantite: Number(r.init_quantite) || 0 });
-const mapMouvementMateriel = (r) => ({ id: r.id, date: r.date, articleId: r.article_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
+const mapArticle = (r) => ({ id: r.id, secteurId: r.secteur_id, nom: r.nom, cat: r.cat, unite: r.unite, coutAchat: Number(r.cout_achat), tarifLocation: Number(r.tarif_location) || 0, initQuantite: Number(r.init_quantite) || 0 });
+const mapMouvementMateriel = (r) => ({ id: r.id, secteurId: r.secteur_id, date: r.date, articleId: r.article_id, type: r.type, quantite: Number(r.quantite), motif: r.motif, agentNom: r.agent_nom });
 const mapMatiere = (r) => ({ id: r.id, nom: r.nom, unite: r.unite });
 const mapMouvementMatiere = (r) => ({ id: r.id, date: r.date, matiereId: r.matiere_id, type: r.type, quantite: Number(r.quantite), agentNom: r.agent_nom });
 const mapTypeBrique = (r) => ({ id: r.id, nom: r.nom, tarifVente: Number(r.tarif_vente), rendement: Number(r.rendement) || 0 });
@@ -190,7 +190,7 @@ export const useStockStore = create((set, get) => ({
   ajouterArticleMateriel: async (payload) => {
     const { data, error } = await supabase
       .from("referentiel_materiel")
-      .insert({ id: nextId("art"), nom: payload.nom, cat: payload.cat, unite: payload.unite || "unités", cout_achat: Number(payload.coutAchat) || 0, tarif_location: Number(payload.tarifLocation) || 0 })
+      .insert({ id: nextId("art"), secteur_id: payload.secteurId, nom: payload.nom, cat: payload.cat, unite: payload.unite || "unités", cout_achat: Number(payload.coutAchat) || 0, tarif_location: Number(payload.tarifLocation) || 0 })
       .select()
       .single();
     if (error) return { ok: false, error: error.message };
@@ -198,8 +198,19 @@ export const useStockStore = create((set, get) => ({
     return { ok: true, article: mapArticle(data) };
   },
 
+  modifierArticleMateriel: async (id, payload) => {
+    const { error } = await supabase
+      .from("referentiel_materiel")
+      .update({ nom: payload.nom, cat: payload.cat, unite: payload.unite || "unités", cout_achat: Number(payload.coutAchat) || 0, tarif_location: Number(payload.tarifLocation) || 0 })
+      .eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerStockMateriel();
+    return { ok: true };
+  },
+
   addMouvementMateriel: async (payload, user) => {
     const { error } = await supabase.from("mouvements_materiel").insert({
+      secteur_id: payload.secteurId,
       date: payload.date,
       article_id: payload.articleId,
       type: payload.type,
@@ -441,6 +452,25 @@ export const useStockStore = create((set, get) => ({
     const { error } = await supabase.from("agro_animaux_individuels").update({ valeur_marchande: v }).eq("id", id);
     if (error) return { ok: false, error: error.message };
     set((s) => ({ animauxIndividuels: s.animauxIndividuels.map((a) => (a.id === id ? { ...a, valeurMarchande: v } : a)) }));
+    return { ok: true };
+  },
+
+  // Modifie les infos d'identité d'un animal déjà enregistré (identifiant,
+  // sexe, date d'entrée, notes) — à la demande explicite de l'utilisateur
+  // (2026-09-17) : l'identifiant proposé par défaut à la création doit
+  // pouvoir être corrigé ensuite.
+  modifierAnimalIndividuel: async (id, payload) => {
+    const { data, error } = await supabase
+      .from("agro_animaux_individuels")
+      .update({
+        identifiant: payload.identifiant.trim(), sexe: payload.sexe || null,
+        date_entree: payload.dateEntree || null, notes: payload.notes || "",
+      })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message.includes("duplicate") ? "Cet identifiant existe déjà pour cette espèce" : error.message };
+    set((s) => ({ animauxIndividuels: s.animauxIndividuels.map((a) => (a.id === id ? mapAnimalIndividuel(data) : a)) }));
     return { ok: true };
   },
 

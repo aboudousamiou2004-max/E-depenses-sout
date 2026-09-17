@@ -41,8 +41,10 @@ const fmtDateShort = (d) => (d ? new Date(d).toLocaleDateString("fr-FR") : "—"
 // ne conserve pas d'historique de quantité possédée à une date donnée.
 export default function LogistiqueDashboard() {
   const config = useOutletContext();
-  const { referentielMateriel, mouvementsMateriel, stockArticle } = useStockStore();
+  const { referentielMateriel: tousArticles, mouvementsMateriel: tousMouvements, stockArticle } = useStockStore();
   const { recettes } = useDataStore();
+  const referentielMateriel = useMemo(() => tousArticles.filter((a) => a.secteurId === config.secteurId), [tousArticles, config.secteurId]);
+  const mouvementsMateriel = useMemo(() => tousMouvements.filter((m) => m.secteurId === config.secteurId), [tousMouvements, config.secteurId]);
 
   const [preset, setPreset] = useState("mois");
   const [from, setFrom] = useState(todayStr().slice(0, 7) + "-01");
@@ -143,7 +145,7 @@ export default function LogistiqueDashboard() {
 
   return (
     <div className="space-y-5">
-      <TopBarSimple title="Analyses" subtitle={`${config.nom} — rentabilité locative, utilisation du parc, pertes`} icon={Gauge} accent={config.color} showPeriodeFilter={false} />
+      <TopBarSimple title="Analyses" subtitle={`${config.nom} : rentabilité locative, utilisation du parc, pertes`} icon={Gauge} accent={config.color} showPeriodeFilter={false} />
 
       <div className="flex flex-wrap items-end gap-3">
         <div>

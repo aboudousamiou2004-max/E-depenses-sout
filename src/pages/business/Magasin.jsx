@@ -30,7 +30,7 @@ export default function Magasin() {
 
   return (
     <div>
-      <TopBarSimple title="Magasin" subtitle={`${config.nom} — matériel, machines & aliments (silo)`} icon={Warehouse} accent={config.color} />
+      <TopBarSimple title="Magasin" subtitle={`${config.nom} : matériel, machines & aliments (silo)`} icon={Warehouse} accent={config.color} />
 
       <div className="glass inline-flex items-center gap-1 rounded-2xl p-1.5 mb-4">
         {[
@@ -157,7 +157,7 @@ function MagasinSection({ config, icon: Icon, unitePlaceholder, categories, refe
               <tbody>
                 {lignes.length === 0 && (
                   <tr><td colSpan={3} className="text-center py-10 text-[13px] text-ink-soft italic">
-                    <Warehouse size={22} className="inline-block mb-1.5 opacity-40" /><br />Aucun article — commencez par « Nouvel article ».
+                    <Warehouse size={22} className="inline-block mb-1.5 opacity-40" /><br />Aucun article : commencez par « Nouvel article ».
                   </td></tr>
                 )}
                 {lignes.map((l, i) => (

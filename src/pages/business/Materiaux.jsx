@@ -55,7 +55,7 @@ export default function Materiaux() {
 
   return (
     <div>
-      <TopBarSimple title="Matériaux" subtitle={`${config.nom} — matières premières : entrées, sorties, stock`} icon={Package} accent={config.color} />
+      <TopBarSimple title="Matériaux" subtitle={`${config.nom} : matières premières : entrées, sorties, stock`} icon={Package} accent={config.color} />
 
       <div className="flex flex-wrap justify-end gap-2.5 mb-4">
         <Button variant="ghost" icon={Plus} onClick={() => { setError(""); setOpenMatiere(true); }}>Nouvelle matière</Button>
@@ -66,7 +66,7 @@ export default function Materiaux() {
         <GlassCard className="p-5 lg:col-span-2" hover={false}>
           <h3 className="font-bold tracking-tight text-ink mb-3">Stock actuel</h3>
           {referentielMatieres.length === 0 ? (
-            <p className="text-[13px] text-ink-soft italic">Aucune matière référencée — commencez par « Nouvelle matière ».</p>
+            <p className="text-[13px] text-ink-soft italic">Aucune matière référencée : commencez par « Nouvelle matière ».</p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {referentielMatieres.map((m) => (

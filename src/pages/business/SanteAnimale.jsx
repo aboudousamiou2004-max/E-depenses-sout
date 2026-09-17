@@ -12,6 +12,9 @@ import Field, { TextInput, Select } from "../../components/ui/Field";
 import { useSanteStore } from "../../store/santeStore";
 import { useStockStore, CAT_ANIMAUX_IDENTIFIES } from "../../store/stockStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutModifier, peutSupprimer } from "../../lib/modules";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 const TYPES = [
   { value: "vaccination", label: "💉 Vaccination", tone: "accent" },
@@ -44,7 +47,7 @@ export default function SanteAnimale() {
 
   return (
     <div>
-      <TopBarSimple title="Santé animale" subtitle={`${config.nom} — vaccinations, traitements, suivi sanitaire`} icon={HeartPulse} accent={config.color} />
+      <TopBarSimple title="Santé animale" subtitle={`${config.nom} : vaccinations, traitements, suivi sanitaire`} icon={HeartPulse} accent={config.color} />
 
       <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-black/[0.03] p-1 mb-4">
         {[
@@ -61,7 +64,7 @@ export default function SanteAnimale() {
       </div>
 
       {tab === "interventions" && <Interventions fiches={fiches} vaccins={vaccins} especes={referentielAnimaux} animauxIndividuels={animauxIndividuels} user={user} config={config} />}
-      {tab === "stock" && <StockVaccins vaccins={vaccins} config={config} />}
+      {tab === "stock" && <StockVaccins vaccins={vaccins} user={user} config={config} />}
       {tab === "rdv" && <RendezVous fiches={fiches} />}
       {tab === "bilan" && <Bilan fiches={fiches} vaccins={vaccins} />}
     </div>
@@ -71,11 +74,13 @@ export default function SanteAnimale() {
 // ─────────── Interventions ───────────
 function Interventions({ fiches, vaccins, especes, animauxIndividuels, user, config }) {
   const { ajouterIntervention, supprimerIntervention } = useSanteStore();
+  const supprimerOk = peutSupprimer(user?.role);
   const [filtreType, setFiltreType] = useState("");
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmCible, setConfirmCible] = useState(null);
 
   const liste = useMemo(
     () => [...fiches].filter((f) => !filtreType || f.type === filtreType).sort((a, b) => (a.date < b.date ? 1 : -1)),
@@ -104,9 +109,10 @@ function Interventions({ fiches, vaccins, especes, animauxIndividuels, user, con
     setOpen(false);
   }
 
-  async function supprimer(f) {
-    if (!window.confirm("Supprimer cette intervention ?")) return;
-    await supprimerIntervention(f.id);
+  async function confirmerSuppression(motif) {
+    const f = confirmCible;
+    await enregistrerMotifSuppression({ user, table: "agro_sante_fiches", label: `${labelOf(f.type)} : ${f.produit}`, motif, secteurId: config.secteurId });
+    return supprimerIntervention(f.id);
   }
 
   function exportXLSX() {
@@ -160,12 +166,20 @@ function Interventions({ fiches, vaccins, especes, animauxIndividuels, user, con
                 <td className="px-3 py-2.5 text-center tabular">{f.nombreAnimaux}</td>
                 <td className="px-3 py-2.5 text-ink-soft">{f.veterinaire || "—"}</td>
                 <td className="px-3 py-2.5">{f.prochainRdv ? <span className="text-[#0A84FF]">📅 {new Date(f.prochainRdv).toLocaleDateString("fr-FR")}</span> : <span className="text-ink-soft/50">—</span>}</td>
-                <td className="px-3 py-2.5"><button onClick={() => supprimer(f)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button></td>
+                <td className="px-3 py-2.5">{supprimerOk && <button onClick={() => setConfirmCible(f)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </GlassCard>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre="Supprimer cette intervention ?"
+        description={confirmCible ? `Vous allez supprimer l'intervention « ${labelOf(confirmCible.type)} : ${confirmCible.produit} » du ${new Date(confirmCible.date).toLocaleDateString("fr-FR")}.` : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
 
       <Modal open={open} onClose={() => setOpen(false)} title="Nouvelle intervention sanitaire"
         icon={HeartPulse} accent={config.color} moduleLabel={config.nom}
@@ -235,12 +249,15 @@ function Interventions({ fiches, vaccins, especes, animauxIndividuels, user, con
 }
 
 // ─────────── Stock vaccins ───────────
-function StockVaccins({ vaccins, config }) {
+function StockVaccins({ vaccins, user, config }) {
   const { enregistrerVaccin, supprimerVaccin } = useSanteStore();
+  const modifierOk = peutModifier(user?.role);
+  const supprimerOk = peutSupprimer(user?.role);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [confirmCible, setConfirmCible] = useState(null);
 
   const liste = useMemo(() => [...vaccins].sort((a, b) => (a.nom || "").localeCompare(b.nom || "")), [vaccins]);
 
@@ -268,9 +285,10 @@ function StockVaccins({ vaccins, config }) {
     setOpen(false);
   }
 
-  async function supprimer(v) {
-    if (!window.confirm(`Supprimer « ${v.nom} » du stock ?`)) return;
-    await supprimerVaccin(v.id);
+  async function confirmerSuppression(motif) {
+    const v = confirmCible;
+    await enregistrerMotifSuppression({ user, table: "agro_sante_vaccins", label: v.nom, motif, secteurId: config.secteurId });
+    return supprimerVaccin(v.id);
   }
 
   const alertes = liste.filter((v) => ["coral", "amber"].includes(etatStock(v).tone));
@@ -304,18 +322,26 @@ function StockVaccins({ vaccins, config }) {
               const e = etatStock(v);
               return (
                 <tr key={v.id} className="text-[13px] hover:bg-white/50 transition-colors">
-                  <td className="px-3 py-2.5"><button onClick={() => openCreate(v)} className="font-semibold text-[#0A84FF] hover:underline">{v.nom}</button></td>
+                  <td className="px-3 py-2.5">{modifierOk ? <button onClick={() => openCreate(v)} className="font-semibold text-[#0A84FF] hover:underline">{v.nom}</button> : <span className="font-semibold text-ink">{v.nom}</span>}</td>
                   <td className="px-3 py-2.5 text-ink-soft">{v.type}</td>
                   <td className="px-3 py-2.5 text-center tabular font-bold">{v.quantite} <span className="text-[11px] font-normal text-ink-soft">{v.unite}</span></td>
                   <td className="px-3 py-2.5 text-ink-soft">{v.peremption ? new Date(v.peremption).toLocaleDateString("fr-FR") : "—"}</td>
                   <td className="px-3 py-2.5 text-center"><Badge tone={e.tone}>{e.label}</Badge></td>
-                  <td className="px-3 py-2.5"><button onClick={() => supprimer(v)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button></td>
+                  <td className="px-3 py-2.5">{supprimerOk && <button onClick={() => setConfirmCible(v)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </GlassCard>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre="Supprimer ce produit ?"
+        description={confirmCible ? `Vous allez supprimer « ${confirmCible.nom} » du stock.` : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
 
       <Modal open={open} onClose={() => setOpen(false)} title={form?.id ? "Modifier le produit" : "Nouveau produit"}
         icon={HeartPulse} accent={config.color} moduleLabel={config.nom}
@@ -354,7 +380,7 @@ function RendezVous({ fiches }) {
   const Item = ({ r, retard }) => (
     <GlassCard hover={false} className="p-4 flex items-start justify-between gap-3">
       <div>
-        <p className="font-bold text-ink">📅 {new Date(r.prochainRdv).toLocaleDateString("fr-FR")} — {r.especeNom}</p>
+        <p className="font-bold text-ink">📅 {new Date(r.prochainRdv).toLocaleDateString("fr-FR")} : {r.especeNom}</p>
         <p className="text-[12px] text-ink-soft">{labelOf(r.type)} · {r.produit}{r.animauxIds ? ` · N° ${r.animauxIds}` : ""}</p>
         {r.rdvNote && <p className="mt-1 text-[12px] italic text-ink-soft">« {r.rdvNote} »</p>}
         <p className="mt-1 text-[11px] text-ink-soft/70">Programmé par {r.creeParNom || "—"}</p>
@@ -367,7 +393,7 @@ function RendezVous({ fiches }) {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 rounded-2xl bg-[#0A84FF1a] px-3.5 py-2.5 text-[12.5px] text-[#0a5cb3]">
-        <Bell size={15} /> Les rendez-vous en retard ou proches sont signalés ici — pas de notification poussée automatique dans cette version.
+        <Bell size={15} /> Les rendez-vous en retard ou proches sont signalés ici : pas de notification poussée automatique dans cette version.
       </div>
 
       {enRetard.length > 0 && (
@@ -385,7 +411,7 @@ function RendezVous({ fiches }) {
         <details className="rounded-2xl bg-black/[0.03] p-3">
           <summary className="cursor-pointer text-[11px] font-bold uppercase tracking-wide text-ink-soft/70">Clôturés ({faits.length})</summary>
           <div className="mt-2 space-y-1">
-            {faits.map((r) => <p key={r.id} className="text-[13px] text-ink-soft">✔️ {new Date(r.prochainRdv).toLocaleDateString("fr-FR")} — {r.especeNom} ({r.produit})</p>)}
+            {faits.map((r) => <p key={r.id} className="text-[13px] text-ink-soft">✔️ {new Date(r.prochainRdv).toLocaleDateString("fr-FR")} : {r.especeNom} ({r.produit})</p>)}
           </div>
         </details>
       )}

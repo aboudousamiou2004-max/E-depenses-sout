@@ -12,25 +12,40 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode } from "../lib/logic";
-import { ROLES_ACCES_TOTAL } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../lib/modules";
 
-// Vue "un seul secteur" — utilisée à la fois par le tableau de bord E-DÉPENSES
-// (quand un secteur précis est sélectionné dans le filtre) et par le tableau de
-// bord des modules métier, pour ne jamais dupliquer ce calcul à deux endroits.
-export default function SecteurOverview({ secteurId, nom, color, labelRecettes = "Dernières recettes", onVoirDepenses, onVoirRecettes }) {
+// Vue "un ou plusieurs secteurs" — utilisée à la fois par le tableau de bord
+// E-DÉPENSES (secteur précis OU module entier sélectionné dans le filtre :
+// voir `secteurIds`) et par le tableau de bord des modules métier (toujours
+// un seul secteur précis : voir `secteurId`), pour ne jamais dupliquer ce
+// calcul à deux endroits. Un module décliné par ville (MAXI GYM, MAXI
+// LOGISTIQUE) sélectionné comme un tout cumule tous ses lieux — à la demande
+// explicite de l'utilisateur (2026-09-15).
+export default function SecteurOverview({ secteurId, secteurIds, nom, color, labelRecettes = "Dernières recettes", onVoirDepenses, onVoirRecettes }) {
   const { secteurs, budgets, depenses, recettes, categories, users, modifierDepense, supprimerDepense, changerStatutDepense, modifierRecette, supprimerRecette } = useDataStore();
   const { periode } = useUIStore();
   const { user } = useAuthStore();
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutSupprimer = peutSupprimerRole(user?.role);
   const [vueTransactions, setVueTransactions] = useState(null); // { type, title, items }
   const [depenseSelectionnee, setDepenseSelectionnee] = useState(null);
   const [recetteSelectionnee, setRecetteSelectionnee] = useState(null);
 
+  const ids = useMemo(() => (secteurIds?.length ? secteurIds : secteurId ? [secteurId] : []), [secteurIds, secteurId]);
   const suffixePeriode = periode.jour ? "du jour" : "du mois";
 
-  const depensesPeriode = depensesSecteurMois(depenses, secteurId, periode.annee, periode.mois, periode.jour);
-  const recettesPeriode = recettes.filter((r) => r.secteurId === secteurId && matchPeriode(r.date, periode));
-  const budget = budgetSecteurMois(budgets, secteurId, periode.annee, periode.mois);
+  const depensesPeriode = useMemo(
+    () => ids.flatMap((id) => depensesSecteurMois(depenses, id, periode.annee, periode.mois, periode.jour)),
+    [ids, depenses, periode]
+  );
+  const recettesPeriode = useMemo(
+    () => recettes.filter((r) => ids.includes(r.secteurId) && matchPeriode(r.date, periode)),
+    [ids, recettes, periode]
+  );
+  const budget = useMemo(
+    () => ids.reduce((s, id) => s + budgetSecteurMois(budgets, id, periode.annee, periode.mois), 0),
+    [ids, budgets, periode]
+  );
   const depenseMois = totalMontant(depensesPeriode);
   const recetteMois = totalMontant(recettesPeriode);
   const pct = budget > 0 ? Math.round((depenseMois / budget) * 100) : depenseMois > 0 ? 100 : 0;
@@ -38,28 +53,28 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
   const solde = recetteMois - depenseMois;
 
   const recentesDepenses = useMemo(
-    () => depenses.filter((d) => d.secteurId === secteurId).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5),
-    [depenses, secteurId]
+    () => depenses.filter((d) => ids.includes(d.secteurId)).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5),
+    [depenses, ids]
   );
   const recentesRecettes = useMemo(
-    () => recettes.filter((r) => r.secteurId === secteurId).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5),
-    [recettes, secteurId]
+    () => recettes.filter((r) => ids.includes(r.secteurId)).sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5),
+    [recettes, ids]
   );
 
   // Revenus vs dépenses par mois, 12 derniers mois — pour repérer d'un coup
-  // d'œil les mois où les dépenses dépassent les encaissements du secteur.
+  // d'œil les mois où les dépenses dépassent les encaissements du/des secteur(s).
   const evolutionMensuelle = useMemo(() => {
     return last12Months().map(({ annee, mois, label }) => {
       const rec = totalMontant(
         recettes.filter((r) => {
           const dt = new Date(r.date);
-          return r.secteurId === secteurId && dt.getFullYear() === annee && dt.getMonth() === mois;
+          return ids.includes(r.secteurId) && dt.getFullYear() === annee && dt.getMonth() === mois;
         })
       );
-      const dep = totalMontant(depensesSecteurMois(depenses, secteurId, annee, mois));
+      const dep = totalMontant(ids.flatMap((id) => depensesSecteurMois(depenses, id, annee, mois)));
       return { label, recettes: rec, depenses: dep };
     });
-  }, [secteurId, recettes, depenses]);
+  }, [ids, recettes, depenses]);
 
   return (
     <div>
@@ -69,28 +84,28 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
           label={`Recettes ${suffixePeriode}`}
           value={fmtCompact(recetteMois) + " FCFA"}
           tone="#30D158"
-          onClick={() => setVueTransactions({ type: "recette", title: `Recettes ${suffixePeriode} — ${nom}`, items: recettesPeriode })}
+          onClick={() => setVueTransactions({ type: "recette", title: `Recettes ${suffixePeriode} : ${nom}`, items: recettesPeriode })}
         />
         <StatTile
           icon={TrendingDown}
           label={`Dépenses ${suffixePeriode}`}
           value={fmtCompact(depenseMois) + " FCFA"}
           tone={color}
-          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} — ${nom}`, items: depensesPeriode })}
+          onClick={() => setVueTransactions({ type: "depense", title: `Dépenses ${suffixePeriode} : ${nom}`, items: depensesPeriode })}
         />
         <StatTile
           icon={Scale}
           label="Solde"
           value={fmtCompact(solde) + " FCFA"}
           tone={solde >= 0 ? "#30D158" : "#FF453A"}
-          onClick={() => setVueTransactions({ type: "recette", title: `Recettes et dépenses ${suffixePeriode} — ${nom}`, items: [...recettesPeriode].sort((a, b) => (a.date < b.date ? 1 : -1)) })}
+          onClick={() => setVueTransactions({ type: "recette", title: `Recettes et dépenses ${suffixePeriode} : ${nom}`, items: [...recettesPeriode].sort((a, b) => (a.date < b.date ? 1 : -1)) })}
         />
         <StatTile icon={PieIcon} label="Budget alloué" value={budget ? fmtCompact(budget) + " FCFA" : "Non défini"} tone="#5E5CE6" />
       </div>
 
       <GlassCard className="p-6 mb-5 flex flex-col" hover={false}>
-        <h3 className="font-bold tracking-tight text-ink mb-0.5">Revenus vs dépenses — {nom}</h3>
-        <p className="text-[12.5px] text-ink-soft font-medium mb-2">Par mois — 12 derniers mois</p>
+        <h3 className="font-bold tracking-tight text-ink mb-0.5">Revenus vs dépenses : {nom}</h3>
+        <p className="text-[12.5px] text-ink-soft font-medium mb-2">Par mois : 12 derniers mois</p>
         <div style={{ height: 240 }} className="-ml-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={evolutionMensuelle} barGap={2}>
@@ -113,7 +128,7 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <GlassCard className="p-6 flex flex-col items-center justify-center gap-3" hover={false}>
-          <p className="text-[12.5px] font-semibold text-ink-soft text-center">Consommation du budget — {nom}</p>
+          <p className="text-[12.5px] font-semibold text-ink-soft text-center">Consommation du budget : {nom}</p>
           {budget > 0 ? (
             <>
               <ProgressRing value={pct / 100} color={pct >= 100 ? "#FF453A" : pct >= 80 ? "#FF9F0A" : "#30D158"} size={116} />
@@ -175,6 +190,7 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
         categories={categories}
         users={users}
         peutModifier={peutModifier}
+        peutSupprimer={peutSupprimer}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
         changerStatutDepense={changerStatutDepense}
@@ -185,8 +201,10 @@ export default function SecteurOverview({ secteurId, nom, color, labelRecettes =
         recette={recetteSelectionnee}
         secteurs={secteurs}
         peutModifier={peutModifier}
+        peutSupprimer={peutSupprimer}
         modifierRecette={modifierRecette}
         supprimerRecette={supprimerRecette}
+        currentUser={user}
         onClose={() => setRecetteSelectionnee(null)}
       />
     </div>

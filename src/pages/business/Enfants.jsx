@@ -12,8 +12,11 @@ import InscriptionJournalierModal from "../../components/InscriptionJournalierMo
 import { useGarderieStore } from "../../store/garderieStore";
 import { useDataStore } from "../../store/dataStore";
 import { useAuthStore } from "../../store/authStore";
+import { peutModifier, peutSupprimer } from "../../lib/modules";
 import { GROUPES_AGE, PROGRAMMES_ENFANT, programmeDuGroupe } from "../../data/garderieData";
 import { ageLabel, dateFinCourtSejour, joursRestants } from "../../lib/garderieLogic";
+import ConfirmSuppressionModal from "../../components/ui/ConfirmSuppressionModal";
+import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 
 const TYPES_ABONNEMENT = [
   { id: "mensuel", label: "Mensuel" },
@@ -34,6 +37,8 @@ export default function Enfants() {
   const { user } = useAuthStore();
   const { addRecette } = useDataStore();
   const { enfants, paiements, journaliers, chargerGarderie, supprimerEnfant, supprimerJournalier } = useGarderieStore();
+  const modifierOk = peutModifier(user?.role);
+  const supprimerOk = peutSupprimer(user?.role);
 
   useEffect(() => { chargerGarderie(); }, [chargerGarderie]);
 
@@ -41,6 +46,7 @@ export default function Enfants() {
   const [choixProgramme, setChoixProgramme] = useState(false);
   const [journalierModal, setJournalierModal] = useState(false);
   const [detail, setDetail] = useState(null);
+  const [confirmCible, setConfirmCible] = useState(null); // { type: "enfant" | "journalier", data }
 
   const soldeEnfantMois = (enfantId, mois) => paiements.filter((p) => p.enfantId === enfantId && p.mois === mois).reduce((s, p) => s + p.montant, 0);
   const montantDuTotal = (e) => e.tarif + (e.fraisCantine || 0);
@@ -62,10 +68,16 @@ export default function Enfants() {
     return jr != null && jr <= 7;
   });
 
-  async function supprimer(e) {
-    if (!window.confirm(`Supprimer la fiche de « ${e.nom} ${e.prenom} » et tout son historique de paiement ?`)) return;
-    await supprimerEnfant(e.id);
-    if (detail?.id === e.id) setDetail(null);
+  async function confirmerSuppression(motif) {
+    const { type, data } = confirmCible;
+    if (type === "journalier") {
+      await enregistrerMotifSuppression({ user, table: "garderie_journaliers", label: `${data.nom} ${data.prenom}`, motif, secteurId: config.secteurId });
+      return supprimerJournalier(data.id);
+    }
+    await enregistrerMotifSuppression({ user, table: "garderie_enfants", label: `${data.nom} ${data.prenom}`, motif, secteurId: config.secteurId });
+    const res = await supprimerEnfant(data.id);
+    if (res.ok && detail?.id === data.id) setDetail(null);
+    return res;
   }
 
   function choisirProgramme(programme) {
@@ -86,11 +98,6 @@ export default function Enfants() {
     }
   }
 
-  async function supprimerJournalierRow(j) {
-    if (!window.confirm(`Supprimer l'accueil journalier de « ${j.nom} ${j.prenom} » du ${new Date(j.date).toLocaleDateString("fr-FR")} ?`)) return;
-    await supprimerJournalier(j.id);
-  }
-
   // Frais d'inscription éventuel, saisi dans la même fiche que l'inscription
   // — enregistré comme recette du secteur (E-GARDERIE n'a pas de volet
   // Prestations : la seule facturation du secteur est ce frais).
@@ -108,7 +115,7 @@ export default function Enfants() {
 
   return (
     <div>
-      <TopBarSimple title="Enfants" subtitle={`${config.nom} — registre des inscriptions`} icon={Baby} accent={config.color} />
+      <TopBarSimple title="Enfants" subtitle={`${config.nom} : registre des inscriptions`} icon={Baby} accent={config.color} />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5">
         <StatTile icon={Users} label="Enfants actifs" value={String(actifs.length)} tone={config.color} />
@@ -159,7 +166,7 @@ export default function Enfants() {
                   <td className="px-3 py-2.5 text-right tabular font-semibold">{Math.round(e.tarif).toLocaleString("fr-FR")}{e.fraisCantine > 0 && <span className="block text-[11px] font-normal text-ink-soft/60">+{Math.round(e.fraisCantine).toLocaleString("fr-FR")} cantine</span>}</td>
                   <td className="px-3 py-2.5 text-center">{sp ? <Badge tone={sp.tone}>{sp.label}</Badge> : <Badge tone={STATUTS_ENFANT[e.statut]?.tone}>{STATUTS_ENFANT[e.statut]?.label}</Badge>}</td>
                   <td className="px-3 py-2.5" onClick={(ev) => ev.stopPropagation()}>
-                    <button onClick={() => supprimer(e)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>
+                    {supprimerOk && <button onClick={() => setConfirmCible({ type: "enfant", data: e })} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}
                   </td>
                 </tr>
               );
@@ -168,7 +175,7 @@ export default function Enfants() {
         </table>
       </GlassCard>
 
-      {/* Choix du programme — détermine ensuite le groupe d'âge proposé dans
+      {/* Choix du programme : détermine ensuite le groupe d'âge proposé dans
           la fiche complète (même geste que termitiere-platform). */}
       <Modal open={choixProgramme} onClose={() => setChoixProgramme(false)} title="Nouvelle inscription" icon={Baby} accent={config.color} moduleLabel={config.nom}>
         <p className="mb-3 text-[13px] text-ink-soft">Choisissez le programme pour cet enfant :</p>
@@ -189,7 +196,7 @@ export default function Enfants() {
         </div>
       </Modal>
 
-      {/* Inscription / modification — fiche complète */}
+      {/* Inscription / modification : fiche complète */}
       {modal && (
         <InscriptionEnfantModal
           key={modal.enfant?.id || "new"}
@@ -234,7 +241,7 @@ export default function Enfants() {
                   <td className="px-3 py-2 text-ink-soft">{new Date(j.date).toLocaleDateString("fr-FR")}</td>
                   <td className="px-3 py-2 text-center tabular text-ink-soft">{j.nombreJours}</td>
                   <td className="px-3 py-2 text-right tabular font-bold text-[#1a7d34]">{j.montantPaye > 0 ? `+${j.montantPaye.toLocaleString("fr-FR")}` : "—"}</td>
-                  <td className="px-3 py-2 text-right"><button onClick={() => supprimerJournalierRow(j)} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button></td>
+                  <td className="px-3 py-2 text-right">{supprimerOk && <button onClick={() => setConfirmCible({ type: "journalier", data: j })} className="text-[#FF453A] hover:opacity-70"><Trash2 size={14} /></button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -242,13 +249,13 @@ export default function Enfants() {
         </GlassCard>
       )}
 
-      {/* Fiche détail — sans les paiements, désormais dans leur propre volet */}
+      {/* Fiche détail : sans les paiements, désormais dans leur propre volet */}
       <Modal open={!!detail} onClose={() => setDetail(null)} title={detail ? `${detail.nom} ${detail.prenom}` : ""}
         icon={Baby} accent={config.color} moduleLabel={config.nom}
         footer={
           <>
             <Button variant="ghost" onClick={() => { setDetail(null); navigate(`${config.path}/paiements?enfant=${detail?.id}`); }}>Voir les paiements</Button>
-            <Button onClick={() => { setModal({ enfant: detail }); setDetail(null); }}>Modifier la fiche</Button>
+            {modifierOk && <Button onClick={() => { setModal({ enfant: detail }); setDetail(null); }}>Modifier la fiche</Button>}
           </>
         }>
         {detail && (
@@ -282,6 +289,16 @@ export default function Enfants() {
           </div>
         )}
       </Modal>
+
+      <ConfirmSuppressionModal
+        open={!!confirmCible}
+        titre={confirmCible?.type === "journalier" ? "Supprimer cet accueil journalier ?" : "Supprimer cette fiche ?"}
+        description={confirmCible ? (confirmCible.type === "journalier"
+          ? `Vous allez supprimer l'accueil journalier de « ${confirmCible.data.nom} ${confirmCible.data.prenom} » du ${new Date(confirmCible.data.date).toLocaleDateString("fr-FR")}.`
+          : `Vous allez supprimer la fiche de « ${confirmCible.data.nom} ${confirmCible.data.prenom} » et tout son historique de paiement.`) : ""}
+        onConfirm={confirmerSuppression}
+        onClose={() => setConfirmCible(null)}
+      />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import { supabase, loginToEmail } from "../lib/supabaseClient";
 import { pieceToColumn, pieceFromColumn } from "../lib/fichiers";
+import { decoupeNomVille } from "../lib/modules";
+import { reinitialiserBaseDeDonnees } from "../lib/resetApplication";
 
 // Store principal — anciennement du JS en mémoire persisté en localStorage,
 // aujourd'hui de simples lectures/écritures Supabase. Les noms d'action et la
@@ -56,6 +58,7 @@ const mapDepense = (r) => ({
   projetId: r.projet_id,
   tacheId: r.tache_id,
   besoinId: r.besoin_id,
+  transportId: r.transport_id,
 });
 const mapRecette = (r) => ({
   id: r.id,
@@ -70,6 +73,7 @@ const mapRecette = (r) => ({
   client: r.client || "",
   description: r.description || "",
   creeParUid: r.cree_par,
+  abonnementId: r.abonnement_id,
 });
 const mapJournalRow = (r) => ({
   id: r.id,
@@ -90,6 +94,16 @@ const mapNotification = (r) => ({
   titre: r.titre,
   message: r.message,
   lien: r.lien,
+});
+const mapArchive = (r) => ({
+  id: r.id,
+  type: r.type,
+  secteurNom: r.secteur_nom,
+  dateOrigine: r.date_origine,
+  motif: r.motif,
+  data: r.data,
+  archivedByNom: r.archived_by_nom,
+  createdAt: r.created_at,
 });
 const mapMouvementBanque = (r) => ({
   id: r.id,
@@ -134,6 +148,7 @@ export const useDataStore = create((set, get) => ({
   categories: [],
   banque: [],
   partenaires: [],
+  archives: [],
   loaded: false,
 
   // Charge toutes les données de l'app en une fois — appelé par authStore dès
@@ -173,7 +188,7 @@ export const useDataStore = create((set, get) => ({
   reset: () =>
     set({
       secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [],
-      categories: [], banque: [], partenaires: [], loaded: false,
+      categories: [], banque: [], partenaires: [], archives: [], loaded: false,
     }),
 
   // Rechargements ciblés après une écriture — évitent de tout re-fetcher.
@@ -210,6 +225,10 @@ export const useDataStore = create((set, get) => ({
     const { data } = await supabase.from("categories_depense").select("*").order("nom");
     set({ categories: (data || []).map(mapCategorie) });
   },
+  chargerArchives: async () => {
+    const { data } = await supabase.from("archives").select("*").order("date_origine", { ascending: false }).limit(500);
+    set({ archives: (data || []).map(mapArchive) });
+  },
 
   // Crée un compte Supabase Auth + déclenche la création du profil (trigger
   // handle_new_user côté serveur, voir supabase/schema.sql). signUp() bascule
@@ -237,10 +256,13 @@ export const useDataStore = create((set, get) => ({
 
     const { error: reloginError } = await supabase.auth.signInWithPassword({
       email: loginToEmail(auteur.login),
-      password: adminPass,
+      password: adminPass.trim(),
     });
     if (reloginError) {
-      return { ok: false, error: "Utilisateur créé, mais la reconnexion a échoué — reconnectez-vous manuellement." };
+      return {
+        ok: false,
+        error: `Utilisateur créé, mais la reconnexion a échoué (${traduireErreurAuth(reloginError.message)}) — reconnectez-vous manuellement.`,
+      };
     }
     await get().chargerUsers();
     return { ok: true, utilisateur: signUpData.user };
@@ -301,10 +323,55 @@ export const useDataStore = create((set, get) => ({
     return { ok: true };
   },
 
+  // Décline un module existant sur une nouvelle ville (ex. « E-BRIQUETERIE
+  // SOKODÉ ») — même mécanisme que MAXI GYM/MAXI LOGISTIQUE (Kara/Lomé),
+  // généralisé à tous les modules depuis Paramètres, à la demande de
+  // l'utilisateur (2026-09-15). Le secteur d'origine n'a jamais de ville
+  // dans son nom la première fois : il devient alors implicitement « Lomé »
+  // (le lieu déjà en service), et la nouvelle ville démarre comme un
+  // secteur neuf, vide — reconnu du même preset (icône/volets) grâce à
+  // `matchNom` (voir src/lib/modules.js), aucun code additionnel requis.
+  dupliquerSecteurVille: async (secteurId, nouvelleVille, color) => {
+    const base = get().secteurs.find((s) => s.id === secteurId);
+    if (!base) return { ok: false, error: "Secteur introuvable" };
+    const villeMaj = (nouvelleVille || "").trim().toUpperCase();
+    if (!villeMaj) return { ok: false, error: "Nom de ville requis" };
+
+    const { base: nomSansVille, ville: villeActuelle } = decoupeNomVille(base.nom);
+    if (villeActuelle && villeActuelle.toUpperCase() === villeMaj) {
+      return { ok: false, error: `${base.nom} existe déjà.` };
+    }
+
+    let nomBase = base.nom;
+    if (!villeActuelle) {
+      // Première déclinaison de ce secteur : il devient « <nom> LOMÉ » et
+      // garde son id (et donc tout son historique dépenses/recettes/budgets).
+      nomBase = `${base.nom} LOMÉ`;
+      const { error: errRenomme } = await supabase.from("secteurs").update({ nom: nomBase }).eq("id", base.id);
+      if (errRenomme) return { ok: false, error: errRenomme.message };
+    }
+
+    const nouveauNom = `${nomSansVille} ${villeMaj}`;
+    const idBase = slugify(nouveauNom);
+    const existants = get().secteurs.map((s) => s.id);
+    let id = idBase;
+    let n = 2;
+    while (existants.includes(id)) id = `${idBase}-${n++}`;
+
+    const { data, error } = await supabase
+      .from("secteurs")
+      .insert({ id, nom: nouveauNom, label: base.label, color: color || base.color })
+      .select()
+      .single();
+    if (error) return { ok: false, error: error.message };
+    await get().chargerSecteurs();
+    return { ok: true, secteur: mapSecteur(data) };
+  },
+
   // Refusée par PostgreSQL (contrainte de clé étrangère) si le secteur a déjà
-  // des dépenses, recettes, budgets ou utilisateurs rattachés — volontaire,
-  // pour ne jamais effacer silencieusement un historique financier. Dans ce
-  // cas, l'appelant doit proposer de désactiver le secteur à la place.
+  // des dépenses, recettes, budgets ou utilisateurs rattachés. Gardée pour un
+  // secteur réellement vide (ex. juste créé par erreur) — pour tout le
+  // reste, voir `archiverEtSupprimerModule` ci-dessous, qui ne bloque jamais.
   supprimerSecteur: async (id) => {
     const { error } = await supabase.from("secteurs").delete().eq("id", id);
     if (error) {
@@ -318,6 +385,103 @@ export const useDataStore = create((set, get) => ({
     }
     await get().chargerSecteurs();
     return { ok: true };
+  },
+
+  // Supprime un secteur (ou tous les secteurs d'un même module décliné par
+  // ville) SANS jamais être bloqué par ses dépenses/recettes/journal — à la
+  // demande explicite de l'utilisateur (2026-09-15) : « je ne veux plus
+  // avoir le truc de il y'a déjà des dépenses, je veux pouvoir supprimer ».
+  // Au lieu de bloquer : 1) chaque dépense/recette/entrée de journal du
+  // secteur est d'abord copiée dans `archives` (voir migration_archives.sql
+  // et le volet Archives) ; 2) les données vivantes scopées sur ce secteur
+  // sont vidées (mêmes tables que reinitialiserBaseDeDonnees, voir
+  // src/lib/resetApplication.js) ; 3) les utilisateurs qui y étaient
+  // rattachés sont détachés (secteur remis à vide) plutôt que bloqués ;
+  // 4) le secteur lui-même est enfin supprimé.
+  archiverEtSupprimerModule: async ({ secteurIds, label, user }) => {
+    if (!Array.isArray(secteurIds) || secteurIds.length === 0) return { ok: false, error: "Aucun secteur à supprimer" };
+    try {
+      const [depRes, recRes, jrnRes] = await Promise.all([
+        supabase.from("depenses").select("*").in("secteur_id", secteurIds),
+        supabase.from("recettes").select("*").in("secteur_id", secteurIds),
+        supabase.from("journal").select("*").in("secteur_id", secteurIds),
+      ]);
+      const lignes = [
+        ...(depRes.data || []).map((r) => ({ type: "depense", date_origine: r.date, data: r })),
+        ...(recRes.data || []).map((r) => ({ type: "recette", date_origine: r.date, data: r })),
+        ...(jrnRes.data || []).map((r) => ({ type: "journal", date_origine: r.timestamp ? r.timestamp.slice(0, 10) : null, data: r })),
+      ];
+      if (lignes.length > 0) {
+        const { error: errArchive } = await supabase.from("archives").insert(
+          lignes.map((l) => ({
+            type: l.type, secteur_nom: label, date_origine: l.date_origine, motif: "suppression_module",
+            data: l.data, archived_by: user?.uid || null, archived_by_nom: user?.nom || user?.login || "",
+          }))
+        );
+        if (errArchive) return { ok: false, error: errArchive.message };
+      }
+
+      const resultats = await reinitialiserBaseDeDonnees({ secteurIds });
+      const echec = resultats.find((r) => !r.ok);
+      if (echec) return { ok: false, error: `Échec sur « ${echec.table} » : ${echec.error}` };
+
+      await supabase.from("profiles").update({ secteur: null }).in("secteur", secteurIds);
+
+      const { error: errSecteurs } = await supabase.from("secteurs").delete().in("id", secteurIds);
+      if (errSecteurs) return { ok: false, error: errSecteurs.message };
+
+      await Promise.all([get().chargerSecteurs(), get().chargerDepenses(), get().chargerRecettes(), get().chargerJournal(), get().chargerUsers()]);
+      return { ok: true, archivees: lignes.length };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  },
+
+  // Archive (copie puis supprime) les dépenses/recettes/entrées de journal
+  // antérieures à 1 an, tous secteurs confondus — alimente le volet
+  // Archives, à la demande explicite de l'utilisateur (2026-09-15).
+  archiverAnciennete: async (user) => {
+    const seuil = new Date();
+    seuil.setFullYear(seuil.getFullYear() - 1);
+    const seuilStr = seuil.toISOString().slice(0, 10);
+    try {
+      const [depRes, recRes, jrnRes] = await Promise.all([
+        supabase.from("depenses").select("*").lt("date", seuilStr),
+        supabase.from("recettes").select("*").lt("date", seuilStr),
+        supabase.from("journal").select("*").lt("timestamp", seuilStr),
+      ]);
+      const secteursParId = Object.fromEntries(get().secteurs.map((s) => [s.id, s.nom]));
+      const lignes = [
+        ...(depRes.data || []).map((r) => ({ type: "depense", date_origine: r.date, data: r, secteur_nom: secteursParId[r.secteur_id] || r.secteur_id || "" })),
+        ...(recRes.data || []).map((r) => ({ type: "recette", date_origine: r.date, data: r, secteur_nom: secteursParId[r.secteur_id] || r.secteur_id || "" })),
+        ...(jrnRes.data || []).map((r) => ({
+          type: "journal", date_origine: r.timestamp ? r.timestamp.slice(0, 10) : null, data: r,
+          secteur_nom: secteursParId[r.secteur_id] || r.secteur_id || r.module || "",
+        })),
+      ];
+      if (lignes.length === 0) return { ok: true, archivees: 0 };
+
+      const { error: errArchive } = await supabase.from("archives").insert(
+        lignes.map((l) => ({
+          type: l.type, secteur_nom: l.secteur_nom, date_origine: l.date_origine, motif: "anciennete",
+          data: l.data, archived_by: user?.uid || null, archived_by_nom: user?.nom || user?.login || "",
+        }))
+      );
+      if (errArchive) return { ok: false, error: errArchive.message };
+
+      const [depDel, recDel, jrnDel] = await Promise.all([
+        supabase.from("depenses").delete().lt("date", seuilStr),
+        supabase.from("recettes").delete().lt("date", seuilStr),
+        supabase.from("journal").delete().lt("timestamp", seuilStr),
+      ]);
+      const errDel = depDel.error || recDel.error || jrnDel.error;
+      if (errDel) return { ok: false, error: errDel.message };
+
+      await Promise.all([get().chargerDepenses(), get().chargerRecettes(), get().chargerJournal()]);
+      return { ok: true, archivees: lignes.length };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
   },
 
   addCategorie: async (secteurId, nom) => {
@@ -352,6 +516,7 @@ export const useDataStore = create((set, get) => ({
         projet_id: payload.projetId || null,
         tache_id: payload.tacheId || null,
         besoin_id: payload.besoinId || null,
+        transport_id: payload.transportId || null,
       })
       .select()
       .single();
@@ -414,6 +579,11 @@ export const useDataStore = create((set, get) => ({
         article_id: payload.articleId || null, quantite: payload.quantite ?? null, jours: payload.jours ?? null,
         date_retour: payload.dateRetour || null,
         client: payload.client || "", description: payload.description || "",
+        // N'envoyé que si fourni : la colonne abonnement_id n'existe qu'après
+        // migration_maxi_gym_abonnements.sql — l'inclure inconditionnellement
+        // casserait la création de TOUTE recette (Prestations, Séances...)
+        // tant que la migration n'est pas exécutée.
+        ...(payload.abonnementId ? { abonnement_id: payload.abonnementId } : {}),
       })
       .select()
       .single();
