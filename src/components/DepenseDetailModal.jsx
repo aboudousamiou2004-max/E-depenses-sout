@@ -21,10 +21,13 @@ function Row({ label, children }) {
 // Vue détaillée d'une dépense, avec bascule vers un formulaire d'édition et
 // suppression — réutilisée par Depenses.jsx, BusinessDepenses.jsx, et par le
 // détail ouvert en cliquant sur un KPI (TransactionsListModal). `peutModifier`
-// (édition + validation) et `peutSupprimer` sont distincts : Superviseur/
-// Gérant peuvent supprimer sans pouvoir modifier ni valider (à la demande de
-// l'utilisateur, 2026-09-14).
-export default function DepenseDetailModal({ depense, secteurs, categories, users = [], peutModifier, peutSupprimer, modifierDepense, supprimerDepense, changerStatutDepense, currentUser, onClose, onDeleted }) {
+// (édition), `peutApprouver` (valider/refuser) et `peutSupprimer` sont
+// distincts : depuis le 2026-09-18, l'auteur d'une dépense encore en_attente
+// peut la modifier (peutModifierDepense() dans lib/modules.js) sans pour
+// autant pouvoir se l'auto-valider — seuls les approbateurs le peuvent
+// (peutApprouver). Superviseur/Gérant peuvent supprimer sans modifier ni
+// valider (règle du 2026-09-14, inchangée).
+export default function DepenseDetailModal({ depense, secteurs, categories, users = [], peutModifier, peutApprouver, peutSupprimer, modifierDepense, supprimerDepense, changerStatutDepense, currentUser, onClose, onDeleted }) {
   const [mode, setMode] = useState("vue");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -82,7 +85,7 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
   const secteur = secteurs.find((s) => s.id === affichee.secteurId);
   const demandeur = users.find((u) => u.uid === affichee.creeParUid);
   const st = statutLabel(affichee.statut);
-  const peutValider = affichee.statut === "en_attente" && typeof changerStatutDepense === "function" && peutModifier;
+  const peutValider = affichee.statut === "en_attente" && typeof changerStatutDepense === "function" && peutApprouver;
   const categoriesDuSecteur = [
     ...new Set([...categories.filter((c) => c.secteurId === form.secteurId).map((c) => c.nom), form.categorie].filter(Boolean)),
   ];

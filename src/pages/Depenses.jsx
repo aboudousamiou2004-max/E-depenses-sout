@@ -15,7 +15,7 @@ import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode } from "../l
 import { exporterDepensesExcel } from "../lib/exportExcel";
 import { exporterDepensesPDF, exporterDepensesCSV } from "../lib/exportDocs";
 import { lireFichier, formatTaille } from "../lib/fichiers";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, secteurIdsPourFiltre } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, secteurIdsPourFiltre } from "../lib/modules";
 
 const ligneVide = () => ({ secteurId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), natureFlux: "exploitation", sourceFinancement: "entreprise", description: "", imprevue: false });
 
@@ -35,9 +35,11 @@ export default function Depenses() {
   const [lot, setLot] = useState(null);
   const [savingLot, setSavingLot] = useState(false);
   const [reconduisant, setReconduisant] = useState(false);
-  // Mêmes rôles que le circuit d'autorisation (is_approbateur côté RLS) — un
-  // agent peut soumettre une dépense mais pas la modifier/effacer après coup.
-  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  // Valider/refuser reste réservé aux approbateurs (is_approbateur côté RLS).
+  // Modifier s'ouvre en plus à l'auteur d'une dépense encore en_attente (voir
+  // peutModifierDepense dans lib/modules.js) — la ligne sélectionnée n'est
+  // connue qu'au clic, donc ce droit est recalculé par dépense, pas ici.
+  const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
 
   const categoriesDuSecteur = useMemo(
@@ -395,7 +397,8 @@ export default function Depenses() {
         secteurs={secteurs}
         categories={categories}
         users={users}
-        peutModifier={peutModifier}
+        peutModifier={peutModifierDepense(user, selection)}
+        peutApprouver={peutApprouver}
         peutSupprimer={peutSupprimer}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}

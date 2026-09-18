@@ -8,10 +8,15 @@ import Button from "../components/ui/Button";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, statutLabel } from "../lib/logic";
+import { ROLES_ACCES_TOTAL, peutDecaisserDepense } from "../lib/modules";
 
 export default function Autorisations() {
   const { secteurs, depenses, changerStatutDepense, marquerVoletVu } = useDataStore();
   const { user } = useAuthStore();
+  // Valider/Refuser : réservé à l'administration (is_approbateur côté RLS).
+  // Décaisser (dépense déjà approuvée) : réservé au gérant DU SECTEUR
+  // concerné — voir peutDecaisserDepense, calculé par ligne plus bas.
+  const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
 
   useEffect(() => { marquerVoletVu(user?.uid, "depenseAutorisations"); }, [user?.uid]);
 
@@ -30,7 +35,7 @@ export default function Autorisations() {
 
   return (
     <div>
-      <TopBar title="Autorisations" subtitle="Circuit de validation des dépenses : dès dépassement du budget alloué (PAU ou GE)" icon={ShieldCheck} accent="#FF9F0A" />
+      <TopBar title="Autorisations" subtitle="Dès dépassement du budget alloué : validation par l'administration, décaissement par le gérant du secteur" icon={ShieldCheck} accent="#FF9F0A" />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 mb-5">
         <GlassCard className="p-5">
@@ -74,12 +79,18 @@ export default function Autorisations() {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="font-bold tabular text-ink">{fmtFCFA(d.montant)}</span>
-                    <Button variant="success" className="!px-3 !py-2" onClick={() => changerStatut(d.id, "approuvee")}>
-                      <Check size={15} strokeWidth={2.6} />
-                    </Button>
-                    <Button variant="danger" className="!px-3 !py-2" onClick={() => changerStatut(d.id, "refusee")}>
-                      <X size={15} strokeWidth={2.6} />
-                    </Button>
+                    {peutApprouver ? (
+                      <>
+                        <Button variant="success" className="!px-3 !py-2" onClick={() => changerStatut(d.id, "approuvee")}>
+                          <Check size={15} strokeWidth={2.6} />
+                        </Button>
+                        <Button variant="danger" className="!px-3 !py-2" onClick={() => changerStatut(d.id, "refusee")}>
+                          <X size={15} strokeWidth={2.6} />
+                        </Button>
+                      </>
+                    ) : (
+                      <span className="text-[11px] text-ink-soft italic">En attente de l'administration</span>
+                    )}
                   </div>
                 </motion.div>
               );
@@ -104,9 +115,13 @@ export default function Autorisations() {
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   <span className="font-bold tabular text-ink">{fmtFCFA(d.montant)}</span>
-                  <Button variant="primary" className="!px-3 !py-2 text-xs" onClick={() => changerStatut(d.id, "decaissee")}>
-                    Décaisser
-                  </Button>
+                  {peutDecaisserDepense(user, d.secteurId) ? (
+                    <Button variant="primary" className="!px-3 !py-2 text-xs" onClick={() => changerStatut(d.id, "decaissee")}>
+                      Décaisser
+                    </Button>
+                  ) : (
+                    <span className="text-[11px] text-ink-soft italic">Au gérant du secteur de décaisser</span>
+                  )}
                 </div>
               </div>
             );

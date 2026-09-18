@@ -6,7 +6,7 @@ import RecetteDetailModal from "./RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, statutLabel } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense } from "../lib/modules";
 
 // Ouverte en cliquant sur un KPI du tableau de bord (général ou sectoriel) —
 // liste les dépenses/recettes qui composent ce chiffre, avec un clic sur une
@@ -16,7 +16,8 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
   const { secteurs, categories, users, modifierDepense, supprimerDepense, changerStatutDepense, modifierRecette, supprimerRecette } = useDataStore();
   const { user } = useAuthStore();
   const [selection, setSelection] = useState(null);
-  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutModifierRecette = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
 
   function secteurOf(id) {
@@ -58,7 +59,8 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
           secteurs={secteurs}
           categories={categories}
           users={users}
-          peutModifier={peutModifier}
+          peutModifier={peutModifierDepense(user, selection)}
+          peutApprouver={peutApprouver}
           peutSupprimer={peutSupprimer}
           modifierDepense={modifierDepense}
           supprimerDepense={supprimerDepense}
@@ -70,7 +72,7 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
         <RecetteDetailModal
           recette={selection}
           secteurs={secteurs}
-          peutModifier={peutModifier}
+          peutModifier={peutModifierRecette}
           peutSupprimer={peutSupprimer}
           modifierRecette={modifierRecette}
           supprimerRecette={supprimerRecette}

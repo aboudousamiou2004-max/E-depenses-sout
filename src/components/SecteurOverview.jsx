@@ -12,7 +12,7 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense } from "../lib/modules";
 
 // Vue "un ou plusieurs secteurs" — utilisée à la fois par le tableau de bord
 // E-DÉPENSES (secteur précis OU module entier sélectionné dans le filtre :
@@ -25,7 +25,10 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
   const { secteurs, budgets, depenses, recettes, categories, users, modifierDepense, supprimerDepense, changerStatutDepense, modifierRecette, supprimerRecette } = useDataStore();
   const { periode } = useUIStore();
   const { user } = useAuthStore();
-  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  // Recettes : inchangé, réservé aux rôles à accès total. Dépenses : voir
+  // peutModifierDepense (chacun peut modifier la sienne tant qu'en_attente).
+  const peutModifierRecette = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
   const [vueTransactions, setVueTransactions] = useState(null); // { type, title, items }
   const [depenseSelectionnee, setDepenseSelectionnee] = useState(null);
@@ -189,7 +192,8 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
         secteurs={secteurs}
         categories={categories}
         users={users}
-        peutModifier={peutModifier}
+        peutModifier={peutModifierDepense(user, depenseSelectionnee)}
+        peutApprouver={peutApprouver}
         peutSupprimer={peutSupprimer}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
@@ -200,7 +204,7 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
       <RecetteDetailModal
         recette={recetteSelectionnee}
         secteurs={secteurs}
-        peutModifier={peutModifier}
+        peutModifier={peutModifierRecette}
         peutSupprimer={peutSupprimer}
         modifierRecette={modifierRecette}
         supprimerRecette={supprimerRecette}
