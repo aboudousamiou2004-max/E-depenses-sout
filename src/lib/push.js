@@ -4,7 +4,7 @@ import { supabase } from "./supabaseClient";
 // finit dans le bundle JS livré au navigateur ; c'est la clé privée
 // correspondante, gardée côté Edge Function, qui protège réellement l'envoi.
 export const VAPID_PUBLIC_KEY =
-  "BBKdoMQGwo6qahR6hyFtVoH8JRi8B9eoa6Bj5HA-T3vXMWg23zVNLrpw8NyTx0QD5hXG9Ymv_55aJeGaagjdJuI";
+  "BGKV4OXBZSTwbTycJhiNME0bjjCNLGis4Kpg7xPWe5FMzJwQaeJiso5bHwYQIEj1KDbu-Kdao8-k3KCnwo_vrno";
 
 export const pushSupporte =
   typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;

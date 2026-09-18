@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, BellOff, Loader2, CheckCheck } from "lucide-react";
@@ -113,24 +114,25 @@ export default function NotificationBell() {
         )}
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none"
-              onClick={() => setOpen(false)}
-            />
-            <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.97 }}
-              transition={{ duration: 0.18 }}
-              className="fixed left-3 right-3 top-[76px] lg:absolute lg:left-auto lg:right-0 lg:top-12 z-50 lg:w-[340px] max-w-full lg:max-w-[calc(100vw-2rem)] glass-strong rounded-[24px] overflow-hidden flex flex-col"
-            >
-              {/* En-tête */}
+      {createPortal(
+        <AnimatePresence>
+          {open && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-40 bg-black/20 backdrop-blur-sm lg:bg-transparent lg:backdrop-blur-none"
+                onClick={() => setOpen(false)}
+              />
+              <motion.div
+                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.97 }}
+                transition={{ duration: 0.18 }}
+                className="fixed left-3 right-3 top-[76px] lg:left-auto lg:right-6 lg:top-16 z-50 lg:w-[340px] max-w-full lg:max-w-[calc(100vw-2rem)] glass-strong rounded-[24px] overflow-hidden flex flex-col"
+              >
+                {/* En-tête */}
               <div className="flex items-center justify-between px-4 pt-3.5 pb-3 border-b border-black/[0.06]">
                 <div className="flex items-center gap-2">
                   <p className="text-[14px] font-bold text-ink tracking-tight">Notifications</p>
@@ -221,10 +223,12 @@ export default function NotificationBell() {
                   );
                 })}
               </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 }

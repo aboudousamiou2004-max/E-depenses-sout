@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Wallet, TrendingDown, Scale, PieChart as PieIcon } from "lucide-react";
+import { Wallet, TrendingDown, Scale, PieChart as PieIcon, Send, CheckCircle2 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
 import GlassCard from "./ui/GlassCard";
 import StatTile from "./ui/StatTile";
@@ -12,7 +12,7 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutConfirmerBudget } from "../lib/modules";
 
 // Vue "un ou plusieurs secteurs" — utilisée à la fois par le tableau de bord
 // E-DÉPENSES (secteur précis OU module entier sélectionné dans le filtre :
@@ -22,7 +22,7 @@ import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepe
 // LOGISTIQUE) sélectionné comme un tout cumule tous ses lieux — à la demande
 // explicite de l'utilisateur (2026-09-15).
 export default function SecteurOverview({ secteurId, secteurIds, nom, color, labelRecettes = "Dernières recettes", onVoirDepenses, onVoirRecettes }) {
-  const { secteurs, budgets, depenses, recettes, categories, users, modifierDepense, supprimerDepense, changerStatutDepense, modifierRecette, supprimerRecette } = useDataStore();
+  const { secteurs, budgets, depenses, recettes, categories, users, modifierDepense, supprimerDepense, changerStatutDepense, modifierRecette, supprimerRecette, validerReceptionBudget } = useDataStore();
   const { periode } = useUIStore();
   const { user } = useAuthStore();
   // Recettes : inchangé, réservé aux rôles à accès total. Dépenses : voir
@@ -33,6 +33,7 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
   const [vueTransactions, setVueTransactions] = useState(null); // { type, title, items }
   const [depenseSelectionnee, setDepenseSelectionnee] = useState(null);
   const [recetteSelectionnee, setRecetteSelectionnee] = useState(null);
+  const [confirmationBusy, setConfirmationBusy] = useState(null);
 
   const ids = useMemo(() => (secteurIds?.length ? secteurIds : secteurId ? [secteurId] : []), [secteurIds, secteurId]);
   const suffixePeriode = periode.jour ? "du jour" : "du mois";
@@ -49,6 +50,21 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
     () => ids.reduce((s, id) => s + budgetSecteurMois(budgets, id, periode.annee, periode.mois), 0),
     [ids, budgets, periode]
   );
+  // Budget(s) proposé(s) en attente de confirmation pour ce(s) secteur(s) —
+  // affiché directement sur le tableau de bord du secteur (pas seulement
+  // dans E-DÉPENSES → Recette et Budget) pour que le gérant, qui n'a pas
+  // forcément accès au module E-DÉPENSES, puisse confirmer depuis son propre
+  // écran (à la demande explicite de l'utilisateur, 2026-09-18).
+  const budgetsProposes = useMemo(
+    () => budgets.filter((b) => ids.includes(b.secteurId) && b.montantPropose != null),
+    [budgets, ids]
+  );
+  async function confirmerReceptionBudget(b) {
+    if (confirmationBusy) return;
+    setConfirmationBusy(b.id);
+    await validerReceptionBudget(b.id, user);
+    setConfirmationBusy(null);
+  }
   const depenseMois = totalMontant(depensesPeriode);
   const recetteMois = totalMontant(recettesPeriode);
   const pct = budget > 0 ? Math.round((depenseMois / budget) * 100) : depenseMois > 0 ? 100 : 0;
@@ -81,6 +97,26 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
 
   return (
     <div>
+      {budgetsProposes.length > 0 && (
+        <div className="flex flex-col gap-2 mb-5">
+          {budgetsProposes.map((b) => (
+            <div key={b.id} className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#B45309]/20 bg-[#B45309]/5 px-4 py-3">
+              <Send size={14} className="shrink-0 text-[#B45309]" />
+              <span className="text-[12.5px] text-[#93400a]">
+                <strong>{fmtFCFA(b.montantPropose)}</strong> proposés par {b.proposeParText}
+                {b.motifPropose ? ` : ${b.motifPropose}` : ""} · en attente de confirmation
+              </span>
+              {peutConfirmerBudget(user, b.secteurId) && (
+                <button onClick={() => confirmerReceptionBudget(b)} disabled={confirmationBusy === b.id}
+                  className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#30D158] px-3 py-1.5 text-[11.5px] font-bold text-white hover:bg-[#29b84c] disabled:opacity-60 transition-colors">
+                  <CheckCircle2 size={13} /> {confirmationBusy === b.id ? "Confirmation…" : "Confirmer la réception"}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile
           icon={Wallet}

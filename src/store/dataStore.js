@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { supabase, loginToEmail } from "../lib/supabaseClient";
+import { supabase, AUTH_EMAIL_DOMAIN } from "../lib/supabaseClient";
 import { pieceToColumn, pieceFromColumn } from "../lib/fichiers";
 import { decoupeNomVille } from "../lib/modules";
 import { reinitialiserBaseDeDonnees } from "../lib/resetApplication";
@@ -254,63 +254,48 @@ export const useDataStore = create((set, get) => ({
     set({ archives: (data || []).map(mapArchive) });
   },
 
-  // Crée un compte Supabase Auth + déclenche la création du profil (trigger
-  // handle_new_user côté serveur, voir supabase/schema.sql). signUp() bascule
-  // la session active sur le nouveau compte : on reconnecte immédiatement
-  // l'admin avec le mot de passe qu'il vient de fournir dans le formulaire
-  // (ré-authentification silencieuse — voir le plan de migration).
-  // signUp() est un point d'entrée PUBLIC (clé anon, sans authentification) —
-  // on ne lui confie donc plus jamais role/modules/secteur/actif, qui
-  // resteraient sinon falsifiables par n'importe qui appelant l'API
-  // directement (faille corrigée le 2026-09-17, voir
-  // migration_fix_securite_inscription_budgets.sql). handle_new_user() crée
-  // désormais systématiquement un compte inerte (agent, aucun module,
-  // désactivé) ; les valeurs réelles du formulaire ne sont appliquées
-  // qu'APRÈS, via une UPDATE authentifiée ci-dessous, soumise à la policy
-  // RLS "profils modifiables par les rôles à accès total" — donc seulement
-  // si l'appelant est réellement admin.
-  addUser: async (payload, auteur, adminPass) => {
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email: loginToEmail(payload.login),
-      password: payload.pass,
-      options: {
-        data: {
-          login: payload.login.trim(),
-          nom: payload.nom.trim(),
-        },
-      },
-    });
-    if (signUpError) return { ok: false, error: traduireErreurAuth(signUpError.message) };
-    const nouveauUid = signUpData.user.id;
-
-    const { error: reloginError } = await supabase.auth.signInWithPassword({
-      email: loginToEmail(auteur.login),
-      password: adminPass.trim(),
-    });
-    if (reloginError) {
-      return {
-        ok: false,
-        error: `Utilisateur créé, mais la reconnexion a échoué (${traduireErreurAuth(reloginError.message)}) — reconnectez-vous manuellement.`,
-      };
-    }
-
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({
+  // Crée un compte utilisateur via l'Edge Function "admin-create-user"
+  // (supabase/functions/admin-create-user/index.ts), pas via
+  // supabase.auth.signUp() côté client : signUp() bascule TOUJOURS la
+  // session active sur le compte qui vient d'être créé (comportement du
+  // SDK), ce que l'utilisateur a explicitement refusé (2026-09-18) : "le
+  // navigateur ne doit pas basculer quand j'ajoute un utilisateur". La
+  // fonction s'exécute côté serveur (clé service_role, jamais exposée) via
+  // l'API Admin de Supabase Auth, qui ne touche à aucune session — ni besoin
+  // de reconnecter l'admin après coup, ni de lui redemander son mot de
+  // passe. Elle vérifie elle-même que l'appelant est un rôle à accès total
+  // avant de créer quoi que ce soit (même barrière que la policy RLS
+  // "profils modifiables par les rôles à accès total", appliquée
+  // manuellement puisque service_role contourne RLS par nature).
+  addUser: async (payload) => {
+    const { data, error } = await supabase.functions.invoke("admin-create-user", {
+      body: {
+        login: payload.login.trim(),
+        pass: payload.pass,
+        nom: payload.nom.trim(),
         role: payload.role,
         secteur: payload.secteur || null,
-        poste: payload.poste?.trim() || "",
-        telephone: payload.telephone?.trim() || "",
-        actif: payload.actif !== false,
+        poste: payload.poste,
+        telephone: payload.telephone,
+        actif: payload.actif,
         modules: payload.modules || [],
-      })
-      .eq("id", nouveauUid);
-    if (updateError) {
-      return { ok: false, error: `Compte créé mais non configuré (${updateError.message}) — modifiez ses accès depuis la liste des utilisateurs.` };
+        emailDomain: AUTH_EMAIL_DOMAIN,
+      },
+    });
+    if (error) {
+      let message = error.message;
+      try {
+        const corps = await error.context?.json?.();
+        if (corps?.error) message = corps.error;
+      } catch {
+        // Corps d'erreur non-JSON (ex. Edge Function injoignable) : on garde error.message.
+      }
+      return { ok: false, error: traduireErreurAuth(message) };
     }
+    if (data?.error) return { ok: false, error: traduireErreurAuth(data.error) };
 
     await get().chargerUsers();
-    return { ok: true, utilisateur: signUpData.user };
+    return { ok: true, uid: data.uid };
   },
 
   supprimerUtilisateur: async (uid) => {
@@ -337,6 +322,41 @@ export const useDataStore = create((set, get) => ({
 
   modifierActifUtilisateur: async (uid, actif) => {
     const { error } = await supabase.from("profiles").update({ actif }).eq("id", uid);
+    if (error) return { ok: false, error: error.message };
+    await get().chargerUsers();
+    return { ok: true };
+  },
+
+  // Modifier le rôle/secteur/poste/téléphone d'un utilisateur existant
+  // (crayon dans Utilisateurs.jsx) — distinct de modifierAccesUtilisateur
+  // (modules) et modifierActifUtilisateur (actif/désactivé). Protégé par la
+  // même policy RLS que la création (profils modifiables par les rôles à
+  // accès total) : un appel direct sans être admin échouerait aussi.
+  //
+  // Synchronise `modules` avec le `secteur` choisi : `secteur` sert de clé
+  // pour les policies RLS gérant (confirmer un budget, décaisser une dépense
+  // — has_module(secteur_id) ET secteur = auth.uid().secteur), mais
+  // `modules` est ce qui accorde RÉELLEMENT l'accès aux données du secteur
+  // (has_module). Sans cet ajout automatique, un admin pourrait assigner un
+  // secteur à un gérant sans lui donner le module correspondant : le bouton
+  // apparaîtrait côté interface (peutConfirmerBudget ne vérifie que
+  // rôle+secteur) mais l'action échouerait silencieusement côté base (RLS) —
+  // demande explicite de l'utilisateur (2026-09-18) : "ses droits et tout le
+  // reste doivent être synchronisés".
+  modifierUtilisateur: async (uid, payload) => {
+    const existant = get().users.find((u) => u.uid === uid);
+    const modulesActuels = existant?.modules || [];
+    const modules = payload.secteur && !modulesActuels.includes(payload.secteur)
+      ? [...modulesActuels, payload.secteur]
+      : modulesActuels;
+    const { error } = await supabase.from("profiles").update({
+      nom: payload.nom?.trim(),
+      role: payload.role,
+      secteur: payload.secteur || null,
+      poste: payload.poste?.trim() || "",
+      telephone: payload.telephone?.trim() || "",
+      modules,
+    }).eq("id", uid);
     if (error) return { ok: false, error: error.message };
     await get().chargerUsers();
     return { ok: true };
