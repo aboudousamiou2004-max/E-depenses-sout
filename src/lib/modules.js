@@ -166,13 +166,43 @@ export const ROLES_SUPPRESSION = [...ROLES_ACCES_TOTAL, "superviseur", "gerant"]
 export function peutModifier(role) { return ROLES_ACCES_TOTAL.includes(role); }
 export function peutSupprimer(role) { return ROLES_SUPPRESSION.includes(role); }
 
-// Confirmer la réception d'un budget alloué par un directeur (Recettes.jsx) :
-// c'est le Gérant de secteur qui reçoit le budget de SON secteur, pas
-// forcément un autre rôle à accès total — Agent en reste exclu (à la
-// demande de l'utilisateur, 2026-09-14 : "c'est l'agent ou c'est le gérant
-// qui valide la réception ?" → le gérant).
-export const ROLES_CONFIRMATION_BUDGET = [...ROLES_ACCES_TOTAL, "gerant"];
-export function peutConfirmerBudget(role) { return ROLES_CONFIRMATION_BUDGET.includes(role); }
+// Modifier UNE DÉPENSE précisément : assouplit peutModifier() ci-dessus, à la
+// demande explicite de l'utilisateur (2026-09-18) — chacun peut modifier une
+// dépense qu'il a lui-même créée, tant qu'elle est encore en_attente (pas déjà
+// approuvée/refusée/décaissée). Les approbateurs (ROLES_ACCES_TOTAL) gardent
+// le droit de tout modifier. Ne s'applique QU'aux dépenses — les autres listes
+// (recettes, clients, forfaits, transport...) restent sur peutModifier(role)
+// ci-dessus. Miroir exact de la policy RLS "update" sur public.depenses — une
+// dépense refusée côté client le serait de toute façon côté base.
+export function peutModifierDepense(user, depense) {
+  if (!depense) return false;
+  if (ROLES_ACCES_TOTAL.includes(user?.role)) return true;
+  return depense.creeParUid === user?.uid && depense.statut === "en_attente";
+}
+
+// Confirmer la réception d'un budget alloué par l'administration (Recettes.jsx) :
+// c'est le Gérant DU SECTEUR CONCERNÉ qui confirme avoir reçu le budget —
+// jamais l'administration elle-même, même si elle a le rôle qui lui permet
+// de tout modifier par ailleurs (décision du 2026-09-14, précisée le
+// 2026-09-18 : "c'est les acteurs du module où on a alloué qui valident, pas
+// l'admin... qui a alloué"). Vérifie donc le SECTEUR précis du gérant, pas
+// seulement son rôle — sinon un gérant d'un autre secteur pourrait confirmer
+// à sa place. Miroir de la policy RLS + du trigger côté base (voir
+// migration_confirmation_reservee_gerant.sql) : refusé même via un appel
+// API direct, pas seulement caché dans l'interface.
+export function peutConfirmerBudget(user, secteurId) {
+  return user?.role === "gerant" && user?.secteur === secteurId;
+}
+
+// Décaisser une dépense déjà approuvée (Autorisations.jsx) : le gérant DU
+// SECTEUR CONCERNÉ, jamais l'administration — décision du 2026-09-18. Valider/
+// refuser une demande reste réservé à l'administration (ROLES_ACCES_TOTAL,
+// is_approbateur côté RLS) : seul le décaissement d'une dépense déjà
+// approuvée passe au gérant. Miroir de la policy RLS sur depenses (voir
+// migration_decaissement_gerant.sql).
+export function peutDecaisserDepense(user, secteurId) {
+  return user?.role === "gerant" && user?.secteur === secteurId;
+}
 
 export function accesModule(user, moduleId) {
   if (!user) return false;

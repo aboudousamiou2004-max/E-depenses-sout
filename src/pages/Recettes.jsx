@@ -47,7 +47,6 @@ export default function Recettes() {
   const [detail, setDetail] = useState(null);
   const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
-  const peutConfirmer = peutConfirmerBudget(user?.role);
 
   // ── Budget par secteur (allocation / révision) ──
   const [revision, setRevision] = useState(null); // { budget, secteur, requiertValidation }
@@ -297,7 +296,7 @@ export default function Recettes() {
                     <strong>{fmtFCFA(bs.budget.montantPropose)}</strong> proposés par {bs.budget.proposeParText}
                     {bs.budget.motifPropose ? ` : ${bs.budget.motifPropose}` : ""} · en attente de confirmation
                   </span>
-                  {peutConfirmer && (
+                  {peutConfirmerBudget(user, bs.secteur.id) && (
                     <button onClick={() => confirmerReception(bs)} disabled={validationBusy === bs.budget.id}
                       className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#30D158] px-3 py-1 text-[11px] font-bold text-white hover:bg-[#29b84c] disabled:opacity-60 transition-colors">
                       <CheckCircle2 size={12} /> {validationBusy === bs.budget.id ? "Confirmation…" : "Confirmer la réception"}

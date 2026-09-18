@@ -14,7 +14,7 @@ import { useAuthStore } from "../../store/authStore";
 import { useUIStore } from "../../store/uiStore";
 import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode } from "../../lib/logic";
 import { exporterDepensesExcel } from "../../lib/exportExcel";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense } from "../../lib/modules";
 
 export default function BusinessDepenses() {
   const config = useOutletContext();
@@ -27,7 +27,7 @@ export default function BusinessDepenses() {
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [selection, setSelection] = useState(null);
   const [form, setForm] = useState({ categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
-  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
 
   const categoriesDuSecteur = useMemo(
@@ -204,7 +204,8 @@ export default function BusinessDepenses() {
         secteurs={secteurs}
         categories={categories}
         users={users}
-        peutModifier={peutModifier}
+        peutModifier={peutModifierDepense(user, selection)}
+        peutApprouver={peutApprouver}
         peutSupprimer={peutSupprimer}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
