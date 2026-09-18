@@ -7,7 +7,7 @@ export const useUIStore = create((set) => ({
   // `jour` reste `null` en vue mensuelle (comportement historique) ; une
   // valeur 1-31 bascule tous les calculs de KPI/graphiques sur une seule
   // journée au lieu du mois entier — voir lib/logic.js `matchPeriode`.
-  periode: { annee: 2026, mois: 6, jour: null }, // juillet 2026 (0-indexé)
+  periode: { annee: new Date().getFullYear(), mois: new Date().getMonth(), jour: null },
   setPeriode: (p) => set((s) => ({ periode: { ...s.periode, ...p } })),
 
   // Recherche globale de la TopBar — consommée par les pages qui listent des

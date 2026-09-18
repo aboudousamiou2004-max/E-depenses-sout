@@ -52,7 +52,7 @@ export default function StockMateriel() {
   const [detail, setDetail] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ articleId: referentielMateriel[0]?.id, type: "achat", quantite: "", motif: "", date: "2026-07-27" });
+  const [form, setForm] = useState({ articleId: referentielMateriel[0]?.id, type: "achat", quantite: "", motif: "", date: new Date().toISOString().slice(0, 10) });
   const [articleForm, setArticleForm] = useState({ nom: "", cat: CAT_MATERIEL[0], unite: "unités", coutAchat: "", tarifLocation: "" });
 
   const cats = useMemo(

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Receipt, FileText, FileDown, Paperclip, Layers, RefreshCw } from "lucide-react";
+import { Plus, Receipt, FileText, FileDown, Paperclip, Layers, RefreshCw, Pencil, Trash2 } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import Badge from "../components/ui/Badge";
@@ -30,7 +30,8 @@ export default function Depenses() {
   const [error, setError] = useState("");
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [selection, setSelection] = useState(null);
-  const [form, setForm] = useState({ secteurId: "", categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "", beneficiaireNom: "", imprevue: false, recurrente: false, piece: null });
+  const [actionSelection, setActionSelection] = useState("vue");
+  const [form, setForm] = useState({ secteurId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), natureFlux: "exploitation", sourceFinancement: "entreprise", description: "", beneficiaireNom: "", imprevue: false, recurrente: false, piece: null });
   const [uploading, setUploading] = useState(false);
   const [lot, setLot] = useState(null);
   const [savingLot, setSavingLot] = useState(false);
@@ -186,6 +187,7 @@ export default function Depenses() {
                 <th className="px-4 py-3">Nature</th>
                 <th className="px-4 py-3">Bénéficiaire</th>
                 <th className="px-4 py-3">Statut</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
@@ -193,13 +195,14 @@ export default function Depenses() {
                 {list.map((d, i) => {
                   const s = secteurOf(d.secteurId);
                   const st = statutLabel(d.statut);
+                  const modifiable = peutModifierDepense(user, d);
                   return (
                     <motion.tr
                       key={d.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: Math.min(i, 8) * 0.02 }}
-                      onClick={() => setSelection(d)}
+                      onClick={() => { setSelection(d); setActionSelection("vue"); }}
                       className="text-[13.5px] hover:bg-white/50 rounded-2xl transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3">
@@ -220,6 +223,20 @@ export default function Depenses() {
                       <td className="px-4 py-3 text-ink-soft">{d.beneficiaireNom || "—"}</td>
                       <td className="px-4 py-3">
                         <Badge tone={st.tone}>{st.label}</Badge>
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2.5">
+                          {modifiable && (
+                            <button onClick={() => { setSelection(d); setActionSelection("edition"); }} className="text-ink-soft hover:text-ink" title="Modifier">
+                              <Pencil size={14} />
+                            </button>
+                          )}
+                          {peutSupprimer && (
+                            <button onClick={() => { setSelection(d); setActionSelection("suppression"); }} className="text-[#FF453A] hover:opacity-70" title="Supprimer">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </motion.tr>
                   );
@@ -404,6 +421,8 @@ export default function Depenses() {
         supprimerDepense={supprimerDepense}
         changerStatutDepense={changerStatutDepense}
         currentUser={user}
+        modeInitial={actionSelection === "edition" ? "edition" : "vue"}
+        demanderSuppression={actionSelection === "suppression"}
         onClose={() => setSelection(null)}
       />
     </div>

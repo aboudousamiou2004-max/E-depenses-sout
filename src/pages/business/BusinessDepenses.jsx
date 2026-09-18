@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Receipt, FileText, FileDown } from "lucide-react";
+import { Plus, Receipt, FileText, FileDown, Pencil, Trash2 } from "lucide-react";
 import TopBarSimple from "../../components/layout/TopBarSimple";
 import GlassCard from "../../components/ui/GlassCard";
 import Badge from "../../components/ui/Badge";
@@ -26,7 +26,8 @@ export default function BusinessDepenses() {
   const [error, setError] = useState("");
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [selection, setSelection] = useState(null);
-  const [form, setForm] = useState({ categorie: "", montant: "", date: "2026-07-27", natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
+  const [actionSelection, setActionSelection] = useState("vue");
+  const [form, setForm] = useState({ categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), natureFlux: "exploitation", sourceFinancement: "entreprise", description: "" });
   const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutSupprimer = peutSupprimerDepense(user);
 
@@ -106,24 +107,26 @@ export default function BusinessDepenses() {
                 <th className="px-4 py-3 text-right">Montant</th>
                 <th className="px-4 py-3">Nature</th>
                 <th className="px-4 py-3">Statut</th>
+                <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody>
               <AnimatePresence initial={false}>
                 {liste.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune dépense pour ce secteur.</td>
+                    <td colSpan={6} className="text-center py-10 text-[13px] text-ink-soft italic">Aucune dépense pour ce secteur.</td>
                   </tr>
                 )}
                 {liste.map((d, i) => {
                   const st = statutLabel(d.statut);
+                  const modifiable = peutModifierDepense(user, d);
                   return (
                     <motion.tr
                       key={d.id}
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: Math.min(i, 8) * 0.02 }}
-                      onClick={() => setSelection(d)}
+                      onClick={() => { setSelection(d); setActionSelection("vue"); }}
                       className="text-[13.5px] hover:bg-white/50 transition-colors cursor-pointer"
                     >
                       <td className="px-4 py-3 font-semibold text-ink">{d.categorie}</td>
@@ -131,6 +134,20 @@ export default function BusinessDepenses() {
                       <td className="px-4 py-3 text-right font-bold tabular text-ink">{fmtFCFA(d.montant)}</td>
                       <td className="px-4 py-3 capitalize text-ink-soft">{d.natureFlux}</td>
                       <td className="px-4 py-3"><Badge tone={st.tone}>{st.label}</Badge></td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2.5">
+                          {modifiable && (
+                            <button onClick={() => { setSelection(d); setActionSelection("edition"); }} className="text-ink-soft hover:text-ink" title="Modifier">
+                              <Pencil size={14} />
+                            </button>
+                          )}
+                          {peutSupprimer && (
+                            <button onClick={() => { setSelection(d); setActionSelection("suppression"); }} className="text-[#FF453A] hover:opacity-70" title="Supprimer">
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </motion.tr>
                   );
                 })}
@@ -211,6 +228,8 @@ export default function BusinessDepenses() {
         supprimerDepense={supprimerDepense}
         changerStatutDepense={changerStatutDepense}
         currentUser={user}
+        modeInitial={actionSelection === "edition" ? "edition" : "vue"}
+        demanderSuppression={actionSelection === "suppression"}
         onClose={() => setSelection(null)}
       />
     </div>

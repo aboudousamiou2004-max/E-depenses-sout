@@ -42,13 +42,20 @@ export async function activerNotificationsPush(userId) {
   const reg = await navigator.serviceWorker.register("/sw.js");
   await navigator.serviceWorker.ready;
 
+  // Un abonnement déjà présent dans ce navigateur peut avoir été créé avec
+  // une ancienne clé VAPID (ex. régénérée côté serveur après un incident) —
+  // le réutiliser tel quel enregistre un endpoint dont les clés ne
+  // correspondent plus à la clé privée actuelle : l'envoi échoue alors côté
+  // service push, silencieusement pour l'utilisateur. On repart donc toujours
+  // d'un abonnement frais avec la clé publique actuelle.
   let sub = await reg.pushManager.getSubscription();
-  if (!sub) {
-    sub = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-    });
+  if (sub) {
+    await sub.unsubscribe();
   }
+  sub = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+  });
 
   const json = sub.toJSON();
   const { error } = await supabase.from("push_subscriptions").upsert(

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Wallet, TrendingDown, Scale, PieChart as PieIcon, Send, CheckCircle2 } from "lucide-react";
+import { Wallet, TrendingDown, Scale, PieChart as PieIcon, Send, CheckCircle2, Banknote } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer, CartesianGrid } from "recharts";
 import GlassCard from "./ui/GlassCard";
 import StatTile from "./ui/StatTile";
@@ -12,7 +12,7 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode, moyenLabel } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutSupprimerDepense, peutConfirmerBudget } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutSupprimerDepense, peutConfirmerBudget, peutDecaisserDepense } from "../lib/modules";
 
 // Vue "un ou plusieurs secteurs" — utilisée à la fois par le tableau de bord
 // E-DÉPENSES (secteur précis OU module entier sélectionné dans le filtre :
@@ -34,6 +34,7 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
   const [depenseSelectionnee, setDepenseSelectionnee] = useState(null);
   const [recetteSelectionnee, setRecetteSelectionnee] = useState(null);
   const [confirmationBusy, setConfirmationBusy] = useState(null);
+  const [decaissementBusy, setDecaissementBusy] = useState(null);
 
   const ids = useMemo(() => (secteurIds?.length ? secteurIds : secteurId ? [secteurId] : []), [secteurIds, secteurId]);
   const suffixePeriode = periode.jour ? "du jour" : "du mois";
@@ -64,6 +65,23 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
     setConfirmationBusy(b.id);
     const res = await validerReceptionBudget(b.id, user);
     setConfirmationBusy(null);
+    if (!res.ok) alert(res.error);
+  }
+  // Dépenses passées par le circuit d'autorisation, déjà approuvées par
+  // l'administration mais pas encore décaissées — affiché directement ici
+  // (pas seulement dans E-DÉPENSES → Autorisations) pour que le gérant, qui
+  // n'a pas forcément accès au module E-DÉPENSES, puisse décaisser depuis son
+  // propre tableau de bord (à la demande explicite de l'utilisateur,
+  // 2026-09-18), même principe que budgetsProposes ci-dessus.
+  const depensesADecaisser = useMemo(
+    () => depenses.filter((d) => ids.includes(d.secteurId) && d.statut === "approuvee"),
+    [depenses, ids]
+  );
+  async function decaisserDepense(d) {
+    if (decaissementBusy) return;
+    setDecaissementBusy(d.id);
+    const res = await changerStatutDepense(d.id, "decaissee");
+    setDecaissementBusy(null);
     if (!res.ok) alert(res.error);
   }
   const depenseMois = totalMontant(depensesPeriode);
@@ -119,6 +137,27 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
         </div>
       )}
 
+      {depensesADecaisser.length > 0 && (
+        <div className="flex flex-col gap-2 mb-5">
+          {depensesADecaisser.map((d) => (
+            <div key={d.id} className="flex flex-wrap items-center gap-2 rounded-2xl border border-[#0A84FF]/20 bg-[#0A84FF]/5 px-4 py-3">
+              <Banknote size={14} className="shrink-0 text-[#0A84FF]" />
+              <span className="text-[12.5px] text-[#0a5cb3]">
+                <strong>{fmtFCFA(d.montant)}</strong> · {d.categorie} approuvée par l'administration · à décaisser
+              </span>
+              {peutDecaisserDepense(user, d.secteurId) ? (
+                <button onClick={() => decaisserDepense(d)} disabled={decaissementBusy === d.id}
+                  className="ml-auto shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-[#0A84FF] px-3 py-1.5 text-[11.5px] font-bold text-white hover:bg-[#0972db] disabled:opacity-60 transition-colors">
+                  <Banknote size={13} /> {decaissementBusy === d.id ? "Décaissement…" : "Décaisser"}
+                </button>
+              ) : (
+                <span className="ml-auto shrink-0 text-[11px] text-ink-soft italic">Au gérant du secteur de décaisser</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-5">
         <StatTile
           icon={Wallet}
@@ -141,7 +180,12 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
           tone={solde >= 0 ? "#30D158" : "#FF453A"}
           onClick={() => setVueTransactions({ type: "recette", title: `Recettes et dépenses ${suffixePeriode} : ${nom}`, items: [...recettesPeriode].sort((a, b) => (a.date < b.date ? 1 : -1)) })}
         />
-        <StatTile icon={PieIcon} label="Budget alloué" value={budget ? fmtCompact(budget) + " FCFA" : "Non défini"} tone="#5E5CE6" />
+        <StatTile
+          icon={PieIcon}
+          label={depenseMois > 0 ? "Budget restant" : "Budget alloué"}
+          value={budget ? fmtCompact(budget - depenseMois) + " FCFA" : "Non défini"}
+          tone={budget ? (budget - depenseMois < 0 ? "#FF453A" : "#5E5CE6") : "#5E5CE6"}
+        />
       </div>
 
       <GlassCard className="p-6 mb-5 flex flex-col" hover={false}>

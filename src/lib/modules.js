@@ -168,16 +168,20 @@ export function peutSupprimer(role) { return ROLES_SUPPRESSION.includes(role); }
 
 // Modifier UNE DÉPENSE précisément : assouplit peutModifier() ci-dessus, à la
 // demande explicite de l'utilisateur (2026-09-18) — chacun peut modifier une
-// dépense qu'il a lui-même créée, tant qu'elle est encore en_attente (pas déjà
-// approuvée/refusée/décaissée). Les approbateurs (ROLES_ACCES_TOTAL) gardent
-// le droit de tout modifier. Ne s'applique QU'aux dépenses — les autres listes
-// (recettes, clients, forfaits, transport...) restent sur peutModifier(role)
-// ci-dessus. Miroir exact de la policy RLS "update" sur public.depenses — une
-// dépense refusée côté client le serait de toute façon côté base.
+// dépense qu'il a lui-même créée tant qu'elle est encore en_attente, OU si
+// elle est décaissée directement (dans le budget du secteur, jamais passée
+// par le circuit d'autorisation — cf. compute_depense_statut côté serveur).
+// Une fois passée par le circuit (approuvée/refusée), elle reste verrouillée
+// pour gérant/agent — décision explicite du 2026-09-18 : « pour celles qui
+// passent par l'autorisation, ne change rien ». Les approbateurs
+// (ROLES_ACCES_TOTAL) gardent le droit de tout modifier. Ne s'applique QU'aux
+// dépenses — les autres listes (recettes, clients, forfaits, transport...)
+// restent sur peutModifier(role) ci-dessus. Miroir exact de la policy RLS
+// "update" sur public.depenses (migration_modification_depense_decaissee_directe.sql).
 export function peutModifierDepense(user, depense) {
   if (!depense) return false;
   if (ROLES_ACCES_TOTAL.includes(user?.role)) return true;
-  return depense.creeParUid === user?.uid && depense.statut === "en_attente";
+  return depense.creeParUid === user?.uid && (depense.statut === "en_attente" || depense.statut === "decaissee");
 }
 
 // Supprimer UNE DÉPENSE précisément : contrairement à peutSupprimer()

@@ -17,8 +17,10 @@ export default function AnalysesSecteur() {
   const config = useOutletContext();
   const { depenses, recettes } = useDataStore();
 
+  // Comme depensesSecteurMois (lib/logic.js) : ne compte qu'une fois
+  // décaissée, jamais en attente/approuvée/refusée.
   const depensesSecteur = useMemo(
-    () => depenses.filter((d) => d.secteurId === config.secteurId && d.statut !== "refusee"),
+    () => depenses.filter((d) => d.secteurId === config.secteurId && d.statut === "decaissee"),
     [depenses, config.secteurId]
   );
   const recettesSecteur = useMemo(() => recettes.filter((r) => r.secteurId === config.secteurId), [recettes, config.secteurId]);
