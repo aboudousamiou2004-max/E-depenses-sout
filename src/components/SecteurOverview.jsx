@@ -11,8 +11,8 @@ import RecetteDetailModal from "./RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
-import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutConfirmerBudget } from "../lib/modules";
+import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode, moyenLabel } from "../lib/logic";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutSupprimerDepense, peutConfirmerBudget } from "../lib/modules";
 
 // Vue "un ou plusieurs secteurs" — utilisée à la fois par le tableau de bord
 // E-DÉPENSES (secteur précis OU module entier sélectionné dans le filtre :
@@ -29,7 +29,7 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
   // peutModifierDepense (chacun peut modifier la sienne tant qu'en_attente).
   const peutModifierRecette = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
-  const peutSupprimer = peutSupprimerRole(user?.role);
+  const peutSupprimerRecette = peutSupprimerRole(user?.role);
   const [vueTransactions, setVueTransactions] = useState(null); // { type, title, items }
   const [depenseSelectionnee, setDepenseSelectionnee] = useState(null);
   const [recetteSelectionnee, setRecetteSelectionnee] = useState(null);
@@ -62,8 +62,9 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
   async function confirmerReceptionBudget(b) {
     if (confirmationBusy) return;
     setConfirmationBusy(b.id);
-    await validerReceptionBudget(b.id, user);
+    const res = await validerReceptionBudget(b.id, user);
     setConfirmationBusy(null);
+    if (!res.ok) alert(res.error);
   }
   const depenseMois = totalMontant(depensesPeriode);
   const recetteMois = totalMontant(recettesPeriode);
@@ -104,7 +105,8 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
               <Send size={14} className="shrink-0 text-[#B45309]" />
               <span className="text-[12.5px] text-[#93400a]">
                 <strong>{fmtFCFA(b.montantPropose)}</strong> proposés par {b.proposeParText}
-                {b.motifPropose ? ` : ${b.motifPropose}` : ""} · en attente de confirmation
+                {b.motifPropose ? ` : ${b.motifPropose}` : ""}
+                {b.moyenPropose ? ` · ${moyenLabel(b.moyenPropose)}` : ""} · en attente de confirmation
               </span>
               {peutConfirmerBudget(user, b.secteurId) && (
                 <button onClick={() => confirmerReceptionBudget(b)} disabled={confirmationBusy === b.id}
@@ -230,7 +232,7 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
         users={users}
         peutModifier={peutModifierDepense(user, depenseSelectionnee)}
         peutApprouver={peutApprouver}
-        peutSupprimer={peutSupprimer}
+        peutSupprimer={peutSupprimerDepense(user)}
         modifierDepense={modifierDepense}
         supprimerDepense={supprimerDepense}
         changerStatutDepense={changerStatutDepense}
@@ -241,7 +243,7 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
         recette={recetteSelectionnee}
         secteurs={secteurs}
         peutModifier={peutModifierRecette}
-        peutSupprimer={peutSupprimer}
+        peutSupprimer={peutSupprimerRecette}
         modifierRecette={modifierRecette}
         supprimerRecette={supprimerRecette}
         currentUser={user}

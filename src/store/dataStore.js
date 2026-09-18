@@ -35,6 +35,7 @@ const mapBudget = (r) => ({
   revisions: r.revisions || [],
   montantPropose: r.montant_propose != null ? Number(r.montant_propose) : null,
   motifPropose: r.motif_propose || null,
+  moyenPropose: r.moyen_propose || null,
   statutValidation: r.statut_validation || null,
   proposeParText: r.propose_par_text || null,
   proposeLe: r.propose_le || null,
@@ -723,7 +724,7 @@ export const useDataStore = create((set, get) => ({
   // « proposé » jusqu'à confirmation de réception (validerReceptionBudget)
   // au lieu de s'appliquer immédiatement — même logique que
   // termitiere-platform/src/modules/depense/RecettesDepenses.jsx.
-  allouerOuReviserBudget: async ({ secteurId, annee, mois, montant, motif, user, requiertValidation }) => {
+  allouerOuReviserBudget: async ({ secteurId, annee, mois, montant, motif, moyen, user, requiertValidation }) => {
     const existant = get().budgets.find((b) => b.secteurId === secteurId && b.annee === annee && b.mois === mois);
     const ancien = existant?.montant || 0;
     const motifFinal = motif?.trim() || "Allocation initiale";
@@ -733,7 +734,7 @@ export const useDataStore = create((set, get) => ({
       const { error } = await supabase.from("budgets").upsert(
         {
           secteur_id: secteurId, annee, mois, montant: ancien, revisions: existant?.revisions || [],
-          montant_propose: montant, motif_propose: motifFinal, statut_validation: "en_attente",
+          montant_propose: montant, motif_propose: motifFinal, moyen_propose: moyen || null, statut_validation: "en_attente",
           propose_par_text: auteur, propose_par_uid: user?.uid || null, propose_le: new Date().toISOString(),
         },
         { onConflict: "secteur_id,annee,mois" }
@@ -743,10 +744,10 @@ export const useDataStore = create((set, get) => ({
       return { ok: true, propose: true };
     }
 
-    const entry = { id: crypto.randomUUID(), ancien, nouveau: montant, motif: motifFinal, date: Date.now(), auteur };
+    const entry = { id: crypto.randomUUID(), ancien, nouveau: montant, motif: motifFinal, moyen: moyen || null, date: Date.now(), auteur };
     const revisions = [...(existant?.revisions || []), entry];
     const { error } = await supabase.from("budgets").upsert(
-      { secteur_id: secteurId, annee, mois, montant, revisions, montant_propose: null, motif_propose: null, statut_validation: null },
+      { secteur_id: secteurId, annee, mois, montant, revisions, montant_propose: null, motif_propose: null, moyen_propose: null, statut_validation: null },
       { onConflict: "secteur_id,annee,mois" }
     );
     if (error) return { ok: false, error: error.message };
@@ -760,12 +761,12 @@ export const useDataStore = create((set, get) => ({
     if (!b || b.montantPropose == null) return { ok: false, error: "Rien à confirmer" };
     const entry = {
       id: crypto.randomUUID(), ancien: b.montant, nouveau: b.montantPropose,
-      motif: `${b.motifPropose || "Allocation"} — confirmé reçu`, date: Date.now(),
+      motif: `${b.motifPropose || "Allocation"} — confirmé reçu`, moyen: b.moyenPropose || null, date: Date.now(),
       auteur: user?.nom || user?.login || "—",
     };
     const revisions = [...(b.revisions || []), entry];
     const { error } = await supabase.from("budgets").update({
-      montant: b.montantPropose, revisions, montant_propose: null, motif_propose: null, statut_validation: null,
+      montant: b.montantPropose, revisions, montant_propose: null, motif_propose: null, moyen_propose: null, statut_validation: null,
     }).eq("id", budgetId);
     if (error) return { ok: false, error: error.message };
     await get().chargerBudgets();

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { LayoutGrid, Receipt, FileText, LogOut, ArrowLeft, ChevronLeft, Boxes, PawPrint, ClipboardList, HeartPulse, Scale, FolderOpen, Baby, Menu, Warehouse, Gauge, RotateCcw, Factory, Package, Wrench, Wallet, Stethoscope, Utensils, BarChart3, FolderKanban, ListTodo, PackagePlus, History, ScrollText, Tag, Users, Megaphone, Truck, Ticket, CalendarCheck, Handshake, Dumbbell, PieChart } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import MobileBottomNav from "./MobileBottomNav";
+import { ROLES } from "../../data/seed";
 
 const ROLES_ADMIN = ["pau", "ge", "super_admin", "directeur"];
 
@@ -222,6 +223,7 @@ export default function BusinessLayout({ config }) {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-semibold text-ink truncate">{user?.nom}</p>
+                <p className="text-[11px] text-ink-soft truncate">{ROLES[user?.role] || user?.role}</p>
               </div>
               <button
                 onClick={logout}

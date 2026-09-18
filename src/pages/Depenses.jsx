@@ -15,7 +15,7 @@ import { fmtFCFA, statutLabel, evaluationAutorisation, matchPeriode } from "../l
 import { exporterDepensesExcel } from "../lib/exportExcel";
 import { exporterDepensesPDF, exporterDepensesCSV } from "../lib/exportDocs";
 import { lireFichier, formatTaille } from "../lib/fichiers";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, secteurIdsPourFiltre } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutModifierDepense, peutSupprimerDepense, secteurIdsPourFiltre } from "../lib/modules";
 
 const ligneVide = () => ({ secteurId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), natureFlux: "exploitation", sourceFinancement: "entreprise", description: "", imprevue: false });
 
@@ -40,7 +40,7 @@ export default function Depenses() {
   // peutModifierDepense dans lib/modules.js) — la ligne sélectionnée n'est
   // connue qu'au clic, donc ce droit est recalculé par dépense, pas ici.
   const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
-  const peutSupprimer = peutSupprimerRole(user?.role);
+  const peutSupprimer = peutSupprimerDepense(user);
 
   const categoriesDuSecteur = useMemo(
     () => categories.filter((c) => c.secteurId === form.secteurId).map((c) => c.nom),

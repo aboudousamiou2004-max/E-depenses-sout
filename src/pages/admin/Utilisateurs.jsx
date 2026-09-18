@@ -63,14 +63,41 @@ export default function Utilisateurs() {
     }
   }
 
+  // Secteur et Modules accessibles sont synchronisés dans les deux sens — à
+  // la demande explicite de l'utilisateur (2026-09-18), pour éviter le bug
+  // constaté sur `iso` : un module coché sans que "Secteur" soit rempli,
+  // qui bloquait silencieusement les actions réservées au gérant (RLS
+  // vérifie secteur, pas modules). Cocher un module en fait donc aussitôt
+  // le secteur ; décocher celui qui était le secteur le vide ; choisir un
+  // secteur coche automatiquement le module correspondant.
   function toggleModule(id) {
-    setForm((f) => ({ ...f, modules: f.modules.includes(id) ? f.modules.filter((m) => m !== id) : [...f.modules, id] }));
+    setForm((f) => {
+      const inclus = f.modules.includes(id);
+      const modules = inclus ? f.modules.filter((m) => m !== id) : [...f.modules, id];
+      const secteur = inclus ? (f.secteur === id ? "" : f.secteur) : id;
+      return { ...f, modules, secteur };
+    });
+  }
+
+  function choisirSecteurForm(id) {
+    setForm((f) => ({
+      ...f,
+      secteur: id,
+      modules: id && !f.modules.includes(id) ? [...f.modules, id] : f.modules,
+    }));
   }
 
   async function toggleAccesExistant(u, moduleId) {
-    const modules = (u.modules || []).includes(moduleId) ? u.modules.filter((m) => m !== moduleId) : [...(u.modules || []), moduleId];
+    const inclus = (u.modules || []).includes(moduleId);
+    const modules = inclus ? u.modules.filter((m) => m !== moduleId) : [...(u.modules || []), moduleId];
     const res = await modifierAccesUtilisateur(u.uid, modules, user);
-    if (!res.ok) alert(res.error);
+    if (!res.ok) return alert(res.error);
+    // Ne remplit "Secteur" que s'il est encore vide — ne doit jamais écraser
+    // un secteur déjà choisi délibérément juste parce qu'on ajoute un accès
+    // à un module supplémentaire.
+    if (!inclus && !u.secteur) {
+      await modifierUtilisateur(u.uid, { nom: u.nom, role: u.role, secteur: moduleId, poste: u.poste, telephone: u.telephone });
+    }
   }
 
   async function toggleActif(u) {
@@ -257,7 +284,7 @@ export default function Utilisateurs() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Secteur">
-              <Select value={form.secteur} onChange={(e) => setForm({ ...form, secteur: e.target.value })}>
+              <Select value={form.secteur} onChange={(e) => choisirSecteurForm(e.target.value)}>
                 <option value="">Aucun</option>
                 {secteurs.map((s) => (
                   <option key={s.id} value={s.id}>{s.nom}</option>

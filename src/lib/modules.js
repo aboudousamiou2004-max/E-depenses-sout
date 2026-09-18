@@ -180,6 +180,18 @@ export function peutModifierDepense(user, depense) {
   return depense.creeParUid === user?.uid && depense.statut === "en_attente";
 }
 
+// Supprimer UNE DÉPENSE précisément : contrairement à peutSupprimer()
+// ci-dessus (qui étend aussi ce droit à Superviseur et Gérant pour les
+// autres listes), la suppression d'une dépense est réservée aux membres de
+// l'administration (ROLES_ACCES_TOTAL) — décision explicite de l'utilisateur
+// (2026-09-18) : "la suppression est visible que par les admins et les
+// membres de l'administration... je rappelle que les gérants ne font pas
+// partie des membres de l'administration... les gérants et agents n'ont pas
+// accès au bouton de suppression." Ne s'applique QU'aux dépenses.
+export function peutSupprimerDepense(user) {
+  return ROLES_ACCES_TOTAL.includes(user?.role);
+}
+
 // Confirmer la réception d'un budget alloué par l'administration (Recettes.jsx) :
 // c'est le Gérant DU SECTEUR CONCERNÉ qui confirme avoir reçu le budget —
 // jamais l'administration elle-même, même si elle a le rôle qui lui permet
