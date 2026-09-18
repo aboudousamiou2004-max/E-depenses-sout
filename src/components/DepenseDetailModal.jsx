@@ -27,7 +27,7 @@ function Row({ label, children }) {
 // autant pouvoir se l'auto-valider — seuls les approbateurs le peuvent
 // (peutApprouver). Superviseur/Gérant peuvent supprimer sans modifier ni
 // valider (règle du 2026-09-14, inchangée).
-export default function DepenseDetailModal({ depense, secteurs, categories, users = [], peutModifier, peutApprouver, peutSupprimer, modifierDepense, supprimerDepense, changerStatutDepense, currentUser, onClose, onDeleted }) {
+export default function DepenseDetailModal({ depense, secteurs, categories, users = [], peutModifier, peutApprouver, peutSupprimer, modifierDepense, supprimerDepense, changerStatutDepense, currentUser, onClose, onDeleted, modeInitial = "vue", demanderSuppression = false }) {
   const [mode, setMode] = useState("vue");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -58,10 +58,12 @@ export default function DepenseDetailModal({ depense, secteurs, categories, user
         recurrente: !!depense.recurrente,
         piece: depense.piece || null,
       });
-      setMode("vue");
+      setMode(modeInitial);
       setError("");
       setEnregistree(null);
+      setConfirmOuvert(demanderSuppression);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [depense]);
 
   async function handlePieceChange(e) {

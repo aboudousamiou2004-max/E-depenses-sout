@@ -29,14 +29,18 @@ export function budgetSecteurMois(budgets, secteurId, annee, mois) {
 }
 
 // N'impacte le tableau de bord (solde, revenu, consommation du budget...)
-// qu'une fois la dépense VALIDÉE (approuvée ou décaissée) — une dépense
-// encore « en attente » d'un membre de l'administration ne doit pas encore
-// être retirée du revenu du secteur, à la demande explicite de l'utilisateur
-// (2026-09-17) : « une fois que c'est validé... cette dépense est retirée
-// dans le revenu du secteur ». Une dépense refusée ne compte jamais.
+// qu'une fois la dépense DÉCAISSÉE — une dépense encore « en attente » d'un
+// membre de l'administration, ou déjà « approuvée » mais pas encore
+// décaissée par le gérant du secteur, ne doit pas encore être retirée du
+// revenu du secteur. Décision explicite de l'utilisateur (2026-09-18), qui
+// revient sur la règle du 2026-09-17 (« une fois validée [approuvée], la
+// dépense est retirée du revenu ») : « je veux que ce soit quand le gérant
+// appuie sur le bouton décaisser que la somme est retirée des revenus, pas
+// suite à l'approbation de l'admin ou du PAU, la GE ». Une dépense refusée
+// ne compte jamais.
 export function depensesSecteurMois(depenses, secteurId, annee, mois, jour = null) {
   return depenses.filter((d) => {
-    if (d.secteurId !== secteurId || d.statut === "refusee" || d.statut === "en_attente") return false;
+    if (d.secteurId !== secteurId || d.statut !== "decaissee") return false;
     return matchPeriode(d.date, { annee, mois, jour });
   });
 }
@@ -88,7 +92,7 @@ export function soldesFluxMois(depenses, recettes, annee, mois) {
   });
   const depMois = depenses.filter((d) => {
     const dt = new Date(d.date);
-    return dt.getFullYear() === annee && dt.getMonth() === mois && d.statut !== "refusee";
+    return dt.getFullYear() === annee && dt.getMonth() === mois && d.statut === "decaissee";
   });
   const totalRec = totalMontant(recMois);
   const exploitation = totalMontant(depMois.filter((d) => d.natureFlux === "exploitation"));
@@ -140,7 +144,7 @@ export function statutLabel(statut) {
   }[statut] || { label: statut, tone: "ink" };
 }
 
-export function last12Months(refDate = new Date(2026, 6, 27)) {
+export function last12Months(refDate = new Date()) {
   const out = [];
   for (let i = 11; i >= 0; i--) {
     const d = new Date(refDate.getFullYear(), refDate.getMonth() - i, 1);

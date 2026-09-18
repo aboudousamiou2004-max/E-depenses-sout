@@ -51,7 +51,7 @@ export default function Recettes() {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({ secteurId: "", origine: ORIGINES[0], montant: "", date: "2026-07-27" });
+  const [form, setForm] = useState({ secteurId: "", origine: ORIGINES[0], montant: "", date: new Date().toISOString().slice(0, 10) });
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [filtreOrigine, setFiltreOrigine] = useState("");
   const [detail, setDetail] = useState(null);
