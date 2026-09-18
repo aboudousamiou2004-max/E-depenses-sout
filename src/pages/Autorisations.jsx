@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, X, ShieldCheck, Banknote } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
@@ -10,8 +10,10 @@ import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, statutLabel } from "../lib/logic";
 
 export default function Autorisations() {
-  const { secteurs, depenses, changerStatutDepense } = useDataStore();
+  const { secteurs, depenses, changerStatutDepense, marquerVoletVu } = useDataStore();
   const { user } = useAuthStore();
+
+  useEffect(() => { marquerVoletVu(user?.uid, "depenseAutorisations"); }, [user?.uid]);
 
   const enAttente = useMemo(() => depenses.filter((d) => d.statut === "en_attente"), [depenses]);
   const approuvees = useMemo(() => depenses.filter((d) => d.statut === "approuvee"), [depenses]);

@@ -1,16 +1,19 @@
+import { useMemo } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   LayoutGrid, Receipt, Wallet, ShieldCheck, LineChart, TrendingUp, Landmark, Handshake, ScrollText, LogOut, ArrowLeft, Users, Settings, Archive,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
+import { useDataStore } from "../../store/dataStore";
 import { ROLES_ACCES_TOTAL } from "../../lib/modules";
+import { calculerBadges } from "../../lib/nouveautes";
 
 const NAV = [
   { to: "/depense", label: "Tableau de bord", icon: LayoutGrid, end: true },
-  { to: "/depense/depenses", label: "Dépenses", icon: Receipt },
-  { to: "/depense/recettes", label: "Recette et Budget", icon: Wallet },
-  { to: "/depense/autorisations", label: "Autorisations", icon: ShieldCheck },
+  { to: "/depense/depenses", label: "Dépenses", icon: Receipt, badgeKey: "depenseDepenses" },
+  { to: "/depense/recettes", label: "Recette et Budget", icon: Wallet, badgeKey: "depenseRecettes" },
+  { to: "/depense/autorisations", label: "Autorisations", icon: ShieldCheck, badgeKey: "depenseAutorisations" },
   { to: "/depense/analyses", label: "Analyses", icon: LineChart },
   { to: "/depense/rentabilite", label: "Rentabilité", icon: TrendingUp },
   { to: "/depense/flux", label: "Flux de trésorerie", icon: TrendingUp },
@@ -21,8 +24,16 @@ const NAV = [
 
 export default function Sidebar({ open = false, onClose }) {
   const { user, logout } = useAuthStore();
+  const { depenses, recettes, vuesVolets } = useDataStore();
   const navigate = useNavigate();
   const peutGererUtilisateurs = ROLES_ACCES_TOTAL.includes(user?.role);
+
+  // Badges "nouveauté" : nombre d'éléments ajoutés par d'autres depuis ma
+  // dernière visite de chaque volet (voir src/lib/nouveautes.js).
+  const badges = useMemo(
+    () => calculerBadges({ depenses, recettes }, vuesVolets, user?.uid),
+    [depenses, recettes, vuesVolets, user?.uid]
+  );
 
   function go(to) {
     navigate(to);
@@ -92,9 +103,14 @@ export default function Sidebar({ open = false, onClose }) {
                     strokeWidth={2.2}
                     className={`relative z-10 transition-colors ${isActive ? "text-[#0A84FF]" : "text-ink-soft group-hover:text-ink"}`}
                   />
-                  <span className={`relative z-10 text-[13.5px] font-semibold tracking-tight transition-colors ${isActive ? "text-ink" : "text-ink-soft group-hover:text-ink"}`}>
+                  <span className={`relative z-10 text-[13.5px] font-semibold tracking-tight transition-colors flex-1 truncate ${isActive ? "text-ink" : "text-ink-soft group-hover:text-ink"}`}>
                     {item.label}
                   </span>
+                  {item.badgeKey && badges[item.badgeKey] > 0 && (
+                    <span className="relative z-10 min-w-[16px] h-4 px-1 rounded-full bg-[#FF453A] text-white text-[9.5px] font-bold flex items-center justify-center shrink-0">
+                      {badges[item.badgeKey] > 9 ? "9+" : badges[item.badgeKey]}
+                    </span>
+                  )}
                 </div>
               )}
             </NavLink>
