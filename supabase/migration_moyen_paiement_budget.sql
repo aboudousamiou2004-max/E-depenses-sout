@@ -1,0 +1,12 @@
+-- Migration : moyen d'envoi (virement bancaire, mobile money, espèces,
+-- chèque) associé à une allocation/révision de budget — à la demande
+-- explicite de l'utilisateur (2026-09-18) : "on doit pouvoir dire par quel
+-- moyen l'argent a été envoyé".
+--
+-- Un seul champ suffit : `moyen_propose` porte le moyen choisi au moment de
+-- l'allocation/proposition, exactement comme `montant_propose`/`motif_propose`
+-- déjà en place (migration_allocation_budget.sql). Il est ensuite recopié
+-- dans l'entrée d'historique (`revisions`, jsonb — pas de colonne
+-- supplémentaire nécessaire pour ça) au moment de la confirmation ou de
+-- l'allocation directe, géré côté client (dataStore.js).
+alter table public.budgets add column if not exists moyen_propose text;

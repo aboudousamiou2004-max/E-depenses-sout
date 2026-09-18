@@ -25,7 +25,11 @@ function essentielsDeSecteur(config) {
   if (config.foncier) return ["dossiers", "besoins"];
   if (config.garderie) return ["enfants", "paiements"];
   if (config.egpro) return ["projets", "taches"];
-  return [];
+  // Secteur générique (créé depuis Paramètres, sans preset dédié — ex. un
+  // nouveau module métier ajouté après coup) : mêmes volets génériques que
+  // BusinessLayout.jsx lui donne par défaut (Prestations + Dépenses), pour
+  // que sa barre mobile ne se limite jamais à Tableau de bord + Plus.
+  return ["facturation", "depenses"];
 }
 
 // Enrobe MobileTabBar pour BusinessLayout.jsx : calcule les items propres à

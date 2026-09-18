@@ -68,6 +68,7 @@ Deno.serve(async (req) => {
   });
 
   let sent = 0;
+  const echecs: Array<{ id: string; statusCode?: number; body?: string; message?: string }> = [];
   await Promise.allSettled(
     subs.map(async (s) => {
       try {
@@ -77,17 +78,22 @@ Deno.serve(async (req) => {
         );
         sent += 1;
       } catch (err) {
+        // Journalisé systématiquement (avant : silencieux sauf 404/410) —
+        // sans ça, un échec d'envoi (mauvaise clé VAPID, endpoint invalide...)
+        // n'apparaît nulle part, ni dans la réponse ni dans les logs.
+        const e = err as { statusCode?: number; body?: string; message?: string };
+        console.error(`push échoué pour l'abonnement ${s.id} :`, e.statusCode, e.body || e.message);
+        echecs.push({ id: s.id, statusCode: e.statusCode, body: e.body, message: e.message });
         // Abonnement expiré ou révoqué côté navigateur : on le retire pour
         // ne pas continuer à essayer de pousser vers une adresse morte.
-        const statusCode = (err as { statusCode?: number })?.statusCode;
-        if (statusCode === 404 || statusCode === 410) {
+        if (e.statusCode === 404 || e.statusCode === 410) {
           await supabase.from("push_subscriptions").delete().eq("id", s.id);
         }
       }
     }),
   );
 
-  return new Response(JSON.stringify({ sent, total: subs.length }), {
+  return new Response(JSON.stringify({ sent, total: subs.length, echecs }), {
     headers: { "Content-Type": "application/json" },
   });
 });

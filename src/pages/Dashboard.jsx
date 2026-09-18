@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Wallet, TrendingUp, AlertTriangle, Clock3, ArrowUpRight, Plus, Building2, LayoutGrid } from "lucide-react";
+import { Wallet, TrendingUp, AlertTriangle, Clock3, ArrowUpRight, Plus, Building2, LayoutGrid, CheckCircle2, X } from "lucide-react";
 import { BarChart, Bar, Cell, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { useNavigate } from "react-router-dom";
 import TopBar from "../components/layout/TopBar";
@@ -25,7 +25,7 @@ import { secteurIdsPourFiltre } from "../lib/modules";
 const COULEURS_SUGGEREES = ["#0A84FF", "#30D158", "#FF9F0A", "#BF5AF2", "#FF453A", "#64D2FF", "#5E5CE6", "#8E8E93"];
 
 export default function Dashboard() {
-  const { secteurs, depenses, budgets, addSecteur } = useDataStore();
+  const { secteurs, depenses, budgets, addSecteur, notifications, marquerNotificationLue } = useDataStore();
   const { periode, secteurFiltre } = useUIStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
@@ -69,6 +69,17 @@ export default function Dashboard() {
   // réactiver. Les dépenses/recettes déjà enregistrées sous ce secteur ne
   // sont pas affectées : seules les vues "liste des secteurs" filtrent.
   const secteursActifs = useMemo(() => secteurs.filter((s) => s.actif !== false), [secteurs]);
+
+  // Budgets réceptionnés par un secteur — notification déjà écrite par
+  // notifier_budget() (trigger, voir migration_confirmation_reservee_gerant.sql)
+  // à destination de l'administration ; affichée ici directement sur le
+  // tableau de bord (pas seulement dans la cloche), fermable par une croix
+  // qui la marque simplement comme lue — à la demande explicite de
+  // l'utilisateur (2026-09-18).
+  const receptionsRecues = useMemo(
+    () => notifications.filter((n) => n.destinataireUid === user?.uid && !n.lu && n.titre?.startsWith("Budget réceptionné")),
+    [notifications, user?.uid]
+  );
 
   const secteursData = useMemo(() => tableauSecteurs(secteursActifs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteursActifs, depenses, budgets, periode]);
   const alertes = useMemo(() => secteursEnAlerte(secteursActifs, depenses, budgets, periode.annee, periode.mois, periode.jour), [secteursActifs, depenses, budgets, periode]);
@@ -127,6 +138,21 @@ export default function Dashboard() {
   return (
     <div>
       <TopBar title="Tableau de bord" subtitle="Vue consolidée : pilotage financier de LA TERMITIÈRE" icon={LayoutGrid} accent="#0A84FF" />
+
+      {receptionsRecues.length > 0 && (
+        <div className="flex flex-col gap-2 mb-5">
+          {receptionsRecues.map((n) => (
+            <div key={n.id} className="flex items-center gap-2 rounded-2xl border border-[#30D158]/25 bg-[#30D158]/8 px-4 py-3">
+              <CheckCircle2 size={15} className="shrink-0 text-[#1a7d34]" />
+              <span className="text-[12.5px] text-[#1a7d34] flex-1">{n.message}</span>
+              <button onClick={() => marquerNotificationLue(n.id)} title="Fermer"
+                className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-[#1a7d34]/60 hover:bg-[#30D158]/20 hover:text-[#1a7d34] transition-colors">
+                <X size={13} strokeWidth={2.4} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 lg:auto-rows-[172px] gap-4 sm:gap-5">
         <StatTile

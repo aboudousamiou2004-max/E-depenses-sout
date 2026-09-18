@@ -118,6 +118,19 @@ export function evaluationAutorisation(depenses, budgets, secteurId, annee, mois
   return { declenche: depasseBudget, budget, dejaDepense, restant: Math.max(0, budget - dejaDepense), depasseBudget };
 }
 
+// Libellé du moyen d'envoi d'un budget (virement, mobile money...) — la
+// liste des boutons cliquables avec icône vit dans Recettes.jsx (seul écran
+// qui la propose en saisie), mais le libellé texte est réutilisé partout où
+// un budget proposé s'affiche (SecteurOverview.jsx notamment).
+export function moyenLabel(id) {
+  return {
+    virement: "Virement bancaire",
+    mobile_money: "Mobile Money",
+    especes: "Espèces",
+    cheque: "Chèque",
+  }[id] || id;
+}
+
 export function statutLabel(statut) {
   return {
     en_attente: { label: "En attente", tone: "amber" },

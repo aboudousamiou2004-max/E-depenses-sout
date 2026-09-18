@@ -6,7 +6,7 @@ import RecetteDetailModal from "./RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, statutLabel } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutSupprimerDepense } from "../lib/modules";
 
 // Ouverte en cliquant sur un KPI du tableau de bord (général ou sectoriel) —
 // liste les dépenses/recettes qui composent ce chiffre, avec un clic sur une
@@ -18,7 +18,10 @@ export default function TransactionsListModal({ type, title, items, onClose }) {
   const [selection, setSelection] = useState(null);
   const peutModifierRecette = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
-  const peutSupprimer = peutSupprimerRole(user?.role);
+  // Suppression : réservée à l'administration pour une dépense
+  // (peutSupprimerDepense), étendue à Superviseur/Gérant pour une recette
+  // (peutSupprimer générique) — cf. lib/modules.js.
+  const peutSupprimer = type === "depense" ? peutSupprimerDepense(user) : peutSupprimerRole(user?.role);
 
   function secteurOf(id) {
     return secteurs.find((s) => s.id === id);

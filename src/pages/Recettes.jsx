@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Plus, Wallet, TrendingUp, AlertTriangle, History, Send, CheckCircle2, Trash2 } from "lucide-react";
+import { Plus, Wallet, TrendingUp, AlertTriangle, History, Send, CheckCircle2, Trash2, Landmark, Smartphone, Banknote, FileText, X } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
 import StatTile from "../components/ui/StatTile";
@@ -13,12 +13,22 @@ import RecetteDetailModal from "../components/RecetteDetailModal";
 import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
-import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte, matchPeriode, budgetSecteurMois, depensesSecteurMois, statutBudget } from "../lib/logic";
+import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte, matchPeriode, budgetSecteurMois, depensesSecteurMois, statutBudget, moyenLabel } from "../lib/logic";
 import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutConfirmerBudget, secteurIdsPourFiltre } from "../lib/modules";
 import ConfirmSuppressionModal from "../components/ui/ConfirmSuppressionModal";
 import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 
 const ORIGINES = ["Vente", "Prestation", "Facturation client", "Subvention"];
+
+// Moyen par lequel la somme allouée à un secteur a été (ou sera) envoyée —
+// boutons à cliquer plutôt qu'une liste déroulante, à la demande explicite
+// de l'utilisateur (2026-09-18).
+const MOYENS_PAIEMENT = [
+  { id: "virement", label: "Virement bancaire", icon: Landmark },
+  { id: "mobile_money", label: "Mobile Money", icon: Smartphone },
+  { id: "especes", label: "Espèces", icon: Banknote },
+  { id: "cheque", label: "Chèque", icon: FileText },
+];
 
 // Même code couleur par type de source que l'écran « Sources de revenus »
 // d'E-DÉPENSES sur la plateforme réelle (facture/vente = vert, prestation =
@@ -52,10 +62,17 @@ export default function Recettes() {
   const [revision, setRevision] = useState(null); // { budget, secteur, requiertValidation }
   const [revMontant, setRevMontant] = useState("");
   const [revMotif, setRevMotif] = useState("");
+  const [revMoyen, setRevMoyen] = useState("");
   const [revSaving, setRevSaving] = useState(false);
   const [revError, setRevError] = useState("");
   const [validationBusy, setValidationBusy] = useState(null);
   const [confirmSuppressionBudget, setConfirmSuppressionBudget] = useState(false);
+  // Budgets tout juste confirmés dans cette session — remplace la bande
+  // « en attente » par « réceptionné » au lieu de la faire simplement
+  // disparaître, jusqu'à ce qu'on la ferme (croix) — à la demande explicite
+  // de l'utilisateur (2026-09-18). État local : pas besoin de le persister,
+  // ce n'est qu'un accusé de réception éphémère pour qui vient de confirmer.
+  const [confirmesRecemment, setConfirmesRecemment] = useState({}); // { [budgetId]: { montant, moyen } }
 
   // Un secteur désactivé depuis Paramètres ne doit plus apparaître dans cette
   // liste (ni dans les alertes) — seul l'écran Paramètres continue de le
@@ -81,6 +98,7 @@ export default function Recettes() {
     setRevision(bs);
     setRevMontant(String(bs.alloue || ""));
     setRevMotif("");
+    setRevMoyen("");
     setRevError("");
   }
 
@@ -104,11 +122,12 @@ export default function Recettes() {
     if (revMontant === "" || nouveau < 0) return setRevError("Montant requis");
     const estAllocation = revision.alloue === 0;
     if (!estAllocation && !revMotif.trim()) return setRevError("Motif de révision requis");
+    if (!revMoyen) return setRevError("Choisis le moyen par lequel la somme a été envoyée.");
     setRevSaving(true);
     setRevError("");
     const res = await allouerOuReviserBudget({
       secteurId: revision.secteur.id, annee: periode.annee, mois: periode.mois,
-      montant: nouveau, motif: revMotif, user, requiertValidation: revision.requiertValidation,
+      montant: nouveau, motif: revMotif, moyen: revMoyen, user, requiertValidation: revision.requiertValidation,
     });
     setRevSaving(false);
     if (!res.ok) return setRevError(res.error);
@@ -118,8 +137,21 @@ export default function Recettes() {
   async function confirmerReception(bs) {
     if (validationBusy) return;
     setValidationBusy(bs.budget.id);
-    await validerReceptionBudget(bs.budget.id, user);
+    const res = await validerReceptionBudget(bs.budget.id, user);
     setValidationBusy(null);
+    if (!res.ok) return alert(res.error);
+    setConfirmesRecemment((c) => ({
+      ...c,
+      [bs.budget.id]: { montant: bs.budget.montantPropose, moyen: bs.budget.moyenPropose },
+    }));
+  }
+
+  function fermerConfirmation(budgetId) {
+    setConfirmesRecemment((c) => {
+      const suivant = { ...c };
+      delete suivant[budgetId];
+      return suivant;
+    });
   }
 
   async function confirmerSuppressionBudget(motif) {
@@ -294,7 +326,8 @@ export default function Recettes() {
                   <Send size={12} className="shrink-0 text-[#B45309]" />
                   <span className="text-[11.5px] text-[#93400a]">
                     <strong>{fmtFCFA(bs.budget.montantPropose)}</strong> proposés par {bs.budget.proposeParText}
-                    {bs.budget.motifPropose ? ` : ${bs.budget.motifPropose}` : ""} · en attente de confirmation
+                    {bs.budget.motifPropose ? ` : ${bs.budget.motifPropose}` : ""}
+                    {bs.budget.moyenPropose ? ` · ${moyenLabel(bs.budget.moyenPropose)}` : ""} · en attente de confirmation
                   </span>
                   {peutConfirmerBudget(user, bs.secteur.id) && (
                     <button onClick={() => confirmerReception(bs)} disabled={validationBusy === bs.budget.id}
@@ -302,6 +335,19 @@ export default function Recettes() {
                       <CheckCircle2 size={12} /> {validationBusy === bs.budget.id ? "Confirmation…" : "Confirmer la réception"}
                     </button>
                   )}
+                </div>
+              )}
+              {bs.budget?.id && confirmesRecemment[bs.budget.id] && (
+                <div className="flex flex-wrap items-center gap-2 border-t border-[#30D158]/15 bg-[#30D158]/8 px-3.5 py-2">
+                  <CheckCircle2 size={12} className="shrink-0 text-[#1a7d34]" />
+                  <span className="text-[11.5px] text-[#1a7d34] flex-1">
+                    <strong>{fmtFCFA(confirmesRecemment[bs.budget.id].montant)}</strong> réceptionnés
+                    {confirmesRecemment[bs.budget.id].moyen ? ` · ${moyenLabel(confirmesRecemment[bs.budget.id].moyen)}` : ""}
+                  </span>
+                  <button onClick={() => fermerConfirmation(bs.budget.id)} title="Fermer"
+                    className="shrink-0 w-5 h-5 rounded-full flex items-center justify-center text-[#1a7d34]/60 hover:bg-[#30D158]/20 hover:text-[#1a7d34] transition-colors">
+                    <X size={12} strokeWidth={2.4} />
+                  </button>
                 </div>
               )}
             </div>
@@ -468,6 +514,26 @@ export default function Recettes() {
                 </>
               )}
 
+              <Field label="Moyen d'envoi">
+                <div className="flex flex-wrap gap-2">
+                  {MOYENS_PAIEMENT.map((m) => {
+                    const actif = revMoyen === m.id;
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setRevMoyen(m.id)}
+                        className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12.5px] font-semibold border transition-colors ${
+                          actif ? "border-[#30D158] bg-[#30D158]/10 text-[#1a7d34]" : "border-black/10 text-ink-soft hover:bg-black/[0.03]"
+                        }`}
+                      >
+                        <m.icon size={14} strokeWidth={2.2} /> {m.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+
               <div className="flex items-center justify-between gap-2 pt-1">
                 {revision.alloue > 0 ? (
                   <Button variant="danger" onClick={() => setConfirmSuppressionBudget(true)} disabled={revSaving}><Trash2 size={14} className="mr-1" />Supprimer</Button>
@@ -484,7 +550,7 @@ export default function Recettes() {
                     {[...revision.budget.revisions].reverse().map((r) => (
                       <div key={r.id} className="rounded-lg bg-white/70 px-3 py-2 text-[12px]">
                         <p className="font-semibold text-ink">{fmtFCFA(r.ancien)} → {fmtFCFA(r.nouveau)}</p>
-                        <p className="mt-0.5 text-ink-soft">{r.motif}</p>
+                        <p className="mt-0.5 text-ink-soft">{r.motif}{r.moyen ? ` · ${moyenLabel(r.moyen)}` : ""}</p>
                         <p className="mt-0.5 text-[10.5px] text-ink-soft/60">par {r.auteur || "—"} · {new Date(r.date).toLocaleString("fr-FR")}</p>
                       </div>
                     ))}

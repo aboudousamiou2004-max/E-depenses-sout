@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import QRCode from "qrcode";
-import { ArrowLeft, Plus, UserPlus, Check, Trash2, ChevronDown, QrCode, Copy, CopyCheck } from "lucide-react";
+import { ArrowLeft, Plus, UserPlus, Check, Trash2, ChevronDown, QrCode, Copy, CopyCheck, Pencil, Save } from "lucide-react";
 import GlassCard from "../../components/ui/GlassCard";
 import Badge from "../../components/ui/Badge";
 import Button from "../../components/ui/Button";
@@ -18,17 +18,20 @@ import { enregistrerMotifSuppression } from "../../lib/motifSuppression";
 const empty = () => ({ login: "", nom: "", pass: "", role: "agent", secteur: "", poste: "", telephone: "", actif: true, modules: [] });
 
 export default function Utilisateurs() {
-  const { users, secteurs, addUser, modifierAccesUtilisateur, modifierActifUtilisateur, supprimerUtilisateur } = useDataStore();
+  const { users, secteurs, addUser, modifierAccesUtilisateur, modifierActifUtilisateur, modifierUtilisateur, supprimerUtilisateur } = useDataStore();
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const modulesM = tousLesModules(secteurs);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState(empty());
-  const [adminPass, setAdminPass] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [supprimantId, setSupprimantId] = useState(null);
   const [confirmCible, setConfirmCible] = useState(null);
+  const [editCible, setEditCible] = useState(null); // utilisateur en cours d'édition (rôle/secteur/poste/téléphone)
+  const [editForm, setEditForm] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState("");
   const [qrPourUtilisateur, setQrPourUtilisateur] = useState(null); // utilisateur dont le QR est affiché
   const [qrDataUrl, setQrDataUrl] = useState("");
   const [lienCopie, setLienCopie] = useState(false);
@@ -60,19 +63,63 @@ export default function Utilisateurs() {
     }
   }
 
+  // Secteur et Modules accessibles sont synchronisés dans les deux sens — à
+  // la demande explicite de l'utilisateur (2026-09-18), pour éviter le bug
+  // constaté sur `iso` : un module coché sans que "Secteur" soit rempli,
+  // qui bloquait silencieusement les actions réservées au gérant (RLS
+  // vérifie secteur, pas modules). Cocher un module en fait donc aussitôt
+  // le secteur ; décocher celui qui était le secteur le vide ; choisir un
+  // secteur coche automatiquement le module correspondant.
   function toggleModule(id) {
-    setForm((f) => ({ ...f, modules: f.modules.includes(id) ? f.modules.filter((m) => m !== id) : [...f.modules, id] }));
+    setForm((f) => {
+      const inclus = f.modules.includes(id);
+      const modules = inclus ? f.modules.filter((m) => m !== id) : [...f.modules, id];
+      const secteur = inclus ? (f.secteur === id ? "" : f.secteur) : id;
+      return { ...f, modules, secteur };
+    });
+  }
+
+  function choisirSecteurForm(id) {
+    setForm((f) => ({
+      ...f,
+      secteur: id,
+      modules: id && !f.modules.includes(id) ? [...f.modules, id] : f.modules,
+    }));
   }
 
   async function toggleAccesExistant(u, moduleId) {
-    const modules = (u.modules || []).includes(moduleId) ? u.modules.filter((m) => m !== moduleId) : [...(u.modules || []), moduleId];
+    const inclus = (u.modules || []).includes(moduleId);
+    const modules = inclus ? u.modules.filter((m) => m !== moduleId) : [...(u.modules || []), moduleId];
     const res = await modifierAccesUtilisateur(u.uid, modules, user);
-    if (!res.ok) alert(res.error);
+    if (!res.ok) return alert(res.error);
+    // Ne remplit "Secteur" que s'il est encore vide — ne doit jamais écraser
+    // un secteur déjà choisi délibérément juste parce qu'on ajoute un accès
+    // à un module supplémentaire.
+    if (!inclus && !u.secteur) {
+      await modifierUtilisateur(u.uid, { nom: u.nom, role: u.role, secteur: moduleId, poste: u.poste, telephone: u.telephone });
+    }
   }
 
   async function toggleActif(u) {
     const res = await modifierActifUtilisateur(u.uid, !u.actif);
     if (!res.ok) alert(res.error);
+  }
+
+  function ouvrirEdition(u) {
+    setEditForm({ nom: u.nom, role: u.role, secteur: u.secteur || "", poste: u.poste || "", telephone: u.telephone || "" });
+    setEditError("");
+    setEditCible(u);
+  }
+
+  async function submitEdition(e) {
+    e.preventDefault();
+    if (!editForm.nom.trim()) return;
+    setEditSaving(true);
+    setEditError("");
+    const res = await modifierUtilisateur(editCible.uid, editForm);
+    setEditSaving(false);
+    if (!res.ok) return setEditError(res.error);
+    setEditCible(null);
   }
 
   async function confirmerSuppression(motif) {
@@ -86,15 +133,18 @@ export default function Utilisateurs() {
 
   async function submit(e) {
     e.preventDefault();
-    if (!form.login.trim() || !form.nom.trim() || !form.pass.trim() || !adminPass.trim()) return;
+    // Échouait silencieusement (aucun retour visible) si un champ obligatoire
+    // était vide. Un message précis remplace le no-op.
+    if (!form.nom.trim()) return setError("Le nom complet est obligatoire.");
+    if (!form.login.trim()) return setError("L'identifiant de connexion est obligatoire.");
+    if (!form.pass.trim()) return setError("Le mot de passe du nouvel utilisateur est obligatoire.");
     setSaving(true);
     setError("");
-    const res = await addUser(form, user, adminPass);
+    const res = await addUser(form);
     setSaving(false);
     if (!res.ok) return setError(res.error);
     setOpen(false);
     setForm(empty());
-    setAdminPass("");
   }
 
   return (
@@ -164,6 +214,13 @@ export default function Utilisateurs() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
                         <button
+                          onClick={() => ouvrirEdition(u)}
+                          title="Modifier le rôle, le secteur, le poste ou le téléphone"
+                          className="w-8 h-8 rounded-xl flex items-center justify-center text-ink-soft hover:bg-[#0A84FF]/10 hover:text-[#0A84FF] transition-colors"
+                        >
+                          <Pencil size={15} strokeWidth={2.2} />
+                        </button>
+                        <button
                           onClick={() => ouvrirQr(u)}
                           title="QR code d'accès mobile (à faire scanner par le téléphone de cet utilisateur)"
                           className="w-8 h-8 rounded-xl flex items-center justify-center text-ink-soft hover:bg-[#0A84FF]/10 hover:text-[#0A84FF] transition-colors"
@@ -227,7 +284,7 @@ export default function Utilisateurs() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Secteur">
-              <Select value={form.secteur} onChange={(e) => setForm({ ...form, secteur: e.target.value })}>
+              <Select value={form.secteur} onChange={(e) => choisirSecteurForm(e.target.value)}>
                 <option value="">Aucun</option>
                 {secteurs.map((s) => (
                   <option key={s.id} value={s.id}>{s.nom}</option>
@@ -252,13 +309,6 @@ export default function Utilisateurs() {
               <span className="text-[13px] font-semibold text-ink">Compte actif</span>
             </label>
           </div>
-
-          <Field label="Votre mot de passe (pour rester connecté) *">
-            <TextInput type="password" value={adminPass} onChange={(e) => setAdminPass(e.target.value)} placeholder="••••••••" />
-          </Field>
-          <p className="text-[12px] text-ink-soft -mt-2 mb-3.5">
-            La création d'un compte reconnecte automatiquement le nouvel utilisateur à sa place : votre mot de passe sert à restaurer votre propre session juste après.
-          </p>
 
           {ROLES_ACCES_TOTAL.includes(form.role) ? (
             <p className="text-[12.5px] text-ink-soft px-3.5 py-2.5 rounded-2xl bg-black/[0.03]">
@@ -299,6 +349,57 @@ export default function Utilisateurs() {
             </div>
             <p className="text-[11.5px] text-ink-soft/70">Pas avec toi ? Envoie-lui simplement ce lien (WhatsApp, SMS…).</p>
           </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!editCible}
+        onClose={() => setEditCible(null)}
+        title={editCible ? `Modifier : ${editCible.nom}` : "Modifier"}
+        icon={Pencil}
+        accent="#0A84FF"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditCible(null)}>Annuler</Button>
+            <Button icon={Save} onClick={submitEdition} disabled={editSaving}>{editSaving ? "Enregistrement…" : "Enregistrer"}</Button>
+          </>
+        }
+      >
+        {editForm && (
+          <form onSubmit={submitEdition}>
+            {editError && <p className="text-[12.5px] text-[#b3241b] bg-[#FF453A]/10 rounded-xl px-3 py-2 mb-3">{editError}</p>}
+            <Field label="Nom complet *">
+              <TextInput value={editForm.nom} onChange={(e) => setEditForm({ ...editForm, nom: e.target.value })} />
+            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Rôle">
+                <Select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}>
+                  {Object.entries(ROLES).map(([k, label]) => (
+                    <option key={k} value={k}>{label}</option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Secteur">
+                <Select value={editForm.secteur} onChange={(e) => setEditForm({ ...editForm, secteur: e.target.value })}>
+                  <option value="">Aucun</option>
+                  {secteurs.map((s) => (
+                    <option key={s.id} value={s.id}>{s.nom}</option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Poste">
+                <TextInput value={editForm.poste} onChange={(e) => setEditForm({ ...editForm, poste: e.target.value })} placeholder="ex : Agent de saisie" />
+              </Field>
+              <Field label="Téléphone WhatsApp">
+                <TextInput type="tel" value={editForm.telephone} onChange={(e) => setEditForm({ ...editForm, telephone: e.target.value })} placeholder="ex : 90 00 00 00" />
+              </Field>
+            </div>
+            <p className="text-[12px] text-ink-soft">
+              Pour les modules accessibles, utilise les boutons directement dans le tableau — ce formulaire ne gère que le rôle, le secteur, le poste et le téléphone.
+            </p>
+          </form>
         )}
       </Modal>
 
