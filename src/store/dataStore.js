@@ -55,6 +55,7 @@ const mapDepense = (r) => ({
   statut: r.statut,
   seuil: Number(r.seuil),
   creeParUid: r.cree_par,
+  createdAt: r.created_at,
   projetId: r.projet_id,
   tacheId: r.tache_id,
   besoinId: r.besoin_id,
@@ -73,6 +74,7 @@ const mapRecette = (r) => ({
   client: r.client || "",
   description: r.description || "",
   creeParUid: r.cree_par,
+  createdAt: r.created_at,
   abonnementId: r.abonnement_id,
 });
 const mapJournalRow = (r) => ({
@@ -85,6 +87,7 @@ const mapJournalRow = (r) => ({
   timestamp: r.timestamp,
   secteurId: r.secteur_id,
 });
+const mapVueVolet = (r) => ({ userId: r.user_id, section: r.section, vu: r.vu });
 const mapNotification = (r) => ({
   id: r.id,
   destinataireUid: r.destinataire_id,
@@ -149,6 +152,7 @@ export const useDataStore = create((set, get) => ({
   banque: [],
   partenaires: [],
   archives: [],
+  vuesVolets: [],
   loaded: false,
 
   // Charge toutes les données de l'app en une fois — appelé par authStore dès
@@ -156,7 +160,7 @@ export const useDataStore = create((set, get) => ({
   // (chacun ne peut de toute façon voir que les siennes, RLS l'impose déjà,
   // mais filtrer ici évite de dépendre de l'ordre des champs retournés).
   chargerTout: async (userId) => {
-    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, banque, partenaires] = await Promise.all([
+    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, banque, partenaires, vuesVolets] = await Promise.all([
       supabase.from("secteurs").select("*").order("created_at"),
       supabase.from("budgets").select("*"),
       supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
@@ -169,6 +173,9 @@ export const useDataStore = create((set, get) => ({
       supabase.from("categories_depense").select("*").order("nom"),
       supabase.from("banque_mouvements").select("*").order("date"),
       supabase.from("partenaires").select("*").order("nom"),
+      userId
+        ? supabase.from("vues_volets").select("*").eq("user_id", userId)
+        : Promise.resolve({ data: [] }),
     ]);
     set({
       secteurs: (secteurs.data || []).map(mapSecteur),
@@ -181,6 +188,7 @@ export const useDataStore = create((set, get) => ({
       categories: (categories.data || []).map(mapCategorie),
       banque: (banque.data || []).map(mapMouvementBanque),
       partenaires: (partenaires.data || []).map(mapPartenaire),
+      vuesVolets: (vuesVolets.data || []).map(mapVueVolet),
       loaded: true,
     });
   },
@@ -188,8 +196,24 @@ export const useDataStore = create((set, get) => ({
   reset: () =>
     set({
       secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [],
-      categories: [], banque: [], partenaires: [], archives: [], loaded: false,
+      categories: [], banque: [], partenaires: [], archives: [], vuesVolets: [], loaded: false,
     }),
+
+  // Marque un volet comme vu par l'utilisateur courant — fait disparaître son
+  // badge "nouveauté" dans la barre latérale (voir src/lib/nouveautes.js).
+  // Mise à jour optimiste locale avant l'écriture réseau : le badge disparaît
+  // immédiatement, sans attendre l'aller-retour Supabase.
+  marquerVoletVu: async (userId, section) => {
+    if (!userId || !section) return;
+    const vu = new Date().toISOString();
+    set((state) => ({
+      vuesVolets: [
+        ...state.vuesVolets.filter((v) => v.section !== section),
+        { userId, section, vu },
+      ],
+    }));
+    await supabase.from("vues_volets").upsert({ user_id: userId, section, vu }, { onConflict: "user_id,section" });
+  },
 
   // Rechargements ciblés après une écriture — évitent de tout re-fetcher.
   chargerSecteurs: async () => {
@@ -235,6 +259,16 @@ export const useDataStore = create((set, get) => ({
   // la session active sur le nouveau compte : on reconnecte immédiatement
   // l'admin avec le mot de passe qu'il vient de fournir dans le formulaire
   // (ré-authentification silencieuse — voir le plan de migration).
+  // signUp() est un point d'entrée PUBLIC (clé anon, sans authentification) —
+  // on ne lui confie donc plus jamais role/modules/secteur/actif, qui
+  // resteraient sinon falsifiables par n'importe qui appelant l'API
+  // directement (faille corrigée le 2026-09-17, voir
+  // migration_fix_securite_inscription_budgets.sql). handle_new_user() crée
+  // désormais systématiquement un compte inerte (agent, aucun module,
+  // désactivé) ; les valeurs réelles du formulaire ne sont appliquées
+  // qu'APRÈS, via une UPDATE authentifiée ci-dessous, soumise à la policy
+  // RLS "profils modifiables par les rôles à accès total" — donc seulement
+  // si l'appelant est réellement admin.
   addUser: async (payload, auteur, adminPass) => {
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: loginToEmail(payload.login),
@@ -243,16 +277,11 @@ export const useDataStore = create((set, get) => ({
         data: {
           login: payload.login.trim(),
           nom: payload.nom.trim(),
-          role: payload.role,
-          secteur: payload.secteur || null,
-          poste: payload.poste?.trim() || "",
-          telephone: payload.telephone?.trim() || "",
-          actif: payload.actif !== false,
-          modules: payload.modules || [],
         },
       },
     });
     if (signUpError) return { ok: false, error: traduireErreurAuth(signUpError.message) };
+    const nouveauUid = signUpData.user.id;
 
     const { error: reloginError } = await supabase.auth.signInWithPassword({
       email: loginToEmail(auteur.login),
@@ -264,6 +293,22 @@ export const useDataStore = create((set, get) => ({
         error: `Utilisateur créé, mais la reconnexion a échoué (${traduireErreurAuth(reloginError.message)}) — reconnectez-vous manuellement.`,
       };
     }
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({
+        role: payload.role,
+        secteur: payload.secteur || null,
+        poste: payload.poste?.trim() || "",
+        telephone: payload.telephone?.trim() || "",
+        actif: payload.actif !== false,
+        modules: payload.modules || [],
+      })
+      .eq("id", nouveauUid);
+    if (updateError) {
+      return { ok: false, error: `Compte créé mais non configuré (${updateError.message}) — modifiez ses accès depuis la liste des utilisateurs.` };
+    }
+
     await get().chargerUsers();
     return { ok: true, utilisateur: signUpData.user };
   },

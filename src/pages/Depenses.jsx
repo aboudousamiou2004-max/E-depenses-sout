@@ -20,9 +20,11 @@ import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, secteurIdsPourFi
 const ligneVide = () => ({ secteurId: "", categorie: "", montant: "", date: new Date().toISOString().slice(0, 10), natureFlux: "exploitation", sourceFinancement: "entreprise", description: "", imprevue: false });
 
 export default function Depenses() {
-  const { secteurs, depenses, categories, budgets, users, addDepense, modifierDepense, supprimerDepense, changerStatutDepense, reconduireDepenses } = useDataStore();
+  const { secteurs, depenses, categories, budgets, users, addDepense, modifierDepense, supprimerDepense, changerStatutDepense, reconduireDepenses, marquerVoletVu } = useDataStore();
   const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
+
+  useEffect(() => { marquerVoletVu(user?.uid, "depenseDepenses"); }, [user?.uid]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");

@@ -31,11 +31,13 @@ const ORIGINE_TONE = {
 };
 
 export default function Recettes() {
-  const { secteurs, recettes, budgets, depenses, users, addRecette, modifierRecette, supprimerRecette, allouerOuReviserBudget, validerReceptionBudget, supprimerBudget } = useDataStore();
+  const { secteurs, recettes, budgets, depenses, users, addRecette, modifierRecette, supprimerRecette, allouerOuReviserBudget, validerReceptionBudget, supprimerBudget, marquerVoletVu } = useDataStore();
   const { secteurFiltre, periode, recherche } = useUIStore();
   const { user } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+
+  useEffect(() => { marquerVoletVu(user?.uid, "depenseRecettes"); }, [user?.uid]);
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
