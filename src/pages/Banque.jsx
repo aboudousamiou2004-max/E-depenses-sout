@@ -9,7 +9,7 @@ import Modal from "../components/ui/Modal";
 import Field, { TextInput } from "../components/ui/Field";
 import { useDataStore } from "../store/dataStore";
 import { fmtFCFA } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../lib/modules";
+import { peutModifier as peutModifierRole, peutSupprimer as peutSupprimerRole } from "../lib/modules";
 import { useAuthStore } from "../store/authStore";
 import ConfirmSuppressionModal from "../components/ui/ConfirmSuppressionModal";
 import { enregistrerMotifSuppression } from "../lib/motifSuppression";
@@ -21,7 +21,7 @@ import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 export default function Banque() {
   const { banque, addMouvementBanque, modifierMouvementBanque, supprimerMouvementBanque, definirSoldeOuverture } = useDataStore();
   const { user } = useAuthStore();
-  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutModifier = peutModifierRole(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
 
   const [modal, setModal] = useState(null); // { data, id }

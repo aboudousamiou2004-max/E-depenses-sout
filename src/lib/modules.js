@@ -157,14 +157,16 @@ export function moduleParId(id, secteurs = []) {
 export const ROLES_ACCES_TOTAL = ["super_admin", "pau", "ge", "directeur"];
 
 // Boutons Modifier/Supprimer, communs à toutes les listes de l'application
-// (dépenses, recettes, clients, forfaits, transport...), à la demande de
-// l'utilisateur (2026-09-14) : Modifier reste réservé aux rôles à accès
-// total (ROLES_ACCES_TOTAL) ; Supprimer s'étend en plus à Superviseur et
-// Gérant de secteur ; Agent ne voit NI l'un ni l'autre, dans AUCUN module —
-// règle non négociable, confirmée explicitement par l'utilisateur.
-export const ROLES_SUPPRESSION = [...ROLES_ACCES_TOTAL, "superviseur", "gerant"];
-export function peutModifier(role) { return ROLES_ACCES_TOTAL.includes(role); }
-export function peutSupprimer(role) { return ROLES_SUPPRESSION.includes(role); }
+// (dépenses, recettes, clients, forfaits, transport...). Révision du
+// 2026-09-19 (annule la règle du 2026-09-14 ci-dessous) : Modifier s'ouvre
+// à tout le monde, y compris Gérant et Agent ; Supprimer se resserre aux
+// seuls rôles à accès total (Directeur, PAU, Admin, GE) — Superviseur,
+// Gérant et Agent ne voient plus le bouton de suppression, nulle part.
+// Décision explicite de l'utilisateur : « la suppression c'est pour les
+// Directeur, PAU, Admin, GE, fait la même chose pour tous les modules » /
+// « la modification = gérants + admin + PAU + GE + Agents ».
+export function peutModifier() { return true; }
+export function peutSupprimer(role) { return ROLES_ACCES_TOTAL.includes(role); }
 
 // Modifier UNE DÉPENSE précisément : assouplit peutModifier() ci-dessus, à la
 // demande explicite de l'utilisateur (2026-09-18) — chacun peut modifier une

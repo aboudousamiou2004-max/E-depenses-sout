@@ -15,7 +15,7 @@ import { useStockStore } from "../../store/stockStore";
 import { useGymStore, niveauLabel } from "../../store/gymStore";
 import { useUIStore } from "../../store/uiStore";
 import { fmtFCFA, fmtCompact, totalMontant, matchPeriode } from "../../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole } from "../../lib/modules";
+import { peutModifier as peutModifierRole, peutSupprimer as peutSupprimerRole } from "../../lib/modules";
 
 export default function BusinessFacturation() {
   const config = useOutletContext();
@@ -36,7 +36,7 @@ export default function BusinessFacturation() {
   const [error, setError] = useState("");
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [selection, setSelection] = useState(null);
-  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutModifier = peutModifierRole(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
 
   const [form, setForm] = useState({
