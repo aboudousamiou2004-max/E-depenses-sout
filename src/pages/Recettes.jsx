@@ -14,7 +14,7 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { fmtFCFA, fmtCompact, totalMontant, secteursEnAlerte, matchPeriode, budgetSecteurMois, depensesSecteurMois, statutBudget, moyenLabel } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutConfirmerBudget, secteurIdsPourFiltre } from "../lib/modules";
+import { peutModifier as peutModifierRole, peutSupprimer as peutSupprimerRole, peutConfirmerBudget, secteurIdsPourFiltre } from "../lib/modules";
 import ConfirmSuppressionModal from "../components/ui/ConfirmSuppressionModal";
 import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 
@@ -55,7 +55,7 @@ export default function Recettes() {
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [filtreOrigine, setFiltreOrigine] = useState("");
   const [detail, setDetail] = useState(null);
-  const peutModifier = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutModifier = peutModifierRole(user?.role);
   const peutSupprimer = peutSupprimerRole(user?.role);
 
   // ── Budget par secteur (allocation / révision) ──

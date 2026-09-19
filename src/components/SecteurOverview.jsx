@@ -12,7 +12,7 @@ import { useDataStore } from "../store/dataStore";
 import { useUIStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import { budgetSecteurMois, depensesSecteurMois, totalMontant, fmtFCFA, fmtCompact, statutBudget, last12Months, matchPeriode, moyenLabel } from "../lib/logic";
-import { ROLES_ACCES_TOTAL, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutSupprimerDepense, peutConfirmerBudget, peutDecaisserDepense } from "../lib/modules";
+import { ROLES_ACCES_TOTAL, peutModifier as peutModifierRole, peutSupprimer as peutSupprimerRole, peutModifierDepense, peutSupprimerDepense, peutConfirmerBudget, peutDecaisserDepense } from "../lib/modules";
 
 // Vue "un ou plusieurs secteurs" — utilisée à la fois par le tableau de bord
 // E-DÉPENSES (secteur précis OU module entier sélectionné dans le filtre :
@@ -27,7 +27,7 @@ export default function SecteurOverview({ secteurId, secteurIds, nom, color, lab
   const { user } = useAuthStore();
   // Recettes : inchangé, réservé aux rôles à accès total. Dépenses : voir
   // peutModifierDepense (chacun peut modifier la sienne tant qu'en_attente).
-  const peutModifierRecette = ROLES_ACCES_TOTAL.includes(user?.role);
+  const peutModifierRecette = peutModifierRole(user?.role);
   const peutApprouver = ROLES_ACCES_TOTAL.includes(user?.role);
   const peutSupprimerRecette = peutSupprimerRole(user?.role);
   const [vueTransactions, setVueTransactions] = useState(null); // { type, title, items }
