@@ -120,6 +120,19 @@ const mapMouvementBanque = (r) => ({
   ouverture: !!r.ouverture,
   creeParUid: r.cree_par,
 });
+const mapMouvementCaisse = (r) => ({
+  id: r.id,
+  date: r.date,
+  type: r.type,
+  libelle: r.libelle,
+  secteurId: r.secteur_id || null,
+  categorie: r.categorie,
+  beneficiaire: r.beneficiaire,
+  montant: Number(r.montant),
+  ouverture: !!r.ouverture,
+  piece: pieceFromColumn(r.piece),
+  creeParUid: r.cree_par,
+});
 const mapPartenaire = (r) => ({ id: r.id, nom: r.nom, type: r.type, contact: r.contact });
 const mapUser = (r) => ({
   uid: r.id,
@@ -151,6 +164,7 @@ export const useDataStore = create((set, get) => ({
   users: [],
   categories: [],
   banque: [],
+  caisse: [],
   partenaires: [],
   archives: [],
   vuesVolets: [],
@@ -161,7 +175,7 @@ export const useDataStore = create((set, get) => ({
   // (chacun ne peut de toute façon voir que les siennes, RLS l'impose déjà,
   // mais filtrer ici évite de dépendre de l'ordre des champs retournés).
   chargerTout: async (userId) => {
-    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, banque, partenaires, vuesVolets] = await Promise.all([
+    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, banque, partenaires, vuesVolets, caisse] = await Promise.all([
       supabase.from("secteurs").select("*").order("created_at"),
       supabase.from("budgets").select("*"),
       supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
@@ -177,6 +191,7 @@ export const useDataStore = create((set, get) => ({
       userId
         ? supabase.from("vues_volets").select("*").eq("user_id", userId)
         : Promise.resolve({ data: [] }),
+      supabase.from("caisse_mouvements").select("*").order("date"),
     ]);
     set({
       secteurs: (secteurs.data || []).map(mapSecteur),
@@ -190,6 +205,7 @@ export const useDataStore = create((set, get) => ({
       banque: (banque.data || []).map(mapMouvementBanque),
       partenaires: (partenaires.data || []).map(mapPartenaire),
       vuesVolets: (vuesVolets.data || []).map(mapVueVolet),
+      caisse: (caisse.data || []).map(mapMouvementCaisse),
       loaded: true,
     });
   },
@@ -197,7 +213,7 @@ export const useDataStore = create((set, get) => ({
   reset: () =>
     set({
       secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [],
-      categories: [], banque: [], partenaires: [], archives: [], vuesVolets: [], loaded: false,
+      categories: [], banque: [], caisse: [], partenaires: [], archives: [], vuesVolets: [], loaded: false,
     }),
 
   // Marque un volet comme vu par l'utilisateur courant — fait disparaître son
@@ -785,6 +801,10 @@ export const useDataStore = create((set, get) => ({
     const { data } = await supabase.from("banque_mouvements").select("*").order("date");
     set({ banque: (data || []).map(mapMouvementBanque) });
   },
+  chargerCaisse: async () => {
+    const { data } = await supabase.from("caisse_mouvements").select("*").order("date");
+    set({ caisse: (data || []).map(mapMouvementCaisse) });
+  },
   chargerPartenaires: async () => {
     const { data } = await supabase.from("partenaires").select("*").order("nom");
     set({ partenaires: (data || []).map(mapPartenaire) });
@@ -824,6 +844,42 @@ export const useDataStore = create((set, get) => ({
     );
     if (error) return { ok: false, error: error.message };
     await get().chargerBanque();
+    return { ok: true };
+  },
+
+  // Caisse courante : dotations (entrées) et dépenses (sorties) datées, avec en
+  // plus le secteur, la catégorie et le bénéficiaire d'une dépense. Le reste en
+  // caisse est la somme des dotations moins les dépenses. Un UPDATE ou un DELETE refusé par RLS ne renvoie
+  // aucune erreur côté PostgREST (0 ligne touchée) : on vérifie donc le nombre
+  // de lignes réellement modifiées pour ne jamais afficher un faux succès.
+  addMouvementCaisse: async (payload) => {
+    const { error } = await supabase.from("caisse_mouvements").insert({
+      date: payload.date, type: payload.type, libelle: payload.libelle || "",
+      secteur_id: payload.secteurId || null, categorie: payload.categorie || "",
+      beneficiaire: payload.beneficiaire || "", montant: payload.montant,
+      piece: pieceToColumn(payload.piece),
+    });
+    if (error) return { ok: false, error: error.message };
+    await get().chargerCaisse();
+    return { ok: true };
+  },
+  modifierMouvementCaisse: async (id, payload) => {
+    const { data, error } = await supabase.from("caisse_mouvements").update({
+      date: payload.date, type: payload.type, libelle: payload.libelle || "",
+      secteur_id: payload.secteurId || null, categorie: payload.categorie || "",
+      beneficiaire: payload.beneficiaire || "", montant: payload.montant,
+      piece: pieceToColumn(payload.piece),
+    }).eq("id", id).select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data?.length) return { ok: false, error: "Modification refusée : vous n'avez pas les droits nécessaires sur ce mouvement." };
+    await get().chargerCaisse();
+    return { ok: true };
+  },
+  supprimerMouvementCaisse: async (id) => {
+    const { data, error } = await supabase.from("caisse_mouvements").delete().eq("id", id).select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data?.length) return { ok: false, error: "Suppression refusée : réservée à l'administration." };
+    await get().chargerCaisse();
     return { ok: true };
   },
 
