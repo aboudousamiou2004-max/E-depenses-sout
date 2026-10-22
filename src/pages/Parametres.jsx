@@ -215,7 +215,7 @@ function SectionZoneDanger({ user, secteurs }) {
             </p>
             {cible?.type === "secteur" && (
               <p className="text-[11.5px] text-ink-soft bg-black/[0.03] rounded-xl px-3 py-2">
-                Certaines données ({TABLES_NON_SCOPABLES.length} tables) ne sont pas (encore) séparées par lieu : stock/magasin partagé de MAXI AGRO et E-BRIQUETERIE, fiches E-GARDERIE/E-FONCIER/E-G.PRO tant qu'un seul lieu existe, banque, partenaires... Celles-ci ne seront jamais touchées par un reset ciblé, pour ne pas risquer de vider les données d'un autre secteur du même module.
+                Certaines données ({TABLES_NON_SCOPABLES.length} tables) ne sont pas (encore) séparées par lieu : stock/magasin partagé de MAXI AGRO et E-BRIQUETERIE, fiches E-GARDERIE/E-FONCIER/E-G.PRO tant qu'un seul lieu existe, banque, caisse, partenaires... Celles-ci ne seront jamais touchées par un reset ciblé, pour ne pas risquer de vider les données d'un autre secteur du même module.
               </p>
             )}
             <p className="text-[13px] text-ink-soft">Pour continuer, recopiez exactement la phrase suivante :</p>

@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  LayoutGrid, Receipt, Wallet, ShieldCheck, LineChart, TrendingUp, Landmark, Handshake, ScrollText, LogOut, ArrowLeft, Users, Settings, Archive,
+  LayoutGrid, Receipt, Wallet, ShieldCheck, LineChart, TrendingUp, Landmark, Banknote, Handshake, ScrollText, LogOut, ArrowLeft, Users, Settings, Archive,
 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import { useDataStore } from "../../store/dataStore";
@@ -10,6 +10,7 @@ import { ROLES_ACCES_TOTAL } from "../../lib/modules";
 import { calculerBadges } from "../../lib/nouveautes";
 
 const NAV = [
+  { to: "/depense/caisse", label: "Caisse", icon: Banknote },
   { to: "/depense", label: "Tableau de bord", icon: LayoutGrid, end: true },
   { to: "/depense/depenses", label: "Dépenses", icon: Receipt, badgeKey: "depenseDepenses" },
   { to: "/depense/recettes", label: "Recette et Budget", icon: Wallet, badgeKey: "depenseRecettes" },

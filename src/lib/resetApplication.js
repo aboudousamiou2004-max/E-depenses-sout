@@ -18,7 +18,7 @@ import { supabase } from "./supabaseClient";
 
 export const TABLES_A_REINITIALISER = [
   // ── E-DÉPENSES ──────────────────────────────────────────────────────────
-  "depenses", "recettes", "budgets", "categories_depense", "banque_mouvements",
+  "depenses", "recettes", "budgets", "categories_depense", "banque_mouvements", "caisse_mouvements",
   "partenaires", "besoins",
   // ── Journal & notifications (tous modules) ─────────────────────────────
   "journal", "notifications", "push_subscriptions",

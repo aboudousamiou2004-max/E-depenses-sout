@@ -18,6 +18,7 @@ import Analyses from "./pages/Analyses";
 import Rentabilite from "./pages/Rentabilite";
 import Flux from "./pages/Flux";
 import Banque from "./pages/Banque";
+import Caisse from "./pages/Caisse";
 import Partenaires from "./pages/Partenaires";
 import Journal from "./pages/Journal";
 import Archives from "./pages/Archives";
@@ -123,6 +124,7 @@ export default function App() {
           <Route path="rentabilite" element={<Rentabilite />} />
           <Route path="flux" element={<Flux />} />
           <Route path="banque" element={<Banque />} />
+          <Route path="caisse" element={<Caisse />} />
           <Route path="partenaires" element={<Partenaires />} />
           <Route path="journal" element={<Journal />} />
           <Route path="archives" element={<Archives />} />
