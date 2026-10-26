@@ -30,8 +30,6 @@ const CATEGORIES_CAISSE = [
   "Carburant", "Transport", "Restauration", "Fournitures de bureau", "Communication", "Eau et électricité",
   "Entretien et réparation", "Salaires et main d'oeuvre", "Frais de mission", "Santé", "Impôts et taxes", "Imprévus", "Divers",
 ];
-const PALETTE_CATEGORIES = ["#FF9F0A", "#0A84FF", "#30D158", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A", "#5E5CE6"];
-const couleurCategorie = (nom) => PALETTE_CATEGORIES[[...nom].reduce((t, c) => t + c.charCodeAt(0), 0) % PALETTE_CATEGORIES.length];
 
 const TYPES = {
   sortie: { couleur: "#FF453A", foncee: "#d9362c", icone: HandCoins, titre: "Dépense", sous: "L'argent sort de la caisse", bouton: "Enregistrer la dépense" },
@@ -120,6 +118,7 @@ export default function Caisse() {
   const peutSupprimer = peutSupprimerRole(user?.role);
 
   const [modal, setModal] = useState(null); // { data, id }
+  const [detailId, setDetailId] = useState(null);
   const [toDelete, setToDelete] = useState(null);
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -168,17 +167,6 @@ export default function Caisse() {
 
   const totalEntrees = affiches.filter((m) => m.type === "entree").reduce((s, m) => s + m.montant, 0);
   const totalSorties = affiches.filter((m) => m.type === "sortie").reduce((s, m) => s + m.montant, 0);
-
-  const parCategorie = useMemo(() => {
-    const map = new Map();
-    for (const m of horsFiltreCategorie) {
-      if (m.type !== "sortie") continue;
-      const cle = m.categorie || SANS_CATEGORIE;
-      map.set(cle, (map.get(cle) || 0) + m.montant);
-    }
-    return [...map.entries()].map(([id, total]) => ({ id, total })).sort((a, b) => b.total - a.total);
-  }, [horsFiltreCategorie]);
-  const maxCategorie = Math.max(1, ...parCategorie.map((c) => c.total));
 
   // Propositions de catégorie dans le formulaire : liste de base + catégories déjà utilisées,
   // réduites à ce que l'utilisateur tape (sauf si le texte est déjà une proposition exacte).
@@ -264,6 +252,7 @@ export default function Caisse() {
   }
 
   const affichageInverse = [...affiches].reverse();
+  const detail = detailId ? avecSolde.find((m) => m.id === detailId) || null : null;
   const etatVide = (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
       <Icone3D icon={Banknote} color={ACCENT} size={64} flotte />
@@ -283,51 +272,6 @@ export default function Caisse() {
           <StatTile compact icone3d icon={Banknote} label="Reste en caisse" value={fmtFCFA(soldeActuel)} tone={soldeActuel < 0 ? "#FF453A" : ACCENT} />
         </div>
       </div>
-
-      {parCategorie.length > 0 && (
-        <GlassCard className="p-5 mb-5" hover={false}>
-          <div className="flex items-center gap-3 mb-4">
-            <Icone3D icon={Tag} color="#5E5CE6" size={34} />
-            <div className="min-w-0">
-              <h3 className="font-bold tracking-tight text-ink">Dépenses de la caisse par catégorie</h3>
-              <p className="text-[11px] text-ink-soft">Touchez une catégorie pour ne voir que ses dépenses</p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {parCategorie.map((p, i) => {
-              const couleur = p.id === SANS_CATEGORIE ? "#8E8E93" : couleurCategorie(p.id);
-              const actif = filtreCategorie === p.id;
-              return (
-                <motion.button
-                  type="button"
-                  key={p.id}
-                  whileTap={{ scale: 0.985 }}
-                  onClick={() => setFiltreCategorie(actif ? "" : p.id)}
-                  className={`rounded-2xl px-3 py-2 text-left transition-colors ${actif ? "bg-black/[0.06]" : "hover:bg-black/[0.03]"}`}
-                >
-                  <div className="flex items-center justify-between gap-3 text-[12.5px] mb-1.5">
-                    <span className="flex min-w-0 items-center gap-2 font-semibold text-ink">
-                      <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: couleur, boxShadow: `0 0 0 3px ${couleur}26` }} />
-                      <span className="truncate">{p.id === SANS_CATEGORIE ? "Sans catégorie" : p.id}</span>
-                      {actif && <Check size={13} strokeWidth={3} className="shrink-0 text-ink-soft" />}
-                    </span>
-                    <span className="shrink-0 tabular font-bold text-ink">{fmtFCFA(p.total)}</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-black/[0.06] overflow-hidden">
-                    <motion.div
-                      className="h-full rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${(p.total / maxCategorie) * 100}%` }}
-                      transition={{ duration: 0.8, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }}
-                      style={{ background: `linear-gradient(90deg, ${couleur}, ${couleur}bb)`, boxShadow: `0 0 10px ${couleur}66` }}
-                    />
-                  </div>
-                </motion.button>
-              );
-            })}
-          </div>
-        </GlassCard>
-      )}
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
@@ -370,7 +314,8 @@ export default function Caisse() {
                   initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
-                  className="glass rounded-3xl p-4"
+                  onClick={() => setDetailId(m.id)}
+                  className="glass cursor-pointer rounded-3xl p-4 transition-shadow hover:shadow-lg active:scale-[0.99]"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: `${t.couleur}1a`, color: t.couleur }}>
@@ -393,7 +338,7 @@ export default function Caisse() {
                         <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><UserRound size={10} />{m.beneficiaire}</span>
                       )}
                       {m.piece && (
-                        <button type="button" onClick={() => ouvrirPiece(m.piece)} className="inline-flex items-center gap-1 rounded-full bg-[#FF9F0A]/15 px-2.5 py-1 text-[11px] font-bold text-[#a8630a] active:scale-95">
+                        <button type="button" onClick={(e) => { e.stopPropagation(); ouvrirPiece(m.piece); }} className="inline-flex items-center gap-1 rounded-full bg-[#FF9F0A]/15 px-2.5 py-1 text-[11px] font-bold text-[#a8630a] active:scale-95">
                           <Paperclip size={10} />Justificatif
                         </button>
                       )}
@@ -405,8 +350,8 @@ export default function Caisse() {
                     </p>
                     {(peutModifier || peutSupprimer) && (
                       <div className="flex gap-1">
-                        {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={() => ouvrirEdition(m)} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={16} /></motion.button>}
-                        {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={() => setToDelete(m)} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={16} /></motion.button>}
+                        {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirEdition(m); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={16} /></motion.button>}
+                        {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setToDelete(m); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={16} /></motion.button>}
                       </div>
                     )}
                   </div>
@@ -441,7 +386,8 @@ export default function Caisse() {
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(i, 10) * 0.03, duration: 0.3 }}
-                    className="text-[13.5px] hover:bg-white/50 transition-colors"
+                    onClick={() => setDetailId(m.id)}
+                    className="cursor-pointer text-[13.5px] hover:bg-white/50 transition-colors"
                   >
                     <td className="px-4 py-2.5 tabular text-ink-soft whitespace-nowrap">{new Date(m.date).toLocaleDateString("fr-FR")}</td>
                     <td className="px-4 py-2.5">
@@ -453,7 +399,7 @@ export default function Caisse() {
                           <p className="flex items-center gap-1.5 font-semibold text-ink">
                             {m.libelle || "—"}
                             {m.piece && (
-                              <button type="button" onClick={() => ouvrirPiece(m.piece)} title={`Voir le justificatif : ${m.piece.nom}`} className="rounded-md p-0.5 text-[#FF9F0A] hover:bg-[#FF9F0A]/15">
+                              <button type="button" onClick={(e) => { e.stopPropagation(); ouvrirPiece(m.piece); }} title={`Voir le justificatif : ${m.piece.nom}`} className="rounded-md p-0.5 text-[#FF9F0A] hover:bg-[#FF9F0A]/15">
                                 <Paperclip size={13} strokeWidth={2.4} />
                               </button>
                             )}
@@ -469,8 +415,8 @@ export default function Caisse() {
                     <td className="px-4 py-2.5">
                       {(peutModifier || peutSupprimer) && (
                         <div className="flex justify-end gap-1">
-                          {peutModifier && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={() => ouvrirEdition(m)} title="Modifier" className="rounded-lg p-1.5 text-ink-soft hover:bg-black/[0.05] hover:text-ink"><Pencil size={14} /></motion.button>}
-                          {peutSupprimer && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={() => setToDelete(m)} title="Supprimer" className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></motion.button>}
+                          {peutModifier && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); ouvrirEdition(m); }} title="Modifier" className="rounded-lg p-1.5 text-ink-soft hover:bg-black/[0.05] hover:text-ink"><Pencil size={14} /></motion.button>}
+                          {peutSupprimer && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); setToDelete(m); }} title="Supprimer" className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></motion.button>}
                         </div>
                       )}
                     </td>
@@ -698,6 +644,70 @@ export default function Caisse() {
             </AnimatePresence>
           </form>
         )}
+      </Modal>
+
+      <Modal
+        open={!!detail}
+        onClose={() => setDetailId(null)}
+        title={detail ? (detail.libelle || (detail.type === "entree" ? "Dotation" : "Dépense")) : ""}
+        moduleLabel={detail ? `${TYPES[detail.type].titre} de caisse` : "Caisse courante"}
+        iconNode={detail && <Icone3D icon={TYPES[detail.type].icone} color={TYPES[detail.type].couleur} size={46} flotte />}
+        accent={ACCENT}
+        feuille
+        footerCollant
+        footer={detail && (
+          <>
+            <Button variant="ghost" onClick={() => setDetailId(null)}>Fermer</Button>
+            {peutSupprimer && <Button variant="ghost" icon={Trash2} className="text-[#FF453A]" onClick={() => { setToDelete(detail); setDetailId(null); }}>Supprimer</Button>}
+            {peutModifier && <Button icon={Pencil} onClick={() => { ouvrirEdition(detail); setDetailId(null); }}>Modifier</Button>}
+          </>
+        )}
+      >
+        {detail && (() => {
+          const t = TYPES[detail.type];
+          const lignes = [
+            { icone: CalendarDays, label: "Date", valeur: new Date(detail.date).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) },
+            detail.type === "sortie" && { icone: Tag, label: "Catégorie", valeur: detail.categorie || "Sans catégorie" },
+            { icone: UserRound, label: detail.type === "sortie" ? "Bénéficiaire" : "Versé par", valeur: detail.beneficiaire || "Non renseigné" },
+            { icone: Banknote, label: "Reste en caisse après ce mouvement", valeur: fmtFCFA(detail.solde), alerte: detail.solde < 0 },
+          ].filter(Boolean);
+          return (
+            <div>
+              <div className="mb-4 rounded-3xl p-4 text-center" style={{ background: `${t.couleur}14` }}>
+                <p className="text-[11.5px] font-bold uppercase tracking-wide" style={{ color: t.foncee }}>{t.titre}</p>
+                <p className="tabular text-[28px] font-extrabold leading-tight" style={{ color: t.foncee }}>
+                  {detail.type === "entree" ? "+" : "-"}{fmtFCFA(detail.montant)}
+                </p>
+              </div>
+              <div className="flex flex-col gap-2.5">
+                {lignes.map((l) => (
+                  <div key={l.label} className="glass flex items-center gap-3 rounded-2xl px-3.5 py-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[0.05] text-ink-soft"><l.icone size={16} strokeWidth={2.2} /></span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold text-ink-soft">{l.label}</p>
+                      <p className={`break-words text-[14px] font-bold ${l.alerte ? "text-[#b3241b]" : "text-ink"}`}>{l.valeur}</p>
+                    </div>
+                  </div>
+                ))}
+                {detail.piece && (
+                  <button type="button" onClick={() => ouvrirPiece(detail.piece)} className="glass flex items-center gap-3 rounded-2xl p-2.5 text-left transition-transform active:scale-[0.99]">
+                    {detail.piece.type.startsWith("image/") ? (
+                      <img src={detail.piece.dataURL} alt="" className="h-16 w-16 shrink-0 rounded-xl object-cover" />
+                    ) : (
+                      <Icone3D icon={FileText} color="#FF453A" size={44} />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-semibold text-ink-soft">Justificatif</p>
+                      <p className="truncate text-[13px] font-bold text-ink">{detail.piece.nom}</p>
+                      <p className="text-[11px] text-ink-soft">{formatTaille(detail.piece.taille)}</p>
+                    </div>
+                    <span className="flex shrink-0 items-center gap-1.5 rounded-xl bg-black/[0.05] px-3 py-2 text-[12px] font-bold text-ink"><Eye size={15} />Voir</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
       </Modal>
 
       <ConfirmSuppressionModal
