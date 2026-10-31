@@ -27,7 +27,10 @@ function darkenHex(hex, factor) {
 // AGRO/Cheptel, généralisé à toute l'application — à la demande de
 // l'utilisateur (2026-08-18). Les contrôles (recherche, période, secteur,
 // notifications) restent sur leur propre rangée en dessous.
-export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF" }) {
+//
+// `action` (optionnel) : un bouton affiché à droite dans le bandeau (ex. export
+// Excel de la Caisse). Les autres pages ne le passent pas et sont inchangées.
+export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF", action }) {
   const { secteurs } = useDataStore();
   const { secteurFiltre, setSecteurFiltre, recherche, setRecherche } = useUIStore();
   const gradient = `linear-gradient(135deg, ${accent}d9 0%, ${darkenHex(accent, 0.58)}cc 100%)`;
@@ -54,6 +57,7 @@ export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF"
           <h1 className="text-lg sm:text-xl font-extrabold drop-shadow truncate">{title}</h1>
           {subtitle && <p className="text-[13px] text-white/90 mt-0.5">{subtitle}</p>}
         </div>
+        {action && <div className="ml-auto shrink-0">{action}</div>}
       </div>
 
       <div className="flex items-center gap-3 flex-wrap justify-between mt-3">
