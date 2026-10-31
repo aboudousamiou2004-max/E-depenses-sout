@@ -133,6 +133,13 @@ const mapMouvementCaisse = (r) => ({
   piece: pieceFromColumn(r.piece),
   creeParUid: r.cree_par,
 });
+const mapCompteCaisse = (r) => ({
+  id: r.id,
+  date: r.date,
+  montant: r.montant === null || r.montant === undefined ? null : Number(r.montant), // null = suit le reste en caisse du jour
+  note: r.note || "",
+  creeParUid: r.cree_par,
+});
 const mapPartenaire = (r) => ({ id: r.id, nom: r.nom, type: r.type, contact: r.contact });
 const mapUser = (r) => ({
   uid: r.id,
@@ -165,6 +172,7 @@ export const useDataStore = create((set, get) => ({
   categories: [],
   banque: [],
   caisse: [],
+  caisseComptes: [],
   partenaires: [],
   archives: [],
   vuesVolets: [],
@@ -175,7 +183,7 @@ export const useDataStore = create((set, get) => ({
   // (chacun ne peut de toute façon voir que les siennes, RLS l'impose déjà,
   // mais filtrer ici évite de dépendre de l'ordre des champs retournés).
   chargerTout: async (userId) => {
-    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, banque, partenaires, vuesVolets, caisse] = await Promise.all([
+    const [secteurs, budgets, depenses, recettes, journal, notifications, users, categories, banque, partenaires, vuesVolets, caisse, caisseComptes] = await Promise.all([
       supabase.from("secteurs").select("*").order("created_at"),
       supabase.from("budgets").select("*"),
       supabase.from("depenses").select("*").order("date", { ascending: false }).order("created_at", { ascending: false }),
@@ -192,6 +200,7 @@ export const useDataStore = create((set, get) => ({
         ? supabase.from("vues_volets").select("*").eq("user_id", userId)
         : Promise.resolve({ data: [] }),
       supabase.from("caisse_mouvements").select("*").order("date"),
+      supabase.from("caisse_comptes").select("*").order("date"),
     ]);
     set({
       secteurs: (secteurs.data || []).map(mapSecteur),
@@ -206,6 +215,7 @@ export const useDataStore = create((set, get) => ({
       partenaires: (partenaires.data || []).map(mapPartenaire),
       vuesVolets: (vuesVolets.data || []).map(mapVueVolet),
       caisse: (caisse.data || []).map(mapMouvementCaisse),
+      caisseComptes: (caisseComptes.data || []).map(mapCompteCaisse),
       loaded: true,
     });
   },
@@ -213,7 +223,7 @@ export const useDataStore = create((set, get) => ({
   reset: () =>
     set({
       secteurs: [], budgets: [], depenses: [], recettes: [], journal: [], notifications: [], users: [],
-      categories: [], banque: [], caisse: [], partenaires: [], archives: [], vuesVolets: [], loaded: false,
+      categories: [], banque: [], caisse: [], caisseComptes: [], partenaires: [], archives: [], vuesVolets: [], loaded: false,
     }),
 
   // Marque un volet comme vu par l'utilisateur courant — fait disparaître son
@@ -805,6 +815,10 @@ export const useDataStore = create((set, get) => ({
     const { data } = await supabase.from("caisse_mouvements").select("*").order("date");
     set({ caisse: (data || []).map(mapMouvementCaisse) });
   },
+  chargerCaisseComptes: async () => {
+    const { data } = await supabase.from("caisse_comptes").select("*").order("date");
+    set({ caisseComptes: (data || []).map(mapCompteCaisse) });
+  },
   chargerPartenaires: async () => {
     const { data } = await supabase.from("partenaires").select("*").order("nom");
     set({ partenaires: (data || []).map(mapPartenaire) });
@@ -880,6 +894,34 @@ export const useDataStore = create((set, get) => ({
     if (error) return { ok: false, error: error.message };
     if (!data?.length) return { ok: false, error: "Suppression refusée : réservée à l'administration." };
     await get().chargerCaisse();
+    return { ok: true };
+  },
+
+  // Comptes rendus de la caisse : un par jour. `montant` est null tant que le compte suit le
+  // reste en caisse du jour (il se met alors à jour tout seul quand une dépense change) ;
+  // une valeur saisie à la main le fige.
+  addCompteCaisse: async (payload) => {
+    const { error } = await supabase.from("caisse_comptes").insert({
+      date: payload.date, montant: payload.montant ?? null, note: (payload.note || "").trim(),
+    });
+    if (error) return { ok: false, error: error.code === "23505" ? "Un compte a déjà été effectué pour cette date : modifiez-le plutôt." : error.message };
+    await get().chargerCaisseComptes();
+    return { ok: true };
+  },
+  modifierCompteCaisse: async (id, payload) => {
+    const { data, error } = await supabase.from("caisse_comptes").update({
+      date: payload.date, montant: payload.montant ?? null, note: (payload.note || "").trim(),
+    }).eq("id", id).select("id");
+    if (error) return { ok: false, error: error.code === "23505" ? "Un compte a déjà été effectué pour cette date." : error.message };
+    if (!data?.length) return { ok: false, error: "Modification refusée : vous n'avez pas les droits nécessaires sur ce compte." };
+    await get().chargerCaisseComptes();
+    return { ok: true };
+  },
+  supprimerCompteCaisse: async (id) => {
+    const { data, error } = await supabase.from("caisse_comptes").delete().eq("id", id).select("id");
+    if (error) return { ok: false, error: error.message };
+    if (!data?.length) return { ok: false, error: "Suppression refusée : réservée à l'administration." };
+    await get().chargerCaisseComptes();
     return { ok: true };
   },
 

@@ -4,7 +4,7 @@ import { AnimatePresence, animate, motion } from "framer-motion";
 import {
   Plus, Banknote, ArrowDownCircle, ArrowUpCircle, ArrowUpRight, ArrowDownLeft, ArrowRight, Pencil, Trash2, FileDown, 
   HandCoins, PiggyBank, CalendarDays, Tag, UserRound, PenLine, TriangleAlert, Check, LoaderCircle, Coins, Sparkles,
-  Paperclip, Eye, FileText, Upload, X,
+  Paperclip, Eye, FileText, Upload, X, ClipboardCheck, Undo2,
 } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
@@ -111,7 +111,7 @@ function MessageErreur({ message }) {
 // quand la liste est filtrée par période ou par recherche, pour qu'il reste
 // toujours exact.
 export default function Caisse() {
-  const { caisse, addMouvementCaisse, modifierMouvementCaisse, supprimerMouvementCaisse } = useDataStore();
+  const { caisse, caisseComptes, addMouvementCaisse, modifierMouvementCaisse, supprimerMouvementCaisse, addCompteCaisse, modifierCompteCaisse, supprimerCompteCaisse } = useDataStore();
   const { user } = useAuthStore();
   const { periode, recherche } = useUIStore();
   const peutModifier = peutModifierRole(user?.role);
@@ -119,6 +119,9 @@ export default function Caisse() {
 
   const [modal, setModal] = useState(null); // { data, id }
   const [detailId, setDetailId] = useState(null);
+  const [modalCompte, setModalCompte] = useState(null); // { id, date, montant, auto, note }
+  const [compteASupprimer, setCompteASupprimer] = useState(null);
+  const [voirTousComptes, setVoirTousComptes] = useState(false);
   const [toDelete, setToDelete] = useState(null);
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -252,6 +255,67 @@ export default function Caisse() {
   }
 
   const affichageInverse = [...affiches].reverse();
+
+  // Comptes rendus : le total d'un compte est celui des dépenses de caisse de son jour, recalculé
+  // à chaque affichage, donc il suit toute modification d'une dépense. Seul un montant saisi à la
+  // main (compte « ajusté ») reste figé.
+  const sortiesParJour = useMemo(() => {
+    const map = new Map();
+    for (const m of caisse) {
+      if (m.type !== "sortie") continue;
+      const j = map.get(m.date) || { total: 0, nb: 0, lignes: [] };
+      j.total += m.montant;
+      j.nb += 1;
+      j.lignes.push(m);
+      map.set(m.date, j);
+    }
+    return map;
+  }, [caisse]);
+  const jour = (date) => sortiesParJour.get(date) || { total: 0, nb: 0, lignes: [] };
+  // Reste en caisse à la fin d'un jour : dotations moins dépenses jusqu'à cette date incluse.
+  const resteAu = (date) => caisse.reduce((t, m) => (m.date <= date ? t + (m.type === "entree" ? 1 : -1) * m.montant : t), 0);
+  // Le montant d'un compte est le reste en caisse après les dépenses du jour, sauf s'il a été saisi à la main.
+  const montantCompte = (c) => (c.montant === null ? resteAu(c.date) : c.montant);
+  // Jours où la caisse a payé des dépenses mais sans compte effectué : ils allument le signal du bouton.
+  const joursSansCompte = [...sortiesParJour.keys()].filter((d) => !caisseComptes.some((c) => c.date === d)).length;
+  const comptesTries = useMemo(() => [...caisseComptes].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)), [caisseComptes]);
+  const comptesAffiches = voirTousComptes ? comptesTries : comptesTries.slice(0, 5);
+  const dateLongue = (d) => new Date(d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  function ouvrirCompte(c) {
+    setError("");
+    setModalCompte(c
+      ? { id: c.id, date: c.date, montant: c.montant === null ? "" : String(c.montant), auto: c.montant === null, note: c.note }
+      : { id: null, date: aujourdhui(), montant: "", auto: true, note: "" });
+  }
+  const majCompte = (champ, valeur) => setModalCompte((m) => ({ ...m, [champ]: valeur }));
+  const jourCompte = modalCompte ? jour(modalCompte.date) : null;
+  const resteCompte = modalCompte ? resteAu(modalCompte.date) : 0;
+  const compteExistant = modalCompte ? caisseComptes.find((c) => c.date === modalCompte.date && c.id !== modalCompte.id) : null;
+
+  async function soumettreCompte(e) {
+    e?.preventDefault();
+    const c = modalCompte;
+    if (!c.date) return setError("La date est obligatoire.");
+    if (c.date > aujourdhui()) return setError("La date ne peut pas être dans le futur.");
+    if (compteExistant) return setError("Un compte a déjà été effectué pour cette date : modifiez-le plutôt.");
+    if (!c.auto && (c.montant === "" || !(Number(c.montant) >= 0))) return setError("Saisissez le montant du compte.");
+    setSaving(true);
+    setError("");
+    const payload = { date: c.date, montant: c.auto ? null : Number(c.montant), note: c.note };
+    const res = c.id ? await modifierCompteCaisse(c.id, payload) : await addCompteCaisse(payload);
+    setSaving(false);
+    if (!res.ok) return setError(res.error);
+    setModalCompte(null);
+  }
+
+  async function confirmerSuppressionCompte(motif) {
+    await enregistrerMotifSuppression({
+      user, table: "caisse_comptes", secteurId: null,
+      label: `Compte du ${new Date(compteASupprimer.date).toLocaleDateString("fr-FR")} : ${fmtFCFA(montantCompte(compteASupprimer))}`, motif,
+    });
+    return supprimerCompteCaisse(compteASupprimer.id);
+  }
   const detail = detailId ? avecSolde.find((m) => m.id === detailId) || null : null;
   const etatVide = (
     <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -263,7 +327,22 @@ export default function Caisse() {
 
   return (
     <div>
-      <TopBar title="Caisse" subtitle="Caisse courante : dotations en espèces et dépenses payées par la caisse" icon={Banknote} accent={ACCENT} />
+      <TopBar
+        title="Caisse"
+        subtitle="Caisse courante : dotations en espèces et dépenses payées par la caisse"
+        icon={Banknote}
+        accent={ACCENT}
+        action={
+          <motion.button
+            type="button" onClick={exporterExcel} title="Exporter Excel" aria-label="Exporter Excel"
+            whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.95 }}
+            className="inline-flex items-center gap-2 rounded-2xl bg-white/20 px-3 py-2.5 text-sm font-semibold text-white backdrop-blur transition-colors hover:bg-white/30"
+          >
+            <FileDown size={17} strokeWidth={2.3} />
+            <span className="hidden sm:inline">Exporter Excel</span>
+          </motion.button>
+        }
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 mb-5">
         <StatTile compact icone3d icon={ArrowDownCircle} label="Dotations (affichées)" value={(totalEntrees > 0 ? "+" : "") + fmtFCFA(totalEntrees)} tone="#30D158" />
@@ -272,6 +351,58 @@ export default function Caisse() {
           <StatTile compact icone3d icon={Banknote} label="Reste en caisse" value={fmtFCFA(soldeActuel)} tone={soldeActuel < 0 ? "#FF453A" : ACCENT} />
         </div>
       </div>
+
+      {comptesTries.length > 0 && (
+        <GlassCard className="p-5 mb-5" hover={false}>
+          <div className="mb-3 flex items-center gap-3">
+            <Icone3D icon={ClipboardCheck} color="#5E5CE6" size={34} />
+            <div className="min-w-0 flex-1">
+              <h3 className="font-bold tracking-tight text-ink">Comptes effectués</h3>
+              <p className="text-[11px] text-ink-soft">Le montant est le reste en caisse après les dépenses du jour : il se met à jour si une dépense change.</p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {comptesAffiches.map((c) => {
+              const j = jour(c.date);
+              const ajuste = c.montant !== null;
+              return (
+                <motion.div
+                  key={c.id}
+                  layout
+                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                  onClick={() => peutModifier && ouvrirCompte(c)}
+                  className={`flex items-center gap-3 rounded-2xl border border-[#5E5CE6]/25 bg-[#5E5CE6]/10 px-3.5 py-3 ${peutModifier ? "cursor-pointer transition-colors hover:bg-[#5E5CE6]/18" : ""}`}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13.5px] font-bold text-ink first-letter:uppercase">{dateLongue(c.date)}</p>
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-ink-soft">
+                      <span>{j.nb} dépense{j.nb > 1 ? "s" : ""}</span>
+                      {ajuste && (
+                        <span className="rounded-full bg-[#5E5CE6]/12 px-2 py-0.5 text-[10.5px] font-bold text-[#4b49c8]">
+                          Ajusté{c.montant !== resteAu(c.date) ? ` (reste réel : ${fmtFCFA(resteAu(c.date))})` : ""}
+                        </span>
+                      )}
+                      {c.note && <span className="truncate">{c.note}</span>}
+                    </p>
+                  </div>
+                  <p className="shrink-0 tabular text-[15px] font-extrabold text-ink">{fmtFCFA(montantCompte(c))}</p>
+                  {(peutModifier || peutSupprimer) && (
+                    <div className="flex shrink-0 gap-0.5">
+                      {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={15} /></motion.button>}
+                      {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={15} /></motion.button>}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+          {comptesTries.length > 5 && (
+            <button type="button" onClick={() => setVoirTousComptes((v) => !v)} className="mt-2 w-full rounded-xl py-2 text-[12.5px] font-bold text-[#4b49c8] hover:bg-black/[0.03]">
+              {voirTousComptes ? "Voir moins" : `Voir tous les comptes (${comptesTries.length})`}
+            </button>
+          )}
+        </GlassCard>
+      )}
 
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
@@ -293,9 +424,29 @@ export default function Caisse() {
           </select>
         </label>
         <div className="grid w-full grid-cols-2 gap-2.5 sm:ml-auto sm:flex sm:w-auto">
-          {peutModifier && <Button icon={Plus} onClick={() => ouvrirCreation("sortie")} className="order-first col-span-2 sm:order-last sm:col-span-1">Ajouter une dépense</Button>}
-          {peutModifier && <Button variant="ghost" icon={PiggyBank} onClick={() => ouvrirCreation("entree")}>Ajouter une dotation</Button>}
-          <Button variant="ghost" icon={FileDown} onClick={exporterExcel} >Exporter Excel</Button>
+          {peutModifier && <Button icon={Plus} onClick={() => ouvrirCreation("sortie")} className="order-1 col-span-2 sm:order-4 sm:col-span-1">Ajouter une dépense</Button>}
+          {peutModifier && (
+            <div
+              className="relative order-2 col-span-2 sm:order-3 sm:col-span-1"
+              title={joursSansCompte > 0 ? `${joursSansCompte} jour${joursSansCompte > 1 ? "s" : ""} avec des dépenses sans compte effectué` : undefined}
+            >
+              {joursSansCompte > 0 && (
+                <motion.span
+                  aria-hidden="true"
+                  className="pointer-events-none absolute inset-0 rounded-2xl"
+                  animate={{ boxShadow: ["0 0 0 0 rgba(94,92,230,0.55), 0 0 10px 1px rgba(94,92,230,0.35)", "0 0 0 7px rgba(94,92,230,0), 0 0 22px 5px rgba(94,92,230,0.55)", "0 0 0 0 rgba(94,92,230,0.55), 0 0 10px 1px rgba(94,92,230,0.35)"] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+              <Button variant="ghost" icon={ClipboardCheck} onClick={() => ouvrirCompte(null)} className={`w-full ${joursSansCompte > 0 ? "text-[#4b49c8]" : ""}`}>Compte effectué</Button>
+              {joursSansCompte > 0 && (
+                <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#5E5CE6]/60" />
+                  <span className="relative flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5E5CE6] px-1 text-[10.5px] font-bold text-white shadow-[0_0_10px_rgba(94,92,230,0.8)]">{joursSansCompte}</span>
+                </span>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -315,6 +466,7 @@ export default function Caisse() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
                   onClick={() => setDetailId(m.id)}
+                  style={m.type === "entree" ? { backgroundColor: "rgba(48, 209, 88, 0.13)", borderColor: "rgba(48, 209, 88, 0.3)" } : undefined}
                   className="glass cursor-pointer rounded-3xl p-4 transition-shadow hover:shadow-lg active:scale-[0.99]"
                 >
                   <div className="flex items-start gap-3">
@@ -387,7 +539,7 @@ export default function Caisse() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: Math.min(i, 10) * 0.03, duration: 0.3 }}
                     onClick={() => setDetailId(m.id)}
-                    className="cursor-pointer text-[13.5px] hover:bg-white/50 transition-colors"
+                    className={`cursor-pointer text-[13.5px] transition-colors ${m.type === "entree" ? "bg-[#30D158]/12 hover:bg-[#30D158]/20" : "hover:bg-white/50"}`}
                   >
                     <td className="px-4 py-2.5 tabular text-ink-soft whitespace-nowrap">{new Date(m.date).toLocaleDateString("fr-FR")}</td>
                     <td className="px-4 py-2.5">
@@ -709,6 +861,97 @@ export default function Caisse() {
           );
         })()}
       </Modal>
+
+      <Modal
+        open={!!modalCompte}
+        onClose={() => setModalCompte(null)}
+        title={modalCompte?.id ? "Modifier le compte" : "Compte effectué"}
+        moduleLabel="Caisse courante"
+        iconNode={<Icone3D icon={ClipboardCheck} color="#5E5CE6" size={46} flotte />}
+        accent={ACCENT}
+        feuille
+        footerCollant
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setModalCompte(null)}>Annuler</Button>
+            <BoutonEnregistrer couleur="#5E5CE6" foncee="#4b49c8" saving={saving} onClick={soumettreCompte}>Enregistrer le compte</BoutonEnregistrer>
+          </>
+        }
+      >
+        {modalCompte && (
+          <form onSubmit={soumettreCompte}>
+            <MessageErreur message={error} />
+            <Champ label="Date du compte" icone={CalendarDays} couleur="#5E5CE6" hint="Par défaut aujourd'hui : choisissez une date antérieure pour un compte en retard">
+              <input type="date" max={aujourdhui()} className={CLASSE_CHAMP} value={modalCompte.date} onChange={(e) => majCompte("date", e.target.value)} />
+            </Champ>
+
+            <AnimatePresence initial={false}>
+              {compteExistant && (
+                <motion.p
+                  initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                  className="mb-3 flex items-start gap-1.5 overflow-hidden rounded-xl bg-[#FF9F0A]/12 px-3 py-2 text-[12px] font-medium text-[#a8630a]"
+                >
+                  <TriangleAlert size={14} strokeWidth={2.5} className="mt-px shrink-0" />
+                  Un compte existe déjà à cette date : fermez cette fenêtre et modifiez-le dans « Comptes effectués ».
+                </motion.p>
+              )}
+            </AnimatePresence>
+
+            <div className="glass mb-3.5 rounded-2xl p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[12px] font-semibold text-ink-soft">Dépenses de caisse de ce jour ({jourCompte.nb})</p>
+                <p className="tabular text-[15px] font-extrabold text-ink"><NombreAnime valeur={jourCompte.total} /></p>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3 border-t border-black/[0.06] pt-2">
+                <p className="text-[12px] font-bold text-[#4b49c8]">Reste en caisse après ces dépenses</p>
+                <p className={`tabular text-[15px] font-extrabold ${resteCompte < 0 ? "text-[#b3241b]" : "text-[#4b49c8]"}`}><NombreAnime valeur={resteCompte} /></p>
+              </div>
+              {jourCompte.lignes.length > 0 && (
+                <ul className="mt-2 max-h-32 divide-y divide-black/[0.05] overflow-auto text-[12px]">
+                  {jourCompte.lignes.map((l) => (
+                    <li key={l.id} className="flex items-center justify-between gap-3 py-1.5">
+                      <span className="min-w-0 truncate text-ink-soft">{l.libelle || "Dépense"}{l.categorie ? ` · ${l.categorie}` : ""}</span>
+                      <span className="shrink-0 tabular font-bold text-ink">{fmtFCFA(l.montant)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <Champ label="Montant du compte : reste en caisse (FCFA)" icone={Coins} couleur="#5E5CE6">
+              <input
+                type="number" min="0" inputMode="numeric"
+                className={`${CLASSE_CHAMP} ${SANS_FLECHES} pr-16 font-bold tabular`}
+                value={modalCompte.auto ? resteCompte : modalCompte.montant}
+                onChange={(e) => setModalCompte((m) => ({ ...m, auto: false, montant: e.target.value }))}
+                placeholder="0"
+              />
+              <span className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[11px] font-bold tracking-wide text-ink-soft/70">FCFA</span>
+            </Champ>
+            <div className="-mt-2 mb-3.5 ml-1 text-[11.5px]">
+              {modalCompte.auto ? (
+                <p className="flex items-center gap-1.5 text-ink-soft"><Sparkles size={12} className="text-[#5E5CE6]" />Reprend le reste en caisse après les dépenses du jour et se met à jour si elles changent.</p>
+              ) : (
+                <button type="button" onClick={() => setModalCompte((m) => ({ ...m, auto: true, montant: "" }))} className="inline-flex items-center gap-1.5 font-bold text-[#4b49c8] hover:underline">
+                  <Undo2 size={13} strokeWidth={2.5} />Revenir au reste en caisse
+                </button>
+              )}
+            </div>
+
+            <Champ label="Remarque" icone={PenLine} couleur="#5E5CE6" hint="Facultatif">
+              <input className={CLASSE_CHAMP} value={modalCompte.note} onChange={(e) => majCompte("note", e.target.value)} />
+            </Champ>
+          </form>
+        )}
+      </Modal>
+
+      <ConfirmSuppressionModal
+        open={!!compteASupprimer}
+        titre="Supprimer ce compte ?"
+        description={compteASupprimer ? `Vous allez supprimer le compte du ${new Date(compteASupprimer.date).toLocaleDateString("fr-FR")} de ${fmtFCFA(montantCompte(compteASupprimer))}. Les mouvements de caisse eux-mêmes ne sont pas supprimés.` : ""}
+        onConfirm={confirmerSuppressionCompte}
+        onClose={() => setCompteASupprimer(null)}
+      />
 
       <ConfirmSuppressionModal
         open={!!toDelete}
