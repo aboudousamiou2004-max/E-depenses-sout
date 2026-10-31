@@ -121,7 +121,6 @@ export default function Caisse() {
   const [detailId, setDetailId] = useState(null);
   const [modalCompte, setModalCompte] = useState(null); // { id, date, montant, auto, note }
   const [compteASupprimer, setCompteASupprimer] = useState(null);
-  const [voirTousComptes, setVoirTousComptes] = useState(false);
   const [toDelete, setToDelete] = useState(null);
   const [respecterPeriode, setRespecterPeriode] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -254,7 +253,6 @@ export default function Caisse() {
     XLSX.writeFile(wb, "caisse-courante.xlsx");
   }
 
-  const affichageInverse = [...affiches].reverse();
 
   // Comptes rendus : le total d'un compte est celui des dépenses de caisse de son jour, recalculé
   // à chaque affichage, donc il suit toute modification d'une dépense. Seul un montant saisi à la
@@ -278,9 +276,18 @@ export default function Caisse() {
   const montantCompte = (c) => (c.montant === null ? resteAu(c.date) : c.montant);
   // Jours où la caisse a payé des dépenses mais sans compte effectué : ils allument le signal du bouton.
   const joursSansCompte = [...sortiesParJour.keys()].filter((d) => !caisseComptes.some((c) => c.date === d)).length;
-  const comptesTries = useMemo(() => [...caisseComptes].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)), [caisseComptes]);
-  const comptesAffiches = voirTousComptes ? comptesTries : comptesTries.slice(0, 5);
-  const dateLongue = (d) => new Date(d).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+
+  // Liste affichée : dépenses, dotations et comptes effectués mêlés, du plus récent au plus ancien.
+  // Un compte se place à la fin de son jour. Il disparaît quand un filtre de catégorie est actif.
+  const comptesListe = caisseComptes.filter((c) =>
+    !filtreCategorie
+    && (!respecterPeriode || matchPeriode(c.date, periode))
+    && (!recherche.trim() || `compte effectué ${c.note}`.toLowerCase().includes(recherche.trim().toLowerCase()))
+  );
+  const lignesListe = [
+    ...affiches.map((m) => ({ ...m, rang: 0 })),
+    ...comptesListe.map((c) => ({ kind: "compte", id: `compte-${c.id}`, date: c.date, c, rang: 1 })),
+  ].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.rang - b.rang)).reverse();
 
   function ouvrirCompte(c) {
     setError("");
@@ -352,64 +359,12 @@ export default function Caisse() {
         </div>
       </div>
 
-      {comptesTries.length > 0 && (
-        <GlassCard className="p-5 mb-5" hover={false}>
-          <div className="mb-3 flex items-center gap-3">
-            <Icone3D icon={ClipboardCheck} color="#5E5CE6" size={34} />
-            <div className="min-w-0 flex-1">
-              <h3 className="font-bold tracking-tight text-ink">Comptes effectués</h3>
-              <p className="text-[11px] text-ink-soft">Le montant est le reste en caisse après les dépenses du jour : il se met à jour si une dépense change.</p>
-            </div>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            {comptesAffiches.map((c) => {
-              const j = jour(c.date);
-              const ajuste = c.montant !== null;
-              return (
-                <motion.div
-                  key={c.id}
-                  layout
-                  initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                  onClick={() => peutModifier && ouvrirCompte(c)}
-                  className={`flex items-center gap-3 rounded-2xl border border-[#5E5CE6]/25 bg-[#5E5CE6]/10 px-3.5 py-3 ${peutModifier ? "cursor-pointer transition-colors hover:bg-[#5E5CE6]/18" : ""}`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13.5px] font-bold text-ink first-letter:uppercase">{dateLongue(c.date)}</p>
-                    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-ink-soft">
-                      <span>{j.nb} dépense{j.nb > 1 ? "s" : ""}</span>
-                      {ajuste && (
-                        <span className="rounded-full bg-[#5E5CE6]/12 px-2 py-0.5 text-[10.5px] font-bold text-[#4b49c8]">
-                          Ajusté{c.montant !== resteAu(c.date) ? ` (reste réel : ${fmtFCFA(resteAu(c.date))})` : ""}
-                        </span>
-                      )}
-                      {c.note && <span className="truncate">{c.note}</span>}
-                    </p>
-                  </div>
-                  <p className="shrink-0 tabular text-[15px] font-extrabold text-ink">{fmtFCFA(montantCompte(c))}</p>
-                  {(peutModifier || peutSupprimer) && (
-                    <div className="flex shrink-0 gap-0.5">
-                      {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={15} /></motion.button>}
-                      {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={15} /></motion.button>}
-                    </div>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
-          {comptesTries.length > 5 && (
-            <button type="button" onClick={() => setVoirTousComptes((v) => !v)} className="mt-2 w-full rounded-xl py-2 text-[12.5px] font-bold text-[#4b49c8] hover:bg-black/[0.03]">
-              {voirTousComptes ? "Voir moins" : `Voir tous les comptes (${comptesTries.length})`}
-            </button>
-          )}
-        </GlassCard>
-      )}
-
       <div className="flex items-center gap-3 flex-wrap mb-4">
         <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
           <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#FF9F0A]" />
           Limiter à la période sélectionnée
         </label>
-        <span className="text-[12.5px] text-ink-soft font-medium">{affiches.length} mouvement(s)</span>
+        <span className="text-[12.5px] text-ink-soft font-medium">{affiches.length} mouvement(s){comptesListe.length > 0 ? ` · ${comptesListe.length} compte${comptesListe.length > 1 ? "s" : ""}` : ""}</span>
         <label className="relative flex w-full items-center sm:w-auto">
           <Tag size={14} strokeWidth={2.4} className="pointer-events-none absolute left-3 text-ink-soft/70" />
           <select
@@ -452,11 +407,55 @@ export default function Caisse() {
 
       {/* Mobile et tablette : une carte par mouvement, sans défilement horizontal */}
       <div className="xl:hidden">
-        {affiches.length === 0 ? (
+        {lignesListe.length === 0 ? (
           <GlassCard className="p-4" hover={false}>{etatVide}</GlassCard>
         ) : (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {affichageInverse.map((m, i) => {
+            {lignesListe.map((m, i) => {
+              if (m.kind === "compte") {
+                const c = m.c;
+                const j = jour(c.date);
+                const ajuste = c.montant !== null;
+                return (
+                  <motion.div
+                    key={m.id}
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
+                    onClick={() => peutModifier && ouvrirCompte(c)}
+                    className={`rounded-3xl border border-[#5E5CE6]/30 bg-[#5E5CE6]/10 p-4 backdrop-blur-md ${peutModifier ? "cursor-pointer transition-shadow hover:shadow-lg active:scale-[0.99]" : ""}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6]/15 text-[#4b49c8]">
+                        <ClipboardCheck size={18} strokeWidth={2.4} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-bold leading-snug text-[#3b39a8]">Compte effectué</p>
+                        <p className="mt-0.5 text-[11.5px] text-ink-soft">{new Date(c.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[10px] font-bold uppercase tracking-wide text-[#4b49c8]">Reste en caisse</p>
+                        <p className="text-[15px] font-extrabold tabular text-ink">{fmtFCFA(montantCompte(c))}</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      <span className="inline-flex items-center rounded-full bg-[#5E5CE6]/12 px-2.5 py-1 text-[11px] font-semibold text-[#4b49c8]">{j.nb} dépense{j.nb > 1 ? "s" : ""} ce jour</span>
+                      {ajuste && (
+                        <span className="inline-flex items-center rounded-full bg-[#5E5CE6]/12 px-2.5 py-1 text-[11px] font-bold text-[#4b49c8]">
+                          Ajusté{c.montant !== resteAu(c.date) ? ` (reste réel : ${fmtFCFA(resteAu(c.date))})` : ""}
+                        </span>
+                      )}
+                      {c.note && <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><PenLine size={10} />{c.note}</span>}
+                    </div>
+                    {(peutModifier || peutSupprimer) && (
+                      <div className="mt-3 flex items-center justify-end gap-1 border-t border-[#5E5CE6]/15 pt-2.5">
+                        {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={16} /></motion.button>}
+                        {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={16} /></motion.button>}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              }
               const t = TYPES[m.type];
               const FlecheType = m.type === "entree" ? ArrowDownLeft : ArrowUpRight;
               return (
@@ -529,7 +528,47 @@ export default function Caisse() {
               </tr>
             </thead>
             <tbody>
-              {affichageInverse.map((m, i) => {
+              {lignesListe.map((m, i) => {
+                if (m.kind === "compte") {
+                  const c = m.c;
+                  const j = jour(c.date);
+                  const ajuste = c.montant !== null;
+                  return (
+                    <motion.tr
+                      key={m.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(i, 10) * 0.03, duration: 0.3 }}
+                      onClick={() => peutModifier && ouvrirCompte(c)}
+                      className={`border-y border-[#5E5CE6]/20 bg-[#5E5CE6]/10 text-[13.5px] transition-colors ${peutModifier ? "cursor-pointer hover:bg-[#5E5CE6]/18" : ""}`}
+                    >
+                      <td className="px-4 py-2.5 tabular text-ink-soft whitespace-nowrap">{new Date(c.date).toLocaleDateString("fr-FR")}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6]/15 text-[#4b49c8]"><ClipboardCheck size={16} strokeWidth={2.4} /></span>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-[#3b39a8]">Compte effectué</p>
+                            <p className="text-[11px] text-ink-soft">
+                              {j.nb} dépense{j.nb > 1 ? "s" : ""} ce jour
+                              {ajuste ? ` · ajusté${c.montant !== resteAu(c.date) ? ` (reste réel : ${fmtFCFA(resteAu(c.date))})` : ""}` : ""}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-ink-soft">{c.note || "—"}</td>
+                      <td colSpan={2} className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wide text-[#4b49c8]">Reste en caisse</td>
+                      <td className="px-4 py-2.5 text-right tabular font-extrabold text-ink">{fmtFCFA(montantCompte(c))}</td>
+                      <td className="px-4 py-2.5">
+                        {(peutModifier || peutSupprimer) && (
+                          <div className="flex justify-end gap-1">
+                            {peutModifier && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-lg p-1.5 text-ink-soft hover:bg-black/[0.05] hover:text-ink"><Pencil size={14} /></motion.button>}
+                            {peutSupprimer && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></motion.button>}
+                          </div>
+                        )}
+                      </td>
+                    </motion.tr>
+                  );
+                }
                 const t = TYPES[m.type];
                 const FlecheType = m.type === "entree" ? ArrowDownLeft : ArrowUpRight;
                 return (
@@ -575,7 +614,7 @@ export default function Caisse() {
                   </motion.tr>
                 );
               })}
-              {affiches.length === 0 && (
+              {lignesListe.length === 0 && (
                 <tr>
                   <td colSpan={7} className="py-6">{etatVide}</td>
                 </tr>
