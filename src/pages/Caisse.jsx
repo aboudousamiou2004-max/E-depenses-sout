@@ -16,7 +16,8 @@ import ConfirmSuppressionModal from "../components/ui/ConfirmSuppressionModal";
 import { useDataStore } from "../store/dataStore";
 import { useAuthStore } from "../store/authStore";
 import { useUIStore } from "../store/uiStore";
-import { fmtFCFA, matchPeriode } from "../lib/logic";
+import { fmtFCFA } from "../lib/logic";
+import { finDePeriode, debutDePeriode, bornesPlage, dansFiltre, libelleFiltre } from "../lib/caisseFiltre";
 import { peutModifier as peutModifierRole, peutSupprimer as peutSupprimerRole } from "../lib/modules";
 import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 import { lireFichier, formatTaille, ouvrirPiece } from "../lib/fichiers";
@@ -126,7 +127,11 @@ export default function Caisse() {
   const [modalCompte, setModalCompte] = useState(null); // { id, date, montant, auto, note }
   const [compteASupprimer, setCompteASupprimer] = useState(null);
   const [toDelete, setToDelete] = useState(null);
-  const [respecterPeriode, setRespecterPeriode] = useState(false);
+  // Filtre de dates : « jusqua » = depuis le début jusqu'à la date choisie dans le bandeau (par défaut),
+  // « plage » = entre deux dates, « tout » = tout l'historique.
+  const [mode, setMode] = useState("jusqua");
+  const [du, setDu] = useState("");
+  const [au, setAu] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [lecturePiece, setLecturePiece] = useState(false);
@@ -157,10 +162,13 @@ export default function Caisse() {
     return { avecSolde: lignes, soldeActuel: solde };
   }, [chronologie]);
 
-  // Lignes de la période / recherche, avant le filtre par catégorie (sert au graphique par catégorie).
+  const finBandeau = finDePeriode(periode);
+  const [lo, hi] = bornesPlage(du, au);
+
+  // Lignes du filtre de dates / recherche, avant le filtre par catégorie.
   const horsFiltreCategorie = useMemo(() => {
     let rows = avecSolde;
-    if (respecterPeriode) rows = rows.filter((m) => matchPeriode(m.date, periode));
+    if (mode !== "tout") rows = rows.filter((m) => dansFiltre(m.date, mode, lo, hi, finBandeau));
     if (recherche.trim()) {
       const q = recherche.toLowerCase();
       rows = rows.filter((m) =>
@@ -168,7 +176,7 @@ export default function Caisse() {
       );
     }
     return rows;
-  }, [avecSolde, respecterPeriode, periode, recherche]);
+  }, [avecSolde, mode, lo, hi, finBandeau, recherche]);
 
   const affiches = useMemo(() => {
     if (!filtreCategorie) return horsFiltreCategorie;
@@ -297,11 +305,24 @@ export default function Caisse() {
   // Jours où la caisse a payé des dépenses mais sans compte effectué : ils allument le signal du bouton.
   const joursSansCompte = [...sortiesParJour.keys()].filter((d) => !caisseComptes.some((c) => c.date === d)).length;
 
+  // Reste en caisse affiché : le reste à la fin de la période filtrée (au plus tard aujourd'hui), ou le reste actuel.
+  const finAffichage = mode === "plage" ? (hi || aujourdhui()) : mode === "jusqua" ? (finBandeau < aujourdhui() ? finBandeau : aujourdhui()) : "";
+  const resteAffiche = mode === "tout" ? soldeActuel : resteAu(finAffichage);
+  const texteFiltre = libelleFiltre(mode, lo, hi, finBandeau);
+
+  function choisirMode(nouveau) {
+    if (nouveau === "plage" && !du && !au) {
+      setDu(debutDePeriode(periode));
+      setAu(finBandeau < aujourdhui() ? finBandeau : aujourdhui());
+    }
+    setMode(nouveau);
+  }
+
   // Liste affichée : dépenses, dotations et comptes effectués mêlés, du plus récent au plus ancien.
   // Un compte se place à la fin de son jour. Il disparaît quand un filtre de catégorie est actif.
   const comptesListe = caisseComptes.filter((c) =>
     !filtreCategorie
-    && (!respecterPeriode || matchPeriode(c.date, periode))
+    && dansFiltre(c.date, mode, lo, hi, finBandeau)
     && (!recherche.trim() || `compte effectué ${c.note}`.toLowerCase().includes(recherche.trim().toLowerCase()))
   );
   const lignesListe = [
@@ -359,6 +380,12 @@ export default function Caisse() {
         subtitle="Caisse courante : dotations en espèces et dépenses payées par la caisse"
         icon={Banknote}
         accent={ACCENT}
+        periodeExtras={[
+          { id: "plage", label: "Plage", onClick: () => choisirMode("plage") },
+          { id: "tout", label: "Tous", onClick: () => choisirMode("tout") },
+        ]}
+        periodeExtraActif={mode === "jusqua" ? null : mode}
+        onQuitterPeriodeExtra={() => setMode("jusqua")}
         action={
           <motion.button
             type="button" onClick={exporterExcel} title="Exporter Excel" aria-label="Exporter Excel"
@@ -375,8 +402,34 @@ export default function Caisse() {
         <StatTile compact icone3d icon={ArrowDownCircle} label="Dotations (affichées)" value={(totalEntrees > 0 ? "+" : "") + fmtFCFA(totalEntrees)} tone="#30D158" />
         <StatTile compact icone3d icon={ArrowUpCircle} label="Dépenses (affichées)" value={(totalSorties > 0 ? "-" : "") + fmtFCFA(totalSorties)} tone="#FF453A" />
         <div className="col-span-2 lg:col-span-1">
-          <StatTile compact icone3d icon={Banknote} label="Reste en caisse" value={fmtFCFA(soldeActuel)} tone={soldeActuel < 0 ? "#FF453A" : ACCENT} />
+          <StatTile compact icone3d icon={Banknote} label={mode !== "tout" ? `Reste en caisse au ${new Date(finAffichage).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}` : "Reste en caisse"} value={fmtFCFA(resteAffiche)} tone={resteAffiche < 0 ? "#FF453A" : ACCENT} />
         </div>
+      </div>
+
+      <div className="mb-5">
+        <AnimatePresence initial={false} mode="wait">
+          {mode === "plage" ? (
+            <motion.div key="plage" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className="flex flex-wrap items-end gap-3">
+              <label className="flex min-w-[9.5rem] flex-1 flex-col gap-1 sm:flex-none">
+                <span className="ml-1 text-[11.5px] font-semibold text-ink-soft">Du</span>
+                <input type="date" value={du} max={au || undefined} onChange={(e) => setDu(e.target.value)} className="glass rounded-2xl px-3.5 py-2.5 text-[16px] text-ink outline-none sm:text-[14px]" />
+              </label>
+              <label className="flex min-w-[9.5rem] flex-1 flex-col gap-1 sm:flex-none">
+                <span className="ml-1 text-[11.5px] font-semibold text-ink-soft">Au</span>
+                <input type="date" value={au} min={du || undefined} onChange={(e) => setAu(e.target.value)} className="glass rounded-2xl px-3.5 py-2.5 text-[16px] text-ink outline-none sm:text-[14px]" />
+              </label>
+              {(du || au) && (
+                <button type="button" onClick={() => { setDu(""); setAu(""); }} className="mb-1 inline-flex items-center gap-1 rounded-xl px-2.5 py-2 text-[12px] font-bold text-ink-soft hover:bg-black/[0.05]">
+                  <X size={13} strokeWidth={2.6} />Effacer
+                </button>
+              )}
+            </motion.div>
+          ) : (
+            <motion.p key="texte" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="ml-1 text-[12px] text-ink-soft">
+              {mode === "jusqua" ? `${texteFiltre}, depuis le premier mouvement.` : "Tous les mouvements, sans limite de date."}
+            </motion.p>
+          )}
+        </AnimatePresence>
       </div>
 
       <div className="glass relative mb-5 flex w-full gap-1 rounded-2xl p-1 sm:w-fit">
@@ -399,15 +452,11 @@ export default function Caisse() {
 
       {onglet === "stats" ? (
         <Suspense fallback={<p className="py-10 text-center text-[13px] text-ink-soft">Chargement des statistiques…</p>}>
-          <CaisseStats mouvements={avecSolde} chronologie={chronologie} />
+          <CaisseStats mouvements={avecSolde} chronologie={chronologie} filtre={{ mode, lo, hi, finBandeau, libelle: texteFiltre }} />
         </Suspense>
       ) : (
         <>
         <div className="flex items-center gap-3 flex-wrap mb-4">
-          <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
-            <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#FF9F0A]" />
-            Limiter à la période sélectionnée
-          </label>
           <span className="text-[12.5px] text-ink-soft font-medium">{affiches.length} mouvement(s){comptesListe.length > 0 ? ` · ${comptesListe.length} compte${comptesListe.length > 1 ? "s" : ""}` : ""}</span>
           <label className="relative flex w-full items-center sm:w-auto">
             <Tag size={14} strokeWidth={2.4} className="pointer-events-none absolute left-3 text-ink-soft/70" />

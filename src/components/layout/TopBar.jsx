@@ -29,8 +29,10 @@ function darkenHex(hex, factor) {
 // notifications) restent sur leur propre rangée en dessous.
 //
 // `action` (optionnel) : un bouton affiché à droite dans le bandeau (ex. export
-// Excel de la Caisse). Les autres pages ne le passent pas et sont inchangées.
-export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF", action }) {
+// Excel de la Caisse). `periodeExtras`, `periodeExtraActif` et `onQuitterPeriodeExtra`
+// ajoutent des boutons au sélecteur de période (voir PeriodeFilter). Les autres pages
+// ne passent rien de tout cela et sont inchangées.
+export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF", action, periodeExtras, periodeExtraActif, onQuitterPeriodeExtra }) {
   const { secteurs } = useDataStore();
   const { secteurFiltre, setSecteurFiltre, recherche, setRecherche } = useUIStore();
   const gradient = `linear-gradient(135deg, ${accent}d9 0%, ${darkenHex(accent, 0.58)}cc 100%)`;
@@ -72,7 +74,7 @@ export default function TopBar({ title, subtitle, icon: Icon, accent = "#0A84FF"
         </div>
 
         <div className="flex items-center gap-3 flex-wrap flex-1 justify-end">
-          <PeriodeFilter />
+          <PeriodeFilter extras={periodeExtras} extraActif={periodeExtraActif} onQuitterExtra={onQuitterPeriodeExtra} />
           <select
             value={secteurFiltre}
             onChange={(e) => setSecteurFiltre(e.target.value)}
