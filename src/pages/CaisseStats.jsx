@@ -8,28 +8,13 @@ import GlassCard from "../components/ui/GlassCard";
 import StatTile from "../components/ui/StatTile";
 import Icone3D from "../components/ui/Icone3D";
 import { fmtFCFA } from "../lib/logic";
+import { dansFiltre } from "../lib/caisseFiltre";
 
 const ACCENT = "#FF9F0A";
 const VERT = "#30D158";
 const ROUGE = "#FF453A";
 const GRIS = "#8E8E93";
 const PALETTE = ["#FF9F0A", "#0A84FF", "#30D158", "#BF5AF2", "#FF453A", "#64D2FF", "#FFD60A", "#5E5CE6"];
-
-const PLAGES = [
-  { id: "mois", label: "Ce mois" },
-  { id: "3m", label: "3 mois" },
-  { id: "annee", label: "Cette année" },
-  { id: "tout", label: "Tout" },
-];
-
-const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-function debutPlage(id) {
-  const n = new Date();
-  if (id === "mois") return iso(new Date(n.getFullYear(), n.getMonth(), 1));
-  if (id === "3m") return iso(new Date(n.getFullYear(), n.getMonth() - 2, 1));
-  if (id === "annee") return `${n.getFullYear()}-01-01`;
-  return "";
-}
 
 // Valeurs d'axe courtes : 1,2 M, 450 k.
 const court = (v) => {
@@ -64,11 +49,14 @@ function Vide({ texte }) {
 
 // Statistiques de la caisse : tout est calculé à partir des mouvements et de la chronologie
 // (qui tient compte des comptes ajustés), donc les graphiques suivent chaque modification.
-export default function CaisseStats({ mouvements, chronologie }) {
-  const [plage, setPlage] = useState("3m");
-  const debut = debutPlage(plage);
+export default function CaisseStats({ mouvements, chronologie, filtre }) {
+  // Les statistiques suivent le filtre de dates de la page (jusqu'à une date, ou plage) ; on peut élargir à tout l'historique.
+  const { mode, lo, hi, finBandeau, libelle } = filtre;
+  const [portee, setPortee] = useState("filtre");
+  const dansPortee = (date) => portee === "tout" || dansFiltre(date, mode, lo, hi, finBandeau);
 
-  const lignes = useMemo(() => mouvements.filter((m) => !debut || m.date >= debut), [mouvements, debut]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lignes = useMemo(() => mouvements.filter((m) => dansPortee(m.date)), [mouvements, portee, mode, lo, hi, finBandeau]);
   const sorties = useMemo(() => lignes.filter((m) => m.type === "sortie"), [lignes]);
 
   const totalDot = lignes.filter((m) => m.type === "entree").reduce((t, m) => t + m.montant, 0);
@@ -86,8 +74,9 @@ export default function CaisseStats({ mouvements, chronologie }) {
       else solde += (e.m.type === "entree" ? 1 : -1) * e.m.montant;
       parJour.set(e.date, solde);
     }
-    return [...parJour.entries()].filter(([d]) => !debut || d >= debut).map(([date, reste]) => ({ date, label: jourCourt(date), reste }));
-  }, [chronologie, debut]);
+    return [...parJour.entries()].filter(([d]) => dansPortee(d)).map(([date, reste]) => ({ date, label: jourCourt(date), reste }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chronologie, portee, mode, lo, hi, finBandeau]);
 
   const parMois = useMemo(() => {
     const map = new Map();
@@ -128,12 +117,12 @@ export default function CaisseStats({ mouvements, chronologie }) {
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="mr-1 flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft"><CalendarDays size={14} />Période</span>
         <div className="glass relative flex rounded-2xl p-1">
-          {PLAGES.map((p) => (
+          {(mode === "tout" ? [{ id: "filtre", label: "Tout l'historique" }] : [{ id: "filtre", label: libelle }, { id: "tout", label: "Tout l'historique" }]).map((p) => (
             <button
-              key={p.id} type="button" onClick={() => setPlage(p.id)}
-              className={`relative rounded-xl px-3 py-1.5 text-[12.5px] font-bold transition-colors ${plage === p.id ? "text-white" : "text-ink-soft hover:text-ink"}`}
+              key={p.id} type="button" onClick={() => setPortee(p.id)}
+              className={`relative rounded-xl px-3 py-1.5 text-[12.5px] font-bold transition-colors ${portee === p.id ? "text-white" : "text-ink-soft hover:text-ink"}`}
             >
-              {plage === p.id && (
+              {portee === p.id && (
                 <motion.span layoutId="caisse-stats-plage" className="absolute inset-0 rounded-xl" style={{ background: `linear-gradient(135deg, ${ACCENT}, #d98200)` }} transition={{ type: "spring", stiffness: 420, damping: 32 }} />
               )}
               <span className="relative">{p.label}</span>
@@ -150,7 +139,7 @@ export default function CaisseStats({ mouvements, chronologie }) {
       </div>
 
       {lignes.length === 0 ? (
-        <GlassCard className="p-6" hover={false}><Vide texte="Aucun mouvement de caisse sur cette période." /></GlassCard>
+        <GlassCard className="p-6" hover={false}><Vide texte="Aucun mouvement de caisse sur cette période. Changez le filtre de dates ou choisissez « Tout l'historique »." /></GlassCard>
       ) : (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <CarteGraphique icone={TrendingUp} couleur={ACCENT} titre="Évolution du reste en caisse" sousTitre="Solde en fin de chaque jour avec mouvement" className="lg:col-span-2">

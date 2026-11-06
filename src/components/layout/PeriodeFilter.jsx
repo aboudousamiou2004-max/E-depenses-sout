@@ -6,12 +6,28 @@ const MOIS = ["Janv.", "Févr.", "Mars", "Avr.", "Mai", "Juin", "Juil.", "Août"
 // tableaux de bord sectoriels — bascule tous les KPI/graphiques qui en
 // dépendent entre une vue "mois entier" (comportement historique) et une
 // vue "un seul jour".
-export default function PeriodeFilter() {
+//
+// Options pour les pages qui en ont besoin (ex. Caisse), absentes par défaut :
+// - `extras` : boutons supplémentaires après « Jour », ex. « Plage », « Tous » ({ id, label, onClick }) ;
+// - `extraActif` : id du bouton supplémentaire actif (Mois/Jour sont alors désactivés et les sélecteurs masqués) ;
+// - `onQuitterExtra` : appelé quand on reclique sur Mois ou Jour pour sortir d'un bouton supplémentaire.
+export default function PeriodeFilter({ extras = [], extraActif = null, onQuitterExtra }) {
   const { periode, setPeriode } = useUIStore();
-  const modeJour = !!periode.jour;
+  const modeJour = !!periode.jour && !extraActif;
 
+  // Hors bouton supplémentaire, Mois et Jour se comportent comme avant (ils basculent l'un vers l'autre).
   function toggleMode() {
     setPeriode({ jour: modeJour ? null : new Date(periode.annee, periode.mois, 1).getDate() });
+  }
+  function choisirMois() {
+    if (!extraActif) return toggleMode();
+    onQuitterExtra?.();
+    setPeriode({ jour: null });
+  }
+  function choisirJour() {
+    if (!extraActif) return toggleMode();
+    onQuitterExtra?.();
+    setPeriode({ jour: new Date(periode.annee, periode.mois, 1).getDate() });
   }
 
   function onMoisChange(e) {
@@ -34,19 +50,28 @@ export default function PeriodeFilter() {
   return (
     <div className="glass rounded-2xl p-1 flex items-center gap-1 flex-wrap max-w-full">
       <button
-        onClick={toggleMode}
-        className={`px-2.5 py-1.5 rounded-xl text-[12px] font-semibold transition-colors ${!modeJour ? "bg-white/80 text-ink shadow-sm" : "text-ink-soft"}`}
+        onClick={choisirMois}
+        className={`px-2.5 py-1.5 rounded-xl text-[12px] font-semibold transition-colors ${!modeJour && !extraActif ? "bg-white/80 text-ink shadow-sm" : "text-ink-soft"}`}
       >
         Mois
       </button>
       <button
-        onClick={toggleMode}
+        onClick={choisirJour}
         className={`px-2.5 py-1.5 rounded-xl text-[12px] font-semibold transition-colors ${modeJour ? "bg-white/80 text-ink shadow-sm" : "text-ink-soft"}`}
       >
         Jour
       </button>
-      <div className="w-px h-5 bg-black/10 mx-0.5" />
-      {modeJour ? (
+      {extras.map((e) => (
+        <button
+          key={e.id}
+          onClick={e.onClick}
+          className={`px-2.5 py-1.5 rounded-xl text-[12px] font-semibold transition-colors ${extraActif === e.id ? "bg-white/80 text-ink shadow-sm" : "text-ink-soft"}`}
+        >
+          {e.label}
+        </button>
+      ))}
+      {!extraActif && <div className="w-px h-5 bg-black/10 mx-0.5" />}
+      {extraActif ? null : modeJour ? (
         <input
           type="date"
           value={dateValue}
