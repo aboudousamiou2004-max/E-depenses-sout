@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { AnimatePresence, animate, motion } from "framer-motion";
 import {
   Plus, Banknote, ArrowDownCircle, ArrowUpCircle, ArrowUpRight, ArrowDownLeft, ArrowRight, Pencil, Trash2, FileDown, 
   HandCoins, PiggyBank, CalendarDays, Tag, UserRound, PenLine, TriangleAlert, Check, LoaderCircle, Coins, Sparkles,
-  Paperclip, Eye, FileText, Upload, X, ClipboardCheck, Undo2,
+  Paperclip, Eye, FileText, Upload, X, ClipboardCheck, Undo2, List, ChartColumn,
 } from "lucide-react";
 import TopBar from "../components/layout/TopBar";
 import GlassCard from "../components/ui/GlassCard";
@@ -20,6 +20,9 @@ import { fmtFCFA, matchPeriode } from "../lib/logic";
 import { peutModifier as peutModifierRole, peutSupprimer as peutSupprimerRole } from "../lib/modules";
 import { enregistrerMotifSuppression } from "../lib/motifSuppression";
 import { lireFichier, formatTaille, ouvrirPiece } from "../lib/fichiers";
+
+// Les graphiques (recharts) ne se chargent qu'à l'ouverture de l'onglet Statistiques.
+const CaisseStats = lazy(() => import("./CaisseStats"));
 
 const ACCENT = "#FF9F0A";
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
@@ -119,6 +122,7 @@ export default function Caisse() {
 
   const [modal, setModal] = useState(null); // { data, id }
   const [detailId, setDetailId] = useState(null);
+  const [onglet, setOnglet] = useState("mouvements"); // "mouvements" | "stats"
   const [modalCompte, setModalCompte] = useState(null); // { id, date, montant, auto, note }
   const [compteASupprimer, setCompteASupprimer] = useState(null);
   const [toDelete, setToDelete] = useState(null);
@@ -128,19 +132,30 @@ export default function Caisse() {
   const [lecturePiece, setLecturePiece] = useState(false);
   const [filtreCategorie, setFiltreCategorie] = useState(""); // "" = toutes, SANS_CATEGORIE = sans catégorie
 
-  // Historique complet avec reste en caisse après chaque mouvement, du plus ancien au plus récent.
-  // Une éventuelle ancienne ligne « solde d'ouverture » est traitée comme une dotation ordinaire.
-  const avecSolde = useMemo(() => {
-    const rows = [...caisse]
-      .map((m) => (m.ouverture ? { ...m, libelle: "Dotation initiale" } : m))
-      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
-    return rows.reduce((acc, m) => {
-      const precedent = acc.length ? acc[acc.length - 1].solde : 0;
-      return [...acc, { ...m, solde: precedent + (m.type === "entree" ? 1 : -1) * m.montant }];
-    }, []);
-  }, [caisse]);
+  // Chronologie de la caisse : mouvements et comptes « ajustés » (montant saisi à la main) du plus
+  // ancien au plus récent. Un compte ajusté est le reste réellement constaté en fin de journée : le
+  // reste en caisse repart de ce montant, donc il est pris en compte dans le KPI « Reste en caisse »
+  // et dans le solde de tous les mouvements suivants. Un compte qui suit les dépenses (auto) ne
+  // change rien. Une ancienne ligne « solde d'ouverture » est traitée comme une dotation ordinaire.
+  const chronologie = useMemo(() => {
+    const evenements = [
+      ...caisse.map((m) => ({ date: m.date, rang: 0, m: m.ouverture ? { ...m, libelle: "Dotation initiale" } : m })),
+      ...caisseComptes.filter((c) => c.montant !== null).map((c) => ({ date: c.date, rang: 1, c })),
+    ];
+    return evenements.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.rang - b.rang));
+  }, [caisse, caisseComptes]);
 
-  const soldeActuel = avecSolde.length ? avecSolde[avecSolde.length - 1].solde : 0;
+  // Historique complet avec reste en caisse après chaque mouvement, et reste actuel.
+  const { avecSolde, soldeActuel } = useMemo(() => {
+    let solde = 0;
+    const lignes = [];
+    for (const e of chronologie) {
+      if (e.c) { solde = e.c.montant; continue; }
+      solde += (e.m.type === "entree" ? 1 : -1) * e.m.montant;
+      lignes.push({ ...e.m, solde });
+    }
+    return { avecSolde: lignes, soldeActuel: solde };
+  }, [chronologie]);
 
   // Lignes de la période / recherche, avant le filtre par catégorie (sert au graphique par catégorie).
   const horsFiltreCategorie = useMemo(() => {
@@ -270,8 +285,13 @@ export default function Caisse() {
     return map;
   }, [caisse]);
   const jour = (date) => sortiesParJour.get(date) || { total: 0, nb: 0, lignes: [] };
-  // Reste en caisse à la fin d'un jour : dotations moins dépenses jusqu'à cette date incluse.
-  const resteAu = (date) => caisse.reduce((t, m) => (m.date <= date ? t + (m.type === "entree" ? 1 : -1) * m.montant : t), 0);
+  // Reste en caisse à la fin d'un jour : dotations moins dépenses jusqu'à cette date incluse, en repartant
+  // des comptes ajustés. `exclureId` écarte un compte (le « reste réel » d'un compte ajusté se calcule sans lui).
+  const resteAu = (date, exclureId) => chronologie.reduce((t, e) => {
+    if (e.date > date) return t;
+    if (e.c) return e.c.id === exclureId ? t : e.c.montant;
+    return t + (e.m.type === "entree" ? 1 : -1) * e.m.montant;
+  }, 0);
   // Le montant d'un compte est le reste en caisse après les dépenses du jour, sauf s'il a été saisi à la main.
   const montantCompte = (c) => (c.montant === null ? resteAu(c.date) : c.montant);
   // Jours où la caisse a payé des dépenses mais sans compte effectué : ils allument le signal du bouton.
@@ -297,7 +317,7 @@ export default function Caisse() {
   }
   const majCompte = (champ, valeur) => setModalCompte((m) => ({ ...m, [champ]: valeur }));
   const jourCompte = modalCompte ? jour(modalCompte.date) : null;
-  const resteCompte = modalCompte ? resteAu(modalCompte.date) : 0;
+  const resteCompte = modalCompte ? resteAu(modalCompte.date, modalCompte.id) : 0;
   const compteExistant = modalCompte ? caisseComptes.find((c) => c.date === modalCompte.date && c.id !== modalCompte.id) : null;
 
   async function soumettreCompte(e) {
@@ -359,270 +379,296 @@ export default function Caisse() {
         </div>
       </div>
 
-      <div className="flex items-center gap-3 flex-wrap mb-4">
-        <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
-          <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#FF9F0A]" />
-          Limiter à la période sélectionnée
-        </label>
-        <span className="text-[12.5px] text-ink-soft font-medium">{affiches.length} mouvement(s){comptesListe.length > 0 ? ` · ${comptesListe.length} compte${comptesListe.length > 1 ? "s" : ""}` : ""}</span>
-        <label className="relative flex w-full items-center sm:w-auto">
-          <Tag size={14} strokeWidth={2.4} className="pointer-events-none absolute left-3 text-ink-soft/70" />
-          <select
-            value={filtreCategorie}
-            onChange={(e) => setFiltreCategorie(e.target.value)}
-            aria-label="Filtrer par catégorie"
-            className={`glass w-full cursor-pointer rounded-2xl py-2.5 pl-8 pr-3 text-[14px] font-semibold outline-none sm:w-auto ${filtreCategorie ? "text-ink" : "text-ink-soft"}`}
+      <div className="glass relative mb-5 flex w-full gap-1 rounded-2xl p-1 sm:w-fit">
+        {[
+          { id: "mouvements", label: "Mouvements", icone: List },
+          { id: "stats", label: "Statistiques", icone: ChartColumn },
+        ].map((o) => (
+          <button
+            key={o.id} type="button" onClick={() => setOnglet(o.id)}
+            className={`relative flex flex-1 items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-[13.5px] font-bold transition-colors sm:flex-none ${onglet === o.id ? "text-white" : "text-ink-soft hover:text-ink"}`}
           >
-            <option value="">Toutes les catégories</option>
-            {categoriesUtilisees.map((c) => <option key={c} value={c}>{c}</option>)}
-            {existeSansCategorie && <option value={SANS_CATEGORIE}>Sans catégorie</option>}
-          </select>
-        </label>
-        <div className="grid w-full grid-cols-2 gap-2.5 sm:ml-auto sm:flex sm:w-auto">
-          {peutModifier && <Button icon={Plus} onClick={() => ouvrirCreation("sortie")} className="order-1 col-span-2 sm:order-4 sm:col-span-1">Ajouter une dépense</Button>}
-          {peutModifier && (
-            <div
-              className="relative order-2 col-span-2 sm:order-3 sm:col-span-1"
-              title={joursSansCompte > 0 ? `${joursSansCompte} jour${joursSansCompte > 1 ? "s" : ""} avec des dépenses sans compte effectué` : undefined}
+            {onglet === o.id && (
+              <motion.span layoutId="caisse-onglet" className="absolute inset-0 rounded-xl" style={{ background: `linear-gradient(135deg, ${ACCENT}, #d98200)`, boxShadow: `0 8px 20px -6px ${ACCENT}aa` }} transition={{ type: "spring", stiffness: 420, damping: 32 }} />
+            )}
+            <o.icone size={16} strokeWidth={2.4} className="relative" />
+            <span className="relative">{o.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {onglet === "stats" ? (
+        <Suspense fallback={<p className="py-10 text-center text-[13px] text-ink-soft">Chargement des statistiques…</p>}>
+          <CaisseStats mouvements={avecSolde} chronologie={chronologie} />
+        </Suspense>
+      ) : (
+        <>
+        <div className="flex items-center gap-3 flex-wrap mb-4">
+          <label className="flex items-center gap-1.5 text-[12.5px] font-semibold text-ink-soft cursor-pointer">
+            <input type="checkbox" checked={respecterPeriode} onChange={(e) => setRespecterPeriode(e.target.checked)} className="w-4 h-4 rounded accent-[#FF9F0A]" />
+            Limiter à la période sélectionnée
+          </label>
+          <span className="text-[12.5px] text-ink-soft font-medium">{affiches.length} mouvement(s){comptesListe.length > 0 ? ` · ${comptesListe.length} compte${comptesListe.length > 1 ? "s" : ""}` : ""}</span>
+          <label className="relative flex w-full items-center sm:w-auto">
+            <Tag size={14} strokeWidth={2.4} className="pointer-events-none absolute left-3 text-ink-soft/70" />
+            <select
+              value={filtreCategorie}
+              onChange={(e) => setFiltreCategorie(e.target.value)}
+              aria-label="Filtrer par catégorie"
+              className={`glass w-full cursor-pointer rounded-2xl py-2.5 pl-8 pr-3 text-[14px] font-semibold outline-none sm:w-auto ${filtreCategorie ? "text-ink" : "text-ink-soft"}`}
             >
-              {joursSansCompte > 0 && (
-                <motion.span
-                  aria-hidden="true"
-                  className="pointer-events-none absolute inset-0 rounded-2xl"
-                  animate={{ boxShadow: ["0 0 0 0 rgba(94,92,230,0.55), 0 0 10px 1px rgba(94,92,230,0.35)", "0 0 0 7px rgba(94,92,230,0), 0 0 22px 5px rgba(94,92,230,0.55)", "0 0 0 0 rgba(94,92,230,0.55), 0 0 10px 1px rgba(94,92,230,0.35)"] }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                />
-              )}
-              <Button variant="ghost" icon={ClipboardCheck} onClick={() => ouvrirCompte(null)} className={`w-full ${joursSansCompte > 0 ? "text-[#4b49c8]" : ""}`}>Compte effectué</Button>
-              {joursSansCompte > 0 && (
-                <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#5E5CE6]/60" />
-                  <span className="relative flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5E5CE6] px-1 text-[10.5px] font-bold text-white shadow-[0_0_10px_rgba(94,92,230,0.8)]">{joursSansCompte}</span>
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile et tablette : une carte par mouvement, sans défilement horizontal */}
-      <div className="xl:hidden">
-        {lignesListe.length === 0 ? (
-          <GlassCard className="p-4" hover={false}>{etatVide}</GlassCard>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            {lignesListe.map((m, i) => {
-              if (m.kind === "compte") {
-                const c = m.c;
-                const j = jour(c.date);
-                const ajuste = c.montant !== null;
-                return (
-                  <motion.div
-                    key={m.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
-                    onClick={() => peutModifier && ouvrirCompte(c)}
-                    className={`rounded-3xl border border-[#5E5CE6]/30 bg-[#5E5CE6]/10 p-4 backdrop-blur-md ${peutModifier ? "cursor-pointer transition-shadow hover:shadow-lg active:scale-[0.99]" : ""}`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6]/15 text-[#4b49c8]">
-                        <ClipboardCheck size={18} strokeWidth={2.4} />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-bold leading-snug text-[#3b39a8]">Compte effectué</p>
-                        <p className="mt-0.5 text-[11.5px] text-ink-soft">{new Date(c.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}</p>
-                      </div>
-                      <div className="shrink-0 text-right">
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-[#4b49c8]">Reste en caisse</p>
-                        <p className="text-[15px] font-extrabold tabular text-ink">{fmtFCFA(montantCompte(c))}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      <span className="inline-flex items-center rounded-full bg-[#5E5CE6]/12 px-2.5 py-1 text-[11px] font-semibold text-[#4b49c8]">{j.nb} dépense{j.nb > 1 ? "s" : ""} ce jour</span>
-                      {ajuste && (
-                        <span className="inline-flex items-center rounded-full bg-[#5E5CE6]/12 px-2.5 py-1 text-[11px] font-bold text-[#4b49c8]">
-                          Ajusté{c.montant !== resteAu(c.date) ? ` (reste réel : ${fmtFCFA(resteAu(c.date))})` : ""}
-                        </span>
-                      )}
-                      {c.note && <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><PenLine size={10} />{c.note}</span>}
-                    </div>
-                    {(peutModifier || peutSupprimer) && (
-                      <div className="mt-3 flex items-center justify-end gap-1 border-t border-[#5E5CE6]/15 pt-2.5">
-                        {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={16} /></motion.button>}
-                        {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={16} /></motion.button>}
-                      </div>
-                    )}
-                  </motion.div>
-                );
-              }
-              const t = TYPES[m.type];
-              const FlecheType = m.type === "entree" ? ArrowDownLeft : ArrowUpRight;
-              return (
-                <motion.div
-                  key={m.id}
-                  initial={{ opacity: 0, y: 12 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
-                  onClick={() => setDetailId(m.id)}
-                  style={m.type === "entree" ? { backgroundColor: "rgba(48, 209, 88, 0.13)", borderColor: "rgba(48, 209, 88, 0.3)" } : undefined}
-                  className="glass cursor-pointer rounded-3xl p-4 transition-shadow hover:shadow-lg active:scale-[0.99]"
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: `${t.couleur}1a`, color: t.couleur }}>
-                      <FlecheType size={18} strokeWidth={2.6} />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="break-words font-bold leading-snug text-ink">{m.libelle || "—"}</p>
-                      <p className="mt-0.5 text-[11.5px] text-ink-soft">{new Date(m.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}</p>
-                    </div>
-                    <p className="shrink-0 text-right text-[15px] font-extrabold tabular" style={{ color: m.type === "entree" ? "#1a7d34" : "#b3241b" }}>
-                      {m.type === "entree" ? "+" : "-"}{fmtFCFA(m.montant)}
-                    </p>
-                  </div>
-                  {(m.categorie || m.beneficiaire || m.piece) && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {m.categorie && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><Tag size={10} />{m.categorie}</span>
-                      )}
-                      {m.beneficiaire && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><UserRound size={10} />{m.beneficiaire}</span>
-                      )}
-                      {m.piece && (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); ouvrirPiece(m.piece); }} className="inline-flex items-center gap-1 rounded-full bg-[#FF9F0A]/15 px-2.5 py-1 text-[11px] font-bold text-[#a8630a] active:scale-95">
-                          <Paperclip size={10} />Justificatif
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <div className="mt-3 flex items-center justify-between gap-2 border-t border-black/[0.06] pt-2.5">
-                    <p className="text-[11.5px] text-ink-soft">
-                      Solde <span className={`font-extrabold tabular ${m.solde < 0 ? "text-[#b3241b]" : "text-ink"}`}>{fmtFCFA(m.solde)}</span>
-                    </p>
-                    {(peutModifier || peutSupprimer) && (
-                      <div className="flex gap-1">
-                        {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirEdition(m); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={16} /></motion.button>}
-                        {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setToDelete(m); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={16} /></motion.button>}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              );
-            })}
+              <option value="">Toutes les catégories</option>
+              {categoriesUtilisees.map((c) => <option key={c} value={c}>{c}</option>)}
+              {existeSansCategorie && <option value={SANS_CATEGORIE}>Sans catégorie</option>}
+            </select>
+          </label>
+          <div className="grid w-full grid-cols-2 gap-2.5 sm:ml-auto sm:flex sm:w-auto">
+            {peutModifier && <Button icon={Plus} onClick={() => ouvrirCreation("sortie")} className="order-1 col-span-2 sm:order-4 sm:col-span-1">Ajouter une dépense</Button>}
+            {peutModifier && (
+              <div
+                className="relative order-2 col-span-2 sm:order-3 sm:col-span-1"
+                title={joursSansCompte > 0 ? `${joursSansCompte} jour${joursSansCompte > 1 ? "s" : ""} avec des dépenses sans compte effectué` : undefined}
+              >
+                {joursSansCompte > 0 && (
+                  <motion.span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-2xl"
+                    animate={{ boxShadow: ["0 0 0 0 rgba(94,92,230,0.55), 0 0 10px 1px rgba(94,92,230,0.35)", "0 0 0 7px rgba(94,92,230,0), 0 0 22px 5px rgba(94,92,230,0.55)", "0 0 0 0 rgba(94,92,230,0.55), 0 0 10px 1px rgba(94,92,230,0.35)"] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                  />
+                )}
+                <Button variant="ghost" icon={ClipboardCheck} onClick={() => ouvrirCompte(null)} className={`w-full ${joursSansCompte > 0 ? "text-[#4b49c8]" : ""}`}>Compte effectué</Button>
+                {joursSansCompte > 0 && (
+                  <span className="pointer-events-none absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#5E5CE6]/60" />
+                    <span className="relative flex h-5 min-w-5 items-center justify-center rounded-full bg-[#5E5CE6] px-1 text-[10.5px] font-bold text-white shadow-[0_0_10px_rgba(94,92,230,0.8)]">{joursSansCompte}</span>
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
 
-      <GlassCard className="hidden overflow-hidden p-2 xl:block" hover={false}>
-        <div className="max-h-[calc(100vh-340px)] overflow-auto">
-          <table className="w-full min-w-[820px] border-collapse">
-            <thead className="sticky top-0 z-10">
-              <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Libellé</th>
-                <th className="px-4 py-3">Bénéficiaire</th>
-                <th className="px-4 py-3 text-right">Entrée</th>
-                <th className="px-4 py-3 text-right">Sortie</th>
-                <th className="px-4 py-3 text-right">Solde</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
+        {/* Mobile et tablette : une carte par mouvement, sans défilement horizontal */}
+        <div className="xl:hidden">
+          {lignesListe.length === 0 ? (
+            <GlassCard className="p-4" hover={false}>{etatVide}</GlassCard>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {lignesListe.map((m, i) => {
                 if (m.kind === "compte") {
                   const c = m.c;
                   const j = jour(c.date);
                   const ajuste = c.montant !== null;
                   return (
-                    <motion.tr
+                    <motion.div
                       key={m.id}
-                      initial={{ opacity: 0, y: 8 }}
+                      initial={{ opacity: 0, y: 12 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: Math.min(i, 10) * 0.03, duration: 0.3 }}
+                      transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
                       onClick={() => peutModifier && ouvrirCompte(c)}
-                      className={`border-y border-[#5E5CE6]/20 bg-[#5E5CE6]/10 text-[13.5px] transition-colors ${peutModifier ? "cursor-pointer hover:bg-[#5E5CE6]/18" : ""}`}
+                      className={`rounded-3xl border border-[#5E5CE6]/30 bg-[#5E5CE6]/10 p-4 backdrop-blur-md ${peutModifier ? "cursor-pointer transition-shadow hover:shadow-lg active:scale-[0.99]" : ""}`}
                     >
-                      <td className="px-4 py-2.5 tabular text-ink-soft whitespace-nowrap">{new Date(c.date).toLocaleDateString("fr-FR")}</td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-2.5">
-                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6]/15 text-[#4b49c8]"><ClipboardCheck size={16} strokeWidth={2.4} /></span>
-                          <div className="min-w-0">
-                            <p className="font-semibold text-[#3b39a8]">Compte effectué</p>
-                            <p className="text-[11px] text-ink-soft">
-                              {j.nb} dépense{j.nb > 1 ? "s" : ""} ce jour
-                              {ajuste ? ` · ajusté${c.montant !== resteAu(c.date) ? ` (reste réel : ${fmtFCFA(resteAu(c.date))})` : ""}` : ""}
-                            </p>
-                          </div>
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6]/15 text-[#4b49c8]">
+                          <ClipboardCheck size={18} strokeWidth={2.4} />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold leading-snug text-[#3b39a8]">Compte effectué</p>
+                          <p className="mt-0.5 text-[11.5px] text-ink-soft">{new Date(c.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}</p>
                         </div>
-                      </td>
-                      <td className="px-4 py-2.5 text-ink-soft">{c.note || "—"}</td>
-                      <td colSpan={2} className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wide text-[#4b49c8]">Reste en caisse</td>
-                      <td className="px-4 py-2.5 text-right tabular font-extrabold text-ink">{fmtFCFA(montantCompte(c))}</td>
-                      <td className="px-4 py-2.5">
-                        {(peutModifier || peutSupprimer) && (
-                          <div className="flex justify-end gap-1">
-                            {peutModifier && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-lg p-1.5 text-ink-soft hover:bg-black/[0.05] hover:text-ink"><Pencil size={14} /></motion.button>}
-                            {peutSupprimer && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></motion.button>}
-                          </div>
+                        <div className="shrink-0 text-right">
+                          <p className="text-[10px] font-bold uppercase tracking-wide text-[#4b49c8]">Reste en caisse</p>
+                          <p className="text-[15px] font-extrabold tabular text-ink">{fmtFCFA(montantCompte(c))}</p>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center rounded-full bg-[#5E5CE6]/12 px-2.5 py-1 text-[11px] font-semibold text-[#4b49c8]">{j.nb} dépense{j.nb > 1 ? "s" : ""} ce jour</span>
+                        {ajuste && (
+                          <span className="inline-flex items-center rounded-full bg-[#5E5CE6]/12 px-2.5 py-1 text-[11px] font-bold text-[#4b49c8]">
+                            Ajusté{c.montant !== resteAu(c.date, c.id) ? ` (reste calculé : ${fmtFCFA(resteAu(c.date, c.id))})` : ""}
+                          </span>
                         )}
-                      </td>
-                    </motion.tr>
+                        {c.note && <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><PenLine size={10} />{c.note}</span>}
+                      </div>
+                      {(peutModifier || peutSupprimer) && (
+                        <div className="mt-3 flex items-center justify-end gap-1 border-t border-[#5E5CE6]/15 pt-2.5">
+                          {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={16} /></motion.button>}
+                          {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={16} /></motion.button>}
+                        </div>
+                      )}
+                    </motion.div>
                   );
                 }
                 const t = TYPES[m.type];
                 const FlecheType = m.type === "entree" ? ArrowDownLeft : ArrowUpRight;
                 return (
-                  <motion.tr
+                  <motion.div
                     key={m.id}
-                    initial={{ opacity: 0, y: 8 }}
+                    initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: Math.min(i, 10) * 0.03, duration: 0.3 }}
+                    transition={{ delay: Math.min(i, 8) * 0.04, duration: 0.3 }}
                     onClick={() => setDetailId(m.id)}
-                    className={`cursor-pointer text-[13.5px] transition-colors ${m.type === "entree" ? "bg-[#30D158]/12 hover:bg-[#30D158]/20" : "hover:bg-white/50"}`}
+                    style={m.type === "entree" ? { backgroundColor: "rgba(48, 209, 88, 0.13)", borderColor: "rgba(48, 209, 88, 0.3)" } : undefined}
+                    className="glass cursor-pointer rounded-3xl p-4 transition-shadow hover:shadow-lg active:scale-[0.99]"
                   >
-                    <td className="px-4 py-2.5 tabular text-ink-soft whitespace-nowrap">{new Date(m.date).toLocaleDateString("fr-FR")}</td>
-                    <td className="px-4 py-2.5">
-                      <div className="flex items-center gap-2.5">
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: `${t.couleur}1a`, color: t.couleur }}>
-                          <FlecheType size={16} strokeWidth={2.6} />
-                        </span>
-                        <div className="min-w-0">
-                          <p className="flex items-center gap-1.5 font-semibold text-ink">
-                            {m.libelle || "—"}
-                            {m.piece && (
-                              <button type="button" onClick={(e) => { e.stopPropagation(); ouvrirPiece(m.piece); }} title={`Voir le justificatif : ${m.piece.nom}`} className="rounded-md p-0.5 text-[#FF9F0A] hover:bg-[#FF9F0A]/15">
-                                <Paperclip size={13} strokeWidth={2.4} />
-                              </button>
-                            )}
-                          </p>
-                          {m.categorie && <p className="flex items-center gap-1 text-[11px] text-ink-soft"><Tag size={10} />{m.categorie}</p>}
-                        </div>
+                    <div className="flex items-start gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: `${t.couleur}1a`, color: t.couleur }}>
+                        <FlecheType size={18} strokeWidth={2.6} />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-words font-bold leading-snug text-ink">{m.libelle || "—"}</p>
+                        <p className="mt-0.5 text-[11.5px] text-ink-soft">{new Date(m.date).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" })}</p>
                       </div>
-                    </td>
-                    <td className="px-4 py-2.5 text-ink-soft">{m.beneficiaire || "—"}</td>
-                    <td className="px-4 py-2.5 text-right tabular font-bold text-[#1a7d34]">{m.type === "entree" ? "+" + fmtFCFA(m.montant) : ""}</td>
-                    <td className="px-4 py-2.5 text-right tabular font-bold text-[#b3241b]">{m.type === "sortie" ? "-" + fmtFCFA(m.montant) : ""}</td>
-                    <td className={`px-4 py-2.5 text-right tabular font-extrabold ${m.solde < 0 ? "text-[#b3241b]" : "text-ink"}`}>{fmtFCFA(m.solde)}</td>
-                    <td className="px-4 py-2.5">
+                      <p className="shrink-0 text-right text-[15px] font-extrabold tabular" style={{ color: m.type === "entree" ? "#1a7d34" : "#b3241b" }}>
+                        {m.type === "entree" ? "+" : "-"}{fmtFCFA(m.montant)}
+                      </p>
+                    </div>
+                    {(m.categorie || m.beneficiaire || m.piece) && (
+                      <div className="mt-3 flex flex-wrap gap-1.5">
+                        {m.categorie && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><Tag size={10} />{m.categorie}</span>
+                        )}
+                        {m.beneficiaire && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-black/[0.05] px-2.5 py-1 text-[11px] font-semibold text-ink-soft"><UserRound size={10} />{m.beneficiaire}</span>
+                        )}
+                        {m.piece && (
+                          <button type="button" onClick={(e) => { e.stopPropagation(); ouvrirPiece(m.piece); }} className="inline-flex items-center gap-1 rounded-full bg-[#FF9F0A]/15 px-2.5 py-1 text-[11px] font-bold text-[#a8630a] active:scale-95">
+                            <Paperclip size={10} />Justificatif
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    <div className="mt-3 flex items-center justify-between gap-2 border-t border-black/[0.06] pt-2.5">
+                      <p className="text-[11.5px] text-ink-soft">
+                        Solde <span className={`font-extrabold tabular ${m.solde < 0 ? "text-[#b3241b]" : "text-ink"}`}>{fmtFCFA(m.solde)}</span>
+                      </p>
                       {(peutModifier || peutSupprimer) && (
-                        <div className="flex justify-end gap-1">
-                          {peutModifier && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); ouvrirEdition(m); }} title="Modifier" className="rounded-lg p-1.5 text-ink-soft hover:bg-black/[0.05] hover:text-ink"><Pencil size={14} /></motion.button>}
-                          {peutSupprimer && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); setToDelete(m); }} title="Supprimer" className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></motion.button>}
+                        <div className="flex gap-1">
+                          {peutModifier && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); ouvrirEdition(m); }} title="Modifier" className="rounded-xl p-2.5 text-ink-soft hover:bg-black/[0.05]"><Pencil size={16} /></motion.button>}
+                          {peutSupprimer && <motion.button whileTap={{ scale: 0.88 }} onClick={(e) => { e.stopPropagation(); setToDelete(m); }} title="Supprimer" className="rounded-xl p-2.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={16} /></motion.button>}
                         </div>
                       )}
-                    </td>
-                  </motion.tr>
+                    </div>
+                  </motion.div>
                 );
               })}
-              {lignesListe.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-6">{etatVide}</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
-      </GlassCard>
+
+        <GlassCard className="hidden overflow-hidden p-2 xl:block" hover={false}>
+          <div className="max-h-[calc(100vh-340px)] overflow-auto">
+            <table className="w-full min-w-[820px] border-collapse">
+              <thead className="sticky top-0 z-10">
+                <tr className="text-left text-[11.5px] font-bold text-ink-soft uppercase tracking-wide">
+                  <th className="px-4 py-3">Date</th>
+                  <th className="px-4 py-3">Libellé</th>
+                  <th className="px-4 py-3">Bénéficiaire</th>
+                  <th className="px-4 py-3 text-right">Entrée</th>
+                  <th className="px-4 py-3 text-right">Sortie</th>
+                  <th className="px-4 py-3 text-right">Solde</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {lignesListe.map((m, i) => {
+                  if (m.kind === "compte") {
+                    const c = m.c;
+                    const j = jour(c.date);
+                    const ajuste = c.montant !== null;
+                    return (
+                      <motion.tr
+                        key={m.id}
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: Math.min(i, 10) * 0.03, duration: 0.3 }}
+                        onClick={() => peutModifier && ouvrirCompte(c)}
+                        className={`border-y border-[#5E5CE6]/20 bg-[#5E5CE6]/10 text-[13.5px] transition-colors ${peutModifier ? "cursor-pointer hover:bg-[#5E5CE6]/18" : ""}`}
+                      >
+                        <td className="px-4 py-2.5 tabular text-ink-soft whitespace-nowrap">{new Date(c.date).toLocaleDateString("fr-FR")}</td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#5E5CE6]/15 text-[#4b49c8]"><ClipboardCheck size={16} strokeWidth={2.4} /></span>
+                            <div className="min-w-0">
+                              <p className="font-semibold text-[#3b39a8]">Compte effectué</p>
+                              <p className="text-[11px] text-ink-soft">
+                                {j.nb} dépense{j.nb > 1 ? "s" : ""} ce jour
+                                {ajuste ? ` · ajusté${c.montant !== resteAu(c.date, c.id) ? ` (reste calculé : ${fmtFCFA(resteAu(c.date, c.id))})` : ""}` : ""}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-2.5 text-ink-soft">{c.note || "—"}</td>
+                        <td colSpan={2} className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wide text-[#4b49c8]">Reste en caisse</td>
+                        <td className="px-4 py-2.5 text-right tabular font-extrabold text-ink">{fmtFCFA(montantCompte(c))}</td>
+                        <td className="px-4 py-2.5">
+                          {(peutModifier || peutSupprimer) && (
+                            <div className="flex justify-end gap-1">
+                              {peutModifier && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); ouvrirCompte(c); }} title="Modifier" className="rounded-lg p-1.5 text-ink-soft hover:bg-black/[0.05] hover:text-ink"><Pencil size={14} /></motion.button>}
+                              {peutSupprimer && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); setCompteASupprimer(c); }} title="Supprimer" className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></motion.button>}
+                            </div>
+                          )}
+                        </td>
+                      </motion.tr>
+                    );
+                  }
+                  const t = TYPES[m.type];
+                  const FlecheType = m.type === "entree" ? ArrowDownLeft : ArrowUpRight;
+                  return (
+                    <motion.tr
+                      key={m.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(i, 10) * 0.03, duration: 0.3 }}
+                      onClick={() => setDetailId(m.id)}
+                      className={`cursor-pointer text-[13.5px] transition-colors ${m.type === "entree" ? "bg-[#30D158]/12 hover:bg-[#30D158]/20" : "hover:bg-white/50"}`}
+                    >
+                      <td className="px-4 py-2.5 tabular text-ink-soft whitespace-nowrap">{new Date(m.date).toLocaleDateString("fr-FR")}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: `${t.couleur}1a`, color: t.couleur }}>
+                            <FlecheType size={16} strokeWidth={2.6} />
+                          </span>
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1.5 font-semibold text-ink">
+                              {m.libelle || "—"}
+                              {m.piece && (
+                                <button type="button" onClick={(e) => { e.stopPropagation(); ouvrirPiece(m.piece); }} title={`Voir le justificatif : ${m.piece.nom}`} className="rounded-md p-0.5 text-[#FF9F0A] hover:bg-[#FF9F0A]/15">
+                                  <Paperclip size={13} strokeWidth={2.4} />
+                                </button>
+                              )}
+                            </p>
+                            {m.categorie && <p className="flex items-center gap-1 text-[11px] text-ink-soft"><Tag size={10} />{m.categorie}</p>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2.5 text-ink-soft">{m.beneficiaire || "—"}</td>
+                      <td className="px-4 py-2.5 text-right tabular font-bold text-[#1a7d34]">{m.type === "entree" ? "+" + fmtFCFA(m.montant) : ""}</td>
+                      <td className="px-4 py-2.5 text-right tabular font-bold text-[#b3241b]">{m.type === "sortie" ? "-" + fmtFCFA(m.montant) : ""}</td>
+                      <td className={`px-4 py-2.5 text-right tabular font-extrabold ${m.solde < 0 ? "text-[#b3241b]" : "text-ink"}`}>{fmtFCFA(m.solde)}</td>
+                      <td className="px-4 py-2.5">
+                        {(peutModifier || peutSupprimer) && (
+                          <div className="flex justify-end gap-1">
+                            {peutModifier && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); ouvrirEdition(m); }} title="Modifier" className="rounded-lg p-1.5 text-ink-soft hover:bg-black/[0.05] hover:text-ink"><Pencil size={14} /></motion.button>}
+                            {peutSupprimer && <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }} onClick={(e) => { e.stopPropagation(); setToDelete(m); }} title="Supprimer" className="rounded-lg p-1.5 text-[#FF453A] hover:bg-[#FF453A]/10"><Trash2 size={14} /></motion.button>}
+                          </div>
+                        )}
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+                {lignesListe.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-6">{etatVide}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+        </>
+      )}
 
       <Modal
         open={!!modal}
@@ -971,9 +1017,12 @@ export default function Caisse() {
               {modalCompte.auto ? (
                 <p className="flex items-center gap-1.5 text-ink-soft"><Sparkles size={12} className="text-[#5E5CE6]" />Reprend le reste en caisse après les dépenses du jour et se met à jour si elles changent.</p>
               ) : (
-                <button type="button" onClick={() => setModalCompte((m) => ({ ...m, auto: true, montant: "" }))} className="inline-flex items-center gap-1.5 font-bold text-[#4b49c8] hover:underline">
-                  <Undo2 size={13} strokeWidth={2.5} />Revenir au reste en caisse
-                </button>
+                <div className="flex flex-col gap-1.5">
+                  <p className="flex items-start gap-1.5 text-ink-soft"><Sparkles size={12} className="mt-0.5 shrink-0 text-[#5E5CE6]" />Ce montant remplace le reste calculé : le « Reste en caisse » repart de cette valeur à partir de ce jour.</p>
+                  <button type="button" onClick={() => setModalCompte((m) => ({ ...m, auto: true, montant: "" }))} className="inline-flex items-center gap-1.5 self-start font-bold text-[#4b49c8] hover:underline">
+                    <Undo2 size={13} strokeWidth={2.5} />Revenir au reste calculé
+                  </button>
+                </div>
               )}
             </div>
 
