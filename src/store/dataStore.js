@@ -133,6 +133,11 @@ const mapMouvementCaisse = (r) => ({
   piece: pieceFromColumn(r.piece),
   creeParUid: r.cree_par,
 });
+// Message lisible quand la base refuse une écriture de caisse faute de droits (politique RLS).
+const erreurCaisse = (error) =>
+  /row-level security/i.test(error.message || "")
+    ? "Accès refusé : la Caisse est réservée aux comptes administrateurs. Connectez-vous avec un compte autorisé."
+    : error.message;
 const mapCompteCaisse = (r) => ({
   id: r.id,
   date: r.date,
@@ -873,7 +878,7 @@ export const useDataStore = create((set, get) => ({
       beneficiaire: payload.beneficiaire || "", montant: payload.montant,
       piece: pieceToColumn(payload.piece),
     });
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: erreurCaisse(error) };
     await get().chargerCaisse();
     return { ok: true };
   },
@@ -884,7 +889,7 @@ export const useDataStore = create((set, get) => ({
       beneficiaire: payload.beneficiaire || "", montant: payload.montant,
       piece: pieceToColumn(payload.piece),
     }).eq("id", id).select("id");
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: erreurCaisse(error) };
     if (!data?.length) return { ok: false, error: "Modification refusée : vous n'avez pas les droits nécessaires sur ce mouvement." };
     await get().chargerCaisse();
     return { ok: true };
@@ -904,7 +909,7 @@ export const useDataStore = create((set, get) => ({
     const { error } = await supabase.from("caisse_comptes").insert({
       date: payload.date, montant: payload.montant ?? null, note: (payload.note || "").trim(),
     });
-    if (error) return { ok: false, error: error.code === "23505" ? "Un compte a déjà été effectué pour cette date : modifiez-le plutôt." : error.message };
+    if (error) return { ok: false, error: error.code === "23505" ? "Un compte a déjà été effectué pour cette date : modifiez-le plutôt." : erreurCaisse(error) };
     await get().chargerCaisseComptes();
     return { ok: true };
   },
@@ -912,7 +917,7 @@ export const useDataStore = create((set, get) => ({
     const { data, error } = await supabase.from("caisse_comptes").update({
       date: payload.date, montant: payload.montant ?? null, note: (payload.note || "").trim(),
     }).eq("id", id).select("id");
-    if (error) return { ok: false, error: error.code === "23505" ? "Un compte a déjà été effectué pour cette date." : error.message };
+    if (error) return { ok: false, error: error.code === "23505" ? "Un compte a déjà été effectué pour cette date." : erreurCaisse(error) };
     if (!data?.length) return { ok: false, error: "Modification refusée : vous n'avez pas les droits nécessaires sur ce compte." };
     await get().chargerCaisseComptes();
     return { ok: true };
